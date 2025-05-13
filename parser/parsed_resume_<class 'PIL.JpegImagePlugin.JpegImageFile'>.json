@@ -1,0 +1,115 @@
+{
+  "candidate_id": "123",
+  "candidate_name": "Prabha Din",
+  "created_at": "2024-01-01 00:00:00",
+  "updated_at": "2024-01-01 00:00:00",
+  "prefix": null,
+  "full_name": "Prabha Din",
+  "first_name": "Prabha",
+  "middle_name": null,
+  "last_name": "Din",
+  "suffix": null,
+  "city_name": "Ahmedabad",
+  "county_name": null,
+  "state_name": null,
+  "geo_coordinates": null,
+  "postal_code": null,
+  "street_address": null,
+  "telephones": [
+    "(555) 123-4567"
+  ],
+  "email_addresses": [
+    "prabha.din@email.com"
+  ],
+  "web_addresses": [],
+  "work_history": [
+    {
+      "job_title": "Project Manager",
+      "employer": "Programize, Ahmedabad",
+      "location": "Ahmedabad",
+      "employment_type": "Full-time",
+      "naics_code": null,
+      "naics_industry_name": null,
+      "start_date": "2016-01-01",
+      "end_date": null,
+      "summary": "- Developed graphic design projects into well-received brand experiences.\n- Oversaw new designs for 15 different industries, often directing up to 10 designers and web developers while balancing the varying needs of stakeholders.\n- Communicated project options and recommendations to clients in a quick, efficient manner.\n- Ensured design flows and project needs to drive management.\n- Key achievements:\n- Successfully managed complex design/technology management tasks across multiple teams, which led to an average of 15% increase in client satisfaction."
+    },
+    {
+      "job_title": "Graphic Designer",
+      "employer": "Vision Technology, Ahmedabad",
+      "location": "Ahmedabad",
+      "employment_type": "Full-time",
+      "naics_code": null,
+      "naics_industry_name": null,
+      "start_date": "2010-12-01",
+      "end_date": "2015-12-01",
+      "summary": "- Created deployment to various channels, including web and social media for The Medical Clinic of North Texas starting in 2014.\n- Coordinated with copywriters, designers, and managers to deliver creative and engaging content.\n- Enhanced graphic design through strong marketing and communication skills.\n- Key achievements:\n- Increased the social media presence and overall marketing effectiveness of The Medical Clinic of North Texas."
+    }
+  ],
+  "education": [
+    {
+      "level": "Bachelor\u2019s",
+      "degree_type": "Bachelor of Arts",
+      "subject": "Graphic Design",
+      "start_date": "2006-09-01",
+      "end_date": "2010-06-01",
+      "institution": "UC Santa Cruz",
+      "gpa": null,
+      "summary": null
+    }
+  ],
+  "skills": [
+    {
+      "name": "Project Planning",
+      "category": "Project Management",
+      "level": "Expert"
+    },
+    {
+      "name": "Always Learning",
+      "category": "Project Management",
+      "level": "Expert"
+    },
+    {
+      "name": "Project Lifecycle Management",
+      "category": "Project Management",
+      "level": "Expert"
+    },
+    {
+      "name": "Budget",
+      "category": "Project Management",
+      "level": "Expert"
+    },
+    {
+      "name": "Time Management",
+      "category": "Project Management",
+      "level": "Expert"
+    },
+    {
+      "name": "Modern Journey",
+      "category": "Design",
+      "level": "Expert"
+    },
+    {
+      "name": "Communication",
+      "category": "Design",
+      "level": "Expert"
+    },
+    {
+      "name": "Graphic Design",
+      "category": "Design",
+      "level": "Expert"
+    }
+  ],
+  "certifications": [
+    {
+      "certification": "Project Management Professional",
+      "certification_group": null,
+      "certification_family": null,
+      "issued_by": "PMI",
+      "issue_date": null,
+      "expiry_date": null,
+      "cert_id": null,
+      "url": null
+    }
+  ]
+}

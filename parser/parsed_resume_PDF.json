@@ -1,0 +1,200 @@
+{
+  "candidate_id": "123",
+  "candidate_name": "Charbel Daher",
+  "created_at": "2024-07-08 14:48:31.123000+00:00",
+  "updated_at": "2024-07-08 14:48:31.123000+00:00",
+  "prefix": null,
+  "full_name": "Charbel Daher",
+  "first_name": null,
+  "middle_name": null,
+  "last_name": null,
+  "suffix": null,
+  "city_name": null,
+  "county_name": null,
+  "state_name": null,
+  "geo_coordinates": null,
+  "postal_code": null,
+  "street_address": null,
+  "telephones": [
+    "+96170435237"
+  ],
+  "email_addresses": [
+    "charbeldaher34@gmail.com"
+  ],
+  "web_addresses": [
+    "https://www.linkedin.com/in/charbeldaher34/",
+    "https://github.com/CharbelDaher34"
+  ],
+  "work_history": [
+    {
+      "job_title": "AI Engineer",
+      "employer": "Eurisko",
+      "location": "Adma",
+      "employment_type": "Full-time",
+      "naics_code": null,
+      "naics_industry_name": null,
+      "start_date": "2024-10-01",
+      "end_date": null,
+      "summary": "AI Engineer"
+    },
+    {
+      "job_title": "AI and Computer Vision Internship",
+      "employer": "Inmind.ai",
+      "location": "Mansourieh",
+      "employment_type": "Internship",
+      "naics_code": null,
+      "naics_industry_name": null,
+      "start_date": "2024-07-01",
+      "end_date": "2024-08-01",
+      "summary": "AI and Computer Vision Internship covering machine learning, NLP, NVIDIA Omniverse, deep learning, GIT, docker, mlflow\nFor the final project, I trained yolov7 and created FCN for segmentation from scratch, wrote an Api and dockerize it"
+    },
+    {
+      "job_title": "AI and Data Analytics Academy",
+      "employer": "Eurisko",
+      "location": "Adma",
+      "employment_type": "Full-time",
+      "naics_code": null,
+      "naics_industry_name": null,
+      "start_date": "2024-07-01",
+      "end_date": "2024-08-01",
+      "summary": "Data analysis, machine learning, nlp, mlops, project lifecycle, agile\nFor the final project, I created a recipe recommendation app with an api and dockerize it"
+    },
+    {
+      "job_title": "AI Content Creator Internship",
+      "employer": "Inatco",
+      "location": "Ideideh",
+      "employment_type": "Full-time",
+      "naics_code": null,
+      "naics_industry_name": null,
+      "start_date": "2023-11-01",
+      "end_date": "2024-01-01",
+      "summary": "I completed Microsoft AI-900 and AI-102 courses, focusing on Azure AI fundamentals and solutions, while also developing and ensuring high-quality AI courses, content"
+    }
+  ],
+  "education": [
+    {
+      "level": "Bachelor\u2019s",
+      "degree_type": "Bachelors in Computer and telecommunication Engineering",
+      "subject": "Computer and telecommunication Engineering",
+      "start_date": "2025-01-01",
+      "end_date": null,
+      "institution": "Lebanese University - Faculty of Engineering II",
+      "gpa": null,
+      "summary": null
+    }
+  ],
+  "skills": [
+    {
+      "name": "Python",
+      "category": "Programming Language",
+      "level": "Intermediate"
+    },
+    {
+      "name": "Pytorch",
+      "category": "Programming Language",
+      "level": "Intermediate"
+    },
+    {
+      "name": "Tensorflow",
+      "category": "Programming Language",
+      "level": "Intermediate"
+    },
+    {
+      "name": "Docker",
+      "category": "Tools",
+      "level": "Intermediate"
+    },
+    {
+      "name": "FastApi",
+      "category": "Framework",
+      "level": "Intermediate"
+    },
+    {
+      "name": "Django",
+      "category": "Framework",
+      "level": "Intermediate"
+    },
+    {
+      "name": "Flask",
+      "category": "Framework",
+      "level": "Intermediate"
+    },
+    {
+      "name": "Kafka",
+      "category": "Tools",
+      "level": "Intermediate"
+    },
+    {
+      "name": "Elastic",
+      "category": "Tools",
+      "level": "Intermediate"
+    },
+    {
+      "name": "C++",
+      "category": "Programming Language",
+      "level": "Intermediate"
+    },
+    {
+      "name": "Agile methodology",
+      "category": "Methodology",
+      "level": "Intermediate"
+    },
+    {
+      "name": "Recommender systems",
+      "category": "Other",
+      "level": "Intermediate"
+    }
+  ],
+  "certifications": [
+    {
+      "certification": "IBM Full Stack Software Developer",
+      "certification_group": null,
+      "certification_family": null,
+      "issued_by": null,
+      "issue_date": "2023-10-01",
+      "expiry_date": null,
+      "cert_id": null,
+      "url": null
+    },
+    {
+      "certification": "Zaka.ai artificial intelligence bootcamp",
+      "certification_group": null,
+      "certification_family": null,
+      "issued_by": null,
+      "issue_date": "2023-08-01",
+      "expiry_date": null,
+      "cert_id": null,
+      "url": null
+    },
+    {
+      "certification": "Applied Data Science with Python Specialization offered by the University of Michigan",
+      "certification_group": null,
+      "certification_family": null,
+      "issued_by": null,
+      "issue_date": "2022-05-01",
+      "expiry_date": null,
+      "cert_id": null,
+      "url": null
+    },
+    {
+      "certification": "Deep Learning Specialization by DeepLearning.AI",
+      "certification_group": null,
+      "certification_family": null,
+      "issued_by": null,
+      "issue_date": "2022-09-01",
+      "expiry_date": null,
+      "cert_id": null,
+      "url": null
+    },
+    {
+      "certification": "DeepLearning.AI TensorFlow Developer Specialization",
+      "certification_group": null,
+      "certification_family": null,
+      "issued_by": null,
+      "issue_date": "2022-10-01",
+      "expiry_date": null,
+      "cert_id": null,
+      "url": null
+    }
+  ]
+}
