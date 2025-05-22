@@ -1,15 +1,17 @@
 from typing import Optional, List, Dict
-from sqlmodel import SQLModel, Field, Relationship
+from sqlmodel import SQLModel, Field, Relationship, Column, Text
+from sqlalchemy import Boolean, JSON
 from datetime import datetime
 
 
 class Company(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True, unique=True)
+    description: Optional[str] = Field(default=None, sa_column=Column(Text))
     industry: Optional[str] = None
     bio: Optional[str] = None
     website: Optional[str] = None
-    is_claimed: bool = Field(default=False)
+    is_owner: bool = Field(default=False, sa_column=Column(Boolean),description="Whether the company is created by the owner or by the recruiter")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -27,7 +29,6 @@ class HR(SQLModel, table=True):
     full_name: str
     company_id: int = Field(foreign_key="company.id")
     role: str  # 'owner', 'hr', 'recruiter'
-    is_owner: bool = Field(default=False)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -62,8 +63,8 @@ class Job(SQLModel, table=True):
     occupation_code: str
     employer_id: int = Field(foreign_key="company.id")
     recruited_to_id: Optional[int] = Field(foreign_key="company.id")
-    education_requirements: Optional[dict] = None  # could be structured
-    skills: Optional[List[str]] = None
+    education_requirements: Optional[Dict] = Field(default=None, sa_column=Column(JSON))
+    skills: Optional[list[str]] = Field(default=None, sa_column=Column(JSON))
     experience_min: Optional[float] = None
     experience_max: Optional[float] = None
     salary_min: Optional[float] = None
@@ -71,13 +72,13 @@ class Job(SQLModel, table=True):
     salary_period: Optional[str] = None
     currency: Optional[str] = None
     remote: Optional[bool] = None
-    locations: Optional[List[str]] = None
+    locations: Optional[list[str]] = Field(default=None, sa_column=Column(JSON))
     date_posted: Optional[datetime] = None
     date_expired: Optional[datetime] = None
     is_internship: Optional[bool] = None
     is_staffing: Optional[bool] = None
     full_time: Optional[bool] = None
-    form_key_ids: Optional[List[int]] = None
+    form_key_ids: Optional[List[int]] = Field(default=None, sa_column=Column(JSON))
     status: str  # 'draft', 'published', 'closed'
     created_by: int = Field(foreign_key="hr.id")
     created_at: datetime = Field(default_factory=datetime.utcnow)
@@ -95,8 +96,8 @@ class Candidate(SQLModel, table=True):
     full_name: str
     email: str
     phone: Optional[str] = None
-    resume_url: Optional[str] = None
-    parsed_resume: Optional[Dict] = None
+    resume_url: Optional[str] = Field(default=None)
+    parsed_resume: Optional[Dict] = Field(default=None, sa_column=Column(JSON))
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     applications: List["Application"] = Relationship(back_populates="candidate")
@@ -107,14 +108,11 @@ class Application(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     candidate_id: int = Field(foreign_key="candidate.id")
     job_id: int = Field(foreign_key="job.id")
-    form_responses: Dict
+    form_responses: Dict = Field(default=None, sa_column=Column(JSON))
     submitted_at: datetime = Field(default_factory=datetime.utcnow)
 
     candidate: Optional["Candidate"] = Relationship(back_populates="applications")
     job: Optional["Job"] = Relationship(back_populates="applications")
-
-
-
 
 
 class Match(SQLModel, table=True):
@@ -122,9 +120,11 @@ class Match(SQLModel, table=True):
     job_id: int = Field(foreign_key="job.id")
     candidate_id: int = Field(foreign_key="candidate.id")
     match_score: float
-    attribute_scores: Dict
-    skills_report: Optional[str] = None
-    narrative_explanation: Optional[str] = None
+    attribute_scores: Dict = Field(default=None, sa_column=Column(JSON))
+    skills_report: Optional[str] = Field(default=None, sa_column=Column(Text))
+    narrative_explanation: Optional[str] = Field(default=None, sa_column=Column(Text))
 
     job: Optional["Job"] = Relationship(back_populates="matches")
     candidate: Optional["Candidate"] = Relationship(back_populates="matches")
+    
+target_metadata = SQLModel.metadata

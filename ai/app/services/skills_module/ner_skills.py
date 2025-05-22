@@ -9,14 +9,36 @@ logger = logging.getLogger(__name__)
 
 class skill_ner:
     # Class variables
+    _nlp = None  # Initialize _nlp
     try:
         _nlp = spacy.load("en_core_web_lg")
-    except Exception as e:
-        
-        spacy.cli.download("en_core_web_lg")
-        _nlp = spacy.load("en_core_web_lg")
-        logger.error(f"Error loading spacy model: {e}")
-        raise e
+        logger.info("Successfully loaded en_core_web_lg model.")
+    except OSError as e_os: # Catch OSError specifically for "model not found" (E050)
+        logger.warning(f"Spacy model 'en_core_web_lg' not found (Original Error: {e_os}). Attempting to download...")
+        try:
+            spacy.cli.download("en_core_web_lg")
+            logger.info("Model 'en_core_web_lg' downloaded. Attempting to load again.")
+            _nlp = spacy.load("en_core_web_lg") # Load after download
+            logger.info("Successfully loaded 'en_core_web_lg' after download.")
+        except SystemExit as se: # spacy.cli.download can cause SystemExit
+            logger.error(f"Spacy download CLI exited with code {se.code}. This may be due to permissions, network issues, or model incompatibility. Model 'en_core_web_lg' may not be loaded.")
+            # Re-raise a comprehensive error indicating failure to load the model
+            raise RuntimeError(f"Failed to initialize spaCy model 'en_core_web_lg'. Download command exited (code: {se.code}). Original OSError: {e_os}") from se
+        except Exception as e_after_download:
+            logger.error(f"Failed to load 'en_core_web_lg' even after download attempt: {e_after_download}")
+            # Propagate this new error, including context from the original OSError
+            raise RuntimeError(f"Failed to initialize spaCy model 'en_core_web_lg' after download attempt. Load error: {e_after_download}. Original OSError: {e_os}") from e_after_download
+    except Exception as e_initial_load:
+        # Catch any other unexpected errors during the initial load
+        logger.error(f"An unexpected error occurred during initial load of 'en_core_web_lg': {e_initial_load}")
+        raise RuntimeError(f"Unexpected error loading spaCy model 'en_core_web_lg': {e_initial_load}") from e_initial_load
+
+    if _nlp is None:
+        # This state indicates a failure to load the model through all attempts.
+        # This should ideally be caught by the exceptions above, but serves as a final check.
+        critical_msg = "CRITICAL: SpaCy model 'en_core_web_lg' could not be loaded and _nlp is None. Application cannot proceed."
+        logger.critical(critical_msg)
+        raise RuntimeError(critical_msg)
     
     _skill_extractor = SkillExtractor(_nlp, SKILL_DB, PhraseMatcher)
 
