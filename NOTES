@@ -1,0 +1,21 @@
+ADD FIELD TO LINK JOB TO THE COMPNAY
+
+
+ADD RECRUITER COMPANIES, TO LINK FOR EACH TALENT AQUISICTION COMPANY THE COMAPNIES IT RECRUIT FOR
+we hace to add a field to the company to link it to the recruiter company
+
+
+nice to have:
+    - one way to initiailzie companies
+
+
+
+
+now start by  creating all the flows where:
+-the company creates a profile
+-start creating form keys
+-creating job forms 
+-candidates applying for the job by filling the form
+- then the matching between candidates and jobs and displaying results to the hr
+
+If anything is unclear tell me and do not assume anything
