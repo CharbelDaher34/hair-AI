@@ -28,7 +28,10 @@ class Company(CompanyBase, TimeBase, table=True):
         sa_relationship_kwargs={"foreign_keys": "Job.employer_id"}
     )
     form_keys: List["FormKey"] = Relationship(back_populates="company")
-    recruiter_links: List["RecruiterCompanyLink"] = Relationship(back_populates="recruiter")
+    recruiter_links: List["RecruiterCompanyLink"] = Relationship(
+        back_populates="recruiter",
+        sa_relationship_kwargs={"foreign_keys": "RecruiterCompanyLink.recruiter_id"}
+    )
     recruited_to_links: List["RecruiterCompanyLink"] = Relationship(
         back_populates="target_company",
         sa_relationship_kwargs={"foreign_keys": "RecruiterCompanyLink.target_company_id"}
