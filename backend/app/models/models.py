@@ -23,7 +23,10 @@ class Company(CompanyBase, TimeBase, table=True):
     is_owner: bool = Field(default=False)
 
     hrs: List["HR"] = Relationship(back_populates="company")
-    jobs: List["Job"] = Relationship(back_populates="employer")
+    jobs: List["Job"] = Relationship(
+        back_populates="employer",
+        sa_relationship_kwargs={"foreign_keys": "Job.employer_id"}
+    )
     form_keys: List["FormKey"] = Relationship(back_populates="company")
     recruiter_links: List["RecruiterCompanyLink"] = Relationship(back_populates="recruiter")
     recruited_to_links: List["RecruiterCompanyLink"] = Relationship(
