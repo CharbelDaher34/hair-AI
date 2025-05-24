@@ -1,7 +1,8 @@
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Union
 from sqlmodel import SQLModel, Field, Relationship, Column, Text
 from sqlalchemy import Boolean, JSON
 from datetime import datetime
+from pydantic import validator
 
 
 class TimeBase(SQLModel):
