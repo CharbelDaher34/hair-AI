@@ -5,7 +5,7 @@ from utils.pydantic_utils import make_optional
 
 
 class CompanyCreate(CompanyBase):
-    pass
+    is_owner: bool = False
 
 @make_optional
 class CompanyUpdate(CompanyBase):
