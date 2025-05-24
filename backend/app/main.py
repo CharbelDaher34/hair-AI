@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 import uvicorn
 import os
 
-from api.v1.endpoints import company, hr, recruiter_company_link, form_key, job, job_form_key_constraint
+from api.v1.endpoints import company, hr, recruiter_company_link, form_key, job, job_form_key_constraint, application, match, candidate
 
 # Get debug mode from environment variable, default to True
 DEBUG_MODE = os.getenv("DEBUG_MODE", "True").lower() == "true"
@@ -76,6 +76,9 @@ app.include_router(recruiter_company_link.router, prefix="/api/v1/recruiter-comp
 app.include_router(form_key.router, prefix="/api/v1/form-keys", tags=["form-keys"])
 app.include_router(job.router, prefix="/api/v1/jobs", tags=["jobs"])
 app.include_router(job_form_key_constraint.router, prefix="/api/v1/job-form-key-constraints", tags=["job-form-key-constraints"])
+app.include_router(application.router, prefix="/api/v1/applications", tags=["applications"])
+app.include_router(match.router, prefix="/api/v1/matches", tags=["matches"])
+app.include_router(candidate.router, prefix="/api/v1/candidates", tags=["candidates"])
 
 @app.get("/")
 async def root():
