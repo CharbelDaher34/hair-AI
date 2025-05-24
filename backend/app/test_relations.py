@@ -159,7 +159,7 @@ def main():
 
     try:
         company_name_to_test = "TestCo" # From test_crud_functions.py
-        company_name_to_test = "TargetLinkCo" # From test_crud_functions.py
+        company_name_to_test = "eurisko" # From test_crud_functions.py
         test_company = get_company_by_name(db, name=company_name_to_test)
 
         if test_company:
