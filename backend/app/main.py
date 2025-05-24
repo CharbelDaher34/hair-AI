@@ -17,6 +17,7 @@ DEBUG_MODE = os.getenv("DEBUG_MODE", "True").lower() == "true"
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup logic
+    create_db_and_tables()
     all_exist, missing_tables = check_db_tables()
     if not all_exist:
         print("Creating database tables...")
@@ -72,10 +73,10 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 # Include routers
 app.include_router(company.router, prefix="/api/v1/companies", tags=["companies"])
 app.include_router(hr.router, prefix="/api/v1/hrs", tags=["hrs"])
-app.include_router(recruiter_company_link.router, prefix="/api/v1/recruiter-company-links", tags=["recruiter-company-links"])
-app.include_router(form_key.router, prefix="/api/v1/form-keys", tags=["form-keys"])
+app.include_router(recruiter_company_link.router, prefix="/api/v1/recruiter_company_links", tags=["recruiter_company_links"])
+app.include_router(form_key.router, prefix="/api/v1/form_keys", tags=["form_keys"])
 app.include_router(job.router, prefix="/api/v1/jobs", tags=["jobs"])
-app.include_router(job_form_key_constraint.router, prefix="/api/v1/job-form-key-constraints", tags=["job-form-key-constraints"])
+app.include_router(job_form_key_constraint.router, prefix="/api/v1/job_form_key_constraints", tags=["job_form_key_constraints"])
 app.include_router(application.router, prefix="/api/v1/applications", tags=["applications"])
 app.include_router(match.router, prefix="/api/v1/matches", tags=["matches"])
 app.include_router(candidate.router, prefix="/api/v1/candidates", tags=["candidates"])
