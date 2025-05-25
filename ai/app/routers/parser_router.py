@@ -5,7 +5,7 @@ from services.llm.entities_models.candidate_pydantic import Candidate
 from utils import create_model_from_schema
 import os
 import json
-from typing import List, Optional, Any, Dict
+from typing import List, Optional, Any, Dict, Union
 import aiofiles
 import tempfile
 import shutil
@@ -56,55 +56,116 @@ async def process_uploaded_files(resume_files: List[UploadFile]) -> tuple[List[s
 
     return processed_file_paths, temp_dir
 
+# @router.post("/parse")
+# async def parse_resume(
+#     resume_texts: Optional[List[str]] = Form(default=None),
+#     resume_files: Optional[List[UploadFile]] = File(default=None),
+#     schema: str = Form(...), # Schema is a required form field (JSON string)
+#     system_prompt: Optional[str] = Form(default=None) # System prompt is an optional form field
+# ):
+#     """
+#     Parse resumes from text, PDF, or image files and return structured candidate data.
+#     """
+#     if not resume_texts and not resume_files:
+#         raise HTTPException(status_code=400, detail="Either resume_texts or resume_files must be provided.")
+    
+#     api_key = os.environ.get("API_KEY")
+#     if not api_key:
+#         raise HTTPException(status_code=500, detail="API_KEY not configured.")
+
+#     # 'schema' is already a string from Form(...)
+#     try:
+#         schema_dict = json.loads(schema)
+#     except Exception as e:
+#         raise HTTPException(status_code=400, detail=f"Schema is not valid JSON: {e}")
+    
+#     schema_model = create_model_from_schema(schema_dict, globals_dict=globals())
+#     if not issubclass(schema_model, BaseModel): # create_model_from_schema should ideally raise or return None on failure
+#         raise HTTPException(status_code=400, detail="Schema must be a valid Pydantic model.")
+#     print(f"Schema model created: {schema_model.__name__}")
+#     print(f"Schema model JSON schema: {schema_model.model_json_schema()}")
+#     llm_parser = LLM(
+#         api_key=api_key,
+#         system_prompt=system_prompt, # Use the system_prompt parameter
+#         result_type=schema_model,
+#     )
+
+#     input_data = []
+#     if resume_texts:
+#         input_data.extend(resume_texts)
+
+#     temp_dir_to_clean = None
+#     try:
+#         if resume_files:
+#             # Pass resume_files (List[UploadFile]) directly to process_uploaded_files
+#             processed_file_paths, temp_dir_to_clean = await process_uploaded_files(resume_files)
+#             input_data.extend(processed_file_paths)
+        
+#         if not input_data: 
+#              raise HTTPException(status_code=400, detail="No data to parse.")
+
+#         result = await llm_parser.parse_async(input_data)
+#         return result
+#     finally:
+#         if temp_dir_to_clean and os.path.exists(temp_dir_to_clean):
+#             shutil.rmtree(temp_dir_to_clean)
+
 @router.post("/parse")
 async def parse_resume(
-    resume_texts: Optional[List[str]] = Form(default=None),
-    resume_files: Optional[List[UploadFile]] = File(default=None),
-    schema: str = Form(...), # Schema is a required form field (JSON string)
-    system_prompt: Optional[str] = Form(default=None) # System prompt is an optional form field
+    inputs: List[Union[str, UploadFile]] = Form(...),
+    schema: str = Form(...),
+    system_prompt: Optional[str] = Form(default=None)
 ):
     """
-    Parse resumes from text, PDF, or image files and return structured candidate data.
+    Parse resumes from ordered list of text strings or files (PDF/images) and return structured candidate data.
     """
-    if not resume_texts and not resume_files:
-        raise HTTPException(status_code=400, detail="Either resume_texts or resume_files must be provided.")
+    if not inputs:
+        raise HTTPException(status_code=400, detail="inputs must be provided.")
     
     api_key = os.environ.get("API_KEY")
     if not api_key:
         raise HTTPException(status_code=500, detail="API_KEY not configured.")
 
-    # 'schema' is already a string from Form(...)
     try:
         schema_dict = json.loads(schema)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Schema is not valid JSON: {e}")
     
     schema_model = create_model_from_schema(schema_dict, globals_dict=globals())
-    if not issubclass(schema_model, BaseModel): # create_model_from_schema should ideally raise or return None on failure
+    if not issubclass(schema_model, BaseModel):
         raise HTTPException(status_code=400, detail="Schema must be a valid Pydantic model.")
-    print(f"Schema model created: {schema_model.__name__}")
-    print(f"Schema model JSON schema: {schema_model.model_json_schema()}")
+    
+    
+    
     llm_parser = LLM(
         api_key=api_key,
-        system_prompt=system_prompt, # Use the system_prompt parameter
+        system_prompt=system_prompt,
         result_type=schema_model,
     )
 
-    input_data = []
-    if resume_texts:
-        input_data.extend(resume_texts)
-
+    processed_inputs = []
+    files_to_process = []
     temp_dir_to_clean = None
+    
     try:
-        if resume_files:
-            # Pass resume_files (List[UploadFile]) directly to process_uploaded_files
-            processed_file_paths, temp_dir_to_clean = await process_uploaded_files(resume_files)
-            input_data.extend(processed_file_paths)
+        for input_item in inputs:
+            if isinstance(input_item, str):
+                processed_inputs.append(input_item)
+            elif isinstance(input_item, UploadFile):
+                files_to_process.append(input_item)
+                processed_inputs.append(None)  # Placeholder to maintain order
         
-        if not input_data: 
-             raise HTTPException(status_code=400, detail="No data to parse.")
-
-        result = await llm_parser.parse_async(input_data)
+        if files_to_process:
+            processed_file_paths, temp_dir_to_clean = await process_uploaded_files(files_to_process)
+            
+            # Replace placeholders with actual file paths in order
+            file_index = 0
+            for i, item in enumerate(processed_inputs):
+                if item is None:
+                    processed_inputs[i] = processed_file_paths[file_index]
+                    file_index += 1
+        
+        result = await llm_parser.parse_async(processed_inputs)
         return result
     finally:
         if temp_dir_to_clean and os.path.exists(temp_dir_to_clean):
