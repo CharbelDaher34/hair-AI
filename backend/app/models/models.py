@@ -17,11 +17,11 @@ class CompanyBase(SQLModel):
     bio: Optional[str] = None
     website: Optional[str] = None
     logo_url: Optional[str] = None
+    is_owner: bool = Field(default=False)
 
 
 class Company(CompanyBase, TimeBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    is_owner: bool = Field(default=False)
 
     hrs: List["HR"] = Relationship(back_populates="company")
     jobs: List["Job"] = Relationship(
