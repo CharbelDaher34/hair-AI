@@ -69,30 +69,26 @@ def create_model_from_schema(schema: dict, globals_dict: dict) -> type[BaseModel
             if model_reference in enums:
                 return enums[model_reference]
             
-            # If $ref points to something in $defs not yet processed (e.g., due to ordering or forward ref)
-            # and Pydantic can't find it in globals_dict yet.
-            # This block attempts to resolve it if it's an enum. Models are harder here.
             defs = schema.get("$defs", {})
             if model_reference in defs:
                 def_schema_ref = defs[model_reference]
                 if def_schema_ref.get("enum") and model_reference not in enums:
-                    # This enum was defined in $defs but not yet processed by the main $defs loop
-                    # (e.g. if it's referenced before its definition appears in $defs iteration)
-                    # Create it now.
                     enums[model_reference] = create_enum(model_reference, def_schema_ref["enum"], globals_dict)
                     return enums[model_reference]
-            
-            # For $ref to models, Pydantic's create_model handles forward references if the
-            # referenced model name (string) will eventually be in globals().
-            # So, just returning the name string might work if Pydantic resolves it later.
-            # However, for safety, we can try to return Any or raise error.
-            # For now, returning the string name relies on Pydantic's forward ref resolution.
-            # If Pydantic requires the actual type, this might fail for unresolvable forward model refs.
-            # Using Type[model_reference] is not directly possible with create_model
-            # unless model_reference is already a defined type.
-            # A common pattern for Pydantic forward refs is to use the string name of the type.
-            # If models are added to globals_dict by their name, this works.
-            return model_reference # Pydantic will try to resolve this string name from globals
+                if def_schema_ref.get("type") == "object" and model_reference not in models:
+                    # Eagerly create the referenced model if it's an object
+                    def_fields = {}
+                    for prop_name, prop_schema in def_schema_ref.get("properties", {}).items():
+                        field_type = resolve_field_type(field_schema_item=prop_schema, field_name_context=prop_name)
+                        field_params = get_field_params_from_field_schema(field_schema=prop_schema)
+                        def_fields[prop_name] = (field_type, Field(**field_params))
+                    model = create_model(model_reference, **def_fields, __doc__=def_schema_ref.get("description", ""))
+                    models[model_reference] = model
+                    globals_dict[model_reference] = model
+                    return model
+                # If it's not an object or enum, fallback to string name (should be rare)
+            # Fallback: return string name for forward ref (should be rare now)
+            return model_reference
 
         if "enum" in field_schema_item: # Inline enum definition
             explicit_title = field_schema_item.get("title")
@@ -205,5 +201,35 @@ def create_model_from_schema(schema: dict, globals_dict: dict) -> type[BaseModel
 
     main_model = create_model(final_main_model_title, **main_fields, __doc__=schema.get("description", ""))
     globals_dict[final_main_model_title] = main_model # Add/update main model in globals
+
+    # After all models are created and placed in globals_dict,
+    # rebuild them to resolve any forward references.
+    
+    # Collect all dynamically created Pydantic model classes
+    all_pydantic_model_classes_to_rebuild = []
+    # Add models from $defs (stored in the 'models' dictionary)
+    for model_class in models.values():
+        if isinstance(model_class, type) and issubclass(model_class, BaseModel):
+            all_pydantic_model_classes_to_rebuild.append(model_class)
+    
+    # Add the main model itself
+    if isinstance(main_model, type) and issubclass(main_model, BaseModel):
+        # Avoid adding main_model if it's already in the list by reference
+        # (e.g., if main_model was one of the models from $defs, though unlikely for the root model)
+        is_main_model_already_in_list = any(mc is main_model for mc in all_pydantic_model_classes_to_rebuild)
+        if not is_main_model_already_in_list:
+             all_pydantic_model_classes_to_rebuild.append(main_model)
+
+    # Call model_rebuild() on each collected Pydantic model class.
+    # This helps Pydantic resolve all forward references using the types now available
+    # in globals_dict.
+    for p_model_class in all_pydantic_model_classes_to_rebuild:
+        try:
+            p_model_class.model_rebuild()
+        except Exception as e:
+            # Log a warning if a model fails to rebuild, as this might indicate
+            # an unresolvable type or a deeper schema issue.
+            print(f"Warning: Error during model_rebuild for {p_model_class.__name__}: {e}")
+            # Depending on requirements, one might choose to raise an error here.
 
     return main_model
