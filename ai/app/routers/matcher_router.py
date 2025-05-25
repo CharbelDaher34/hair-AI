@@ -10,15 +10,10 @@ from services.matcher.matcher import Matcher
 router = APIRouter()
 matcher_instance = Matcher()
 
-class Candidate(BaseModel):
-    id: str
-    text: str
-    # Add any other candidate specific fields you might have
-    # e.g., name: Optional[str] = None, years_of_experience: Optional[int] = None
 
 class MatchRequest(BaseModel):
     job_description: str = Field(..., example="We are looking for a software engineer with Python and FastAPI experience.")
-    candidates: List[Candidate] = Field(..., example=[{"id": "1", "text": "I am a python developer with 3 years of experience in FastAPI."}])
+    candidates: List[str] = Field(..., example=["I am a python developer with 3 years of experience in FastAPI."])
     skill_weight: Optional[float] = Field(0.4, ge=0, le=1, description="Weight for skill-based similarity, between 0 and 1.")
     embedding_weight: Optional[float] = Field(0.6, ge=0, le=1, description="Weight for embedding-based similarity, between 0 and 1.")
 
@@ -30,7 +25,7 @@ class SkillAnalysisDetail(BaseModel):
     summary: Dict[str, int]
 
 class MatchResult(BaseModel):
-    candidate: Candidate
+    candidate: str
     score: float
     skill_analysis: SkillAnalysisDetail
     embedding_similarity: float
@@ -54,7 +49,7 @@ async def match_candidates_endpoint(request: MatchRequest):
 
     try:
         # Convert Pydantic Candidate models to dicts for the Matcher service
-        candidates_data = [candidate.model_dump() for candidate in request.candidates]
+        candidates_data = request.candidates
         
         matched_results = matcher_instance.match_candidates(
             job_description=request.job_description,
@@ -68,7 +63,7 @@ async def match_candidates_endpoint(request: MatchRequest):
         for res in matched_results:
             # The Matcher service returns candidate as a dict, convert it back to Candidate model
             # Ensure the 'candidate' dict from Matcher output matches the Candidate Pydantic model structure
-            candidate_model = Candidate(**res["candidate"])
+            candidate_model = res["candidate"]
             
             skill_analysis_model = SkillAnalysisDetail(**res["skill_analysis"])
             
@@ -83,7 +78,7 @@ async def match_candidates_endpoint(request: MatchRequest):
         return MatchResponse(results=response_results)
     except Exception as e:
         # Log the exception for debugging
-        # logger.error(f"Error during candidate matching: {e}")
+        logger.error(f"Error during candidate matching: {e}")
         raise HTTPException(status_code=500, detail=f"An error occurred during the matching process: {str(e)}")
 
 # To run this router (example, typically done in a main.py or app.py)

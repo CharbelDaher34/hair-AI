@@ -2,11 +2,12 @@ import numpy as np
 from typing import List, Dict, Tuple
 import sys
 from pathlib import Path
+
 # Add parent directory to path for imports
-project_root = Path(__file__).resolve().parent.parent
+project_root = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from skills_module.ner_skills import skill_ner
+from services.skills_module.ner_skills import skill_ner
 from sentence_transformers import SentenceTransformer
 import logging
 
@@ -59,7 +60,7 @@ class Matcher:
     def match_candidates(
         self,
         job_description: str,
-        candidates: List[Dict[str, str]],
+        candidates: List[str],
         skill_weight: float = 0.4,
         embedding_weight: float = 0.6
     ) -> List[Dict]:
@@ -81,7 +82,7 @@ class Matcher:
         results = []
         
         for candidate in candidates:
-            candidate_text = candidate.get('text', '')
+            candidate_text = candidate
             
             # Get detailed skill analysis
             skill_analysis = self.skills_ner.get_skill_match_details(
@@ -148,31 +149,23 @@ if __name__ == "__main__":
 
     # Example candidates
     candidates = [
-        {
-            "id": "1",
-            "text": """
+        """
             Senior ML Engineer with 8+ years of experience
             - Expert in Python, TensorFlow, and PyTorch
             - Deep Learning and NLP specialist
             - Strong MLOps and cloud experience
             - Docker and Kubernetes expertise
             - Led multiple ML projects from research to production
-            """
-        },
-        {
-            "id": "2",
-            "text": """
+                """,
+        """
             Senior Data Scientist with 7+ years of experience
             - Python and statistical analysis expert
             - Machine Learning and data analysis
             - Basic deep learning knowledge
             - Cloud platform experience
             - Focus on analytics and reporting
-            """
-        },
-        {
-            "id": "3",
-            "text": """
+            """,
+        """
             Senior Software Engineer with 10+ years of experience
             - Java and Spring Boot expert
             - System architecture and design
@@ -180,7 +173,6 @@ if __name__ == "__main__":
             - Basic ML understanding
             - Focus on backend development
             """
-        }
     ]
 
     # Get matches with detailed analysis
@@ -192,7 +184,7 @@ if __name__ == "__main__":
     
     for match in matches:
         candidate = match['candidate']
-        print(f"\nCandidate {candidate['id']}:")
+        print(f"\nCandidate {candidate}:")
         print(f"Final Score: {match['score']:.3f}")
         print(f"Skill Match: {match['skill_analysis']['match_percentage']}%")
         print(f"Embedding Similarity: {match['embedding_similarity']:.3f}")
