@@ -70,59 +70,59 @@ system_prompt = (
     "You are a resume parser. Extract all relevant information from the provided resume and structure it according to the Candidate schema. Follow these guidelines:"
 )
 
-resume_texts = [
-    "John Doe\nEmail: john@example.com\nSkills: Python, FastAPI, Machine Learning",
-    "Jane Smith\nEmail: jane@example.com\nSkills: Java, Docker, AWS"
-]
+# resume_texts = [
+#     "John Doe\nEmail: john@example.com\nSkills: Python, FastAPI, Machine Learning",
+#     "Jane Smith\nEmail: jane@example.com\nSkills: Java, Docker, AWS"
+# ]
 
-files = []
-try:
-    pdf_file = open("/storage/hussein/matching/ai/app/services/llm/Charbel_Daher_Resume.pdf", "rb")
-    files.append(("resume_files", ("sample_resume.pdf", pdf_file, "application/pdf")))
-except FileNotFoundError:
-    print("sample_resume.pdf not found.")
-    pdf_file = None
+# files = []
+# try:
+#     pdf_file = open("/storage/hussein/matching/ai/app/services/llm/Charbel_Daher_Resume.pdf", "rb")
+#     files.append(("resume_files", ("sample_resume.pdf", pdf_file, "application/pdf")))
+# except FileNotFoundError:
+#     print("sample_resume.pdf not found.")
+#     pdf_file = None
 
-image_path = "/storage/hussein/matching/ai/app/services/llm/images.jpeg"
-try:
-    img_file = open(image_path, "rb")
-    files.append(("resume_files", ("sample_resume.png", img_file, "image/png")))
-except FileNotFoundError:
-    print(f"{image_path} not found.")
-    img_file = None
+# image_path = "/storage/hussein/matching/ai/app/services/llm/images.jpeg"
+# try:
+#     img_file = open(image_path, "rb")
+#     files.append(("resume_files", ("sample_resume.png", img_file, "image/png")))
+# except FileNotFoundError:
+#     print(f"{image_path} not found.")
+#     img_file = None
 
-# Prepare multipart data for both lists and fields
-multipart_data = []
-for resume_text in resume_texts:
-    multipart_data.append(("resume_texts", resume_text))
-multipart_data.append(("schema", schema_json))
-multipart_data.append(("system_prompt", system_prompt))
+# # Prepare multipart data for both lists and fields
+# multipart_data = []
+# for resume_text in resume_texts:
+#     multipart_data.append(("resume_texts", resume_text))
+# multipart_data.append(("schema", schema_json))
+# multipart_data.append(("system_prompt", system_prompt))
 
-response = requests.post(url, data=multipart_data, files=files)
-import json
+# response = requests.post(url, data=multipart_data, files=files)
+# import json
 
-# Print the parsed candidates
-print(json.dumps(response.json(), indent=2))
+# # Print the parsed candidates
+# print(json.dumps(response.json(), indent=2))
 
-# Parse single response as Pydantic model
-single_response_json = response.json()
-try:
-    if isinstance(single_response_json, list):
-        parsed_single = [Candidate(**item) if item is not None else None for item in single_response_json]
-    else:
-        parsed_single = Candidate(**single_response_json)
-    print("Parsed single response as Pydantic model(s):", parsed_single)
-except Exception as e:
-    print(f"Error parsing single response as Pydantic model: {e}")
+# # Parse single response as Pydantic model
+# single_response_json = response.json()
+# try:
+#     if isinstance(single_response_json, list):
+#         parsed_single = [Candidate(**item) if item is not None else None for item in single_response_json]
+#     else:
+#         parsed_single = Candidate(**single_response_json)
+#     print("Parsed single response as Pydantic model(s):", parsed_single)
+# except Exception as e:
+#     print(f"Error parsing single response as Pydantic model: {e}")
 
-# Close files
-if pdf_file:
-    pdf_file.close()
-if 'img_file' in locals() and img_file:
-    img_file.close()
+# # Close files
+# if pdf_file:
+#     pdf_file.close()
+# if 'img_file' in locals() and img_file:
+#     img_file.close()
 
-print("Single parse response status:", response.status_code)
-print("Single parse response text:", response.text)
+# print("Single parse response status:", response.status_code)
+# print("Single parse response text:", response.text)
 
 
 # --- Test for /batch_parse endpoint with files ---
