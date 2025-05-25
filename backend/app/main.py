@@ -17,7 +17,7 @@ DEBUG_MODE = os.getenv("DEBUG_MODE", "True").lower() == "true"
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup logic
-    create_db_and_tables()
+ 
     all_exist, missing_tables = check_db_tables()
     if not all_exist:
         print("Creating database tables...")
