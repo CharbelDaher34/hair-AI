@@ -119,11 +119,11 @@ if __name__ == "__main__":
     system_prompt = "Extract structured information from resumes. Focus on contact details, skills, and work experience."
     schema = Candidates
     inputs = [
-        "Charbel daher/ charbeldaher34@gmail.com: Skills: Python, FastAPI, Machine Learning\n\n"
-        "John Doe\njohn.doe@email.com\n(555) 123-4567",
-        # "/storage/hussein/matching/ai/app/services/llm/Charbel_Daher_Resume.pdf",
+        # "Charbel daher/ charbeldaher34@gmail.com: Skills: Python, FastAPI, Machine Learning\n\n"
+        # "John Doe\njohn.doe@email.com\n(555) 123-4567",
+        "/storage/hussein/matching/ai/app/services/llm/Charbel_Daher_Resume.pdf",
         # "Jane Smith\njane.smith@company.com\n(555) 987-6543\nSkills: React, Node.js, TypeScript",
-        # "/storage/hussein/matching/ai/app/services/llm/images.jpeg",
+        "/storage/hussein/matching/ai/app/services/llm/images.jpeg",
         # "Alice Johnson\nalice@example.com\nExpertise: Java, Spring Boot, AWS"
     ]
     client = ResumeParserClient(system_prompt, schema.model_json_schema(), inputs)

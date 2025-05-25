@@ -43,6 +43,25 @@ from crud import (
 
 from core.database import get_session, create_db_and_tables
 
+# Add import for ResumeParserClient
+from services.resume_upload import ResumeParserClient
+
+from pydantic import BaseModel
+from typing import Optional
+# Define the Resume_Data class inheriting from BaseModel
+class Resume_Data(BaseModel):
+    """
+    A Pydantic model to represent basic resume data, 
+    starting with just the name.
+    """
+    name: str
+    # You can add more fields as needed, for example:
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    summary: Optional[str] = None 
+    
+
+
 def run_sequential_crud_tests():
     print("=== Starting Sequential CRUD Tests ===")
     create_db_and_tables()
@@ -159,7 +178,17 @@ def run_sequential_crud_tests():
         # print(f"DELETE JobFormKeyConstraint: ID {deleted_constraint.id}")
 
         # --- 6. Candidate ---
-        print("\\n--- Testing Candidate ---")
+        print("\n--- Testing Candidate ---")
+        # Use ResumeParserClient to parse the candidate's resume text
+        resume_text = candidate_data["full_name"] + "\n" + candidate_data["email"] + "\n" + candidate_data["phone"]
+        pdf="/storage/hussein/matching/ai/app/services/llm/Charbel_Daher_Resume.pdf"
+        system_prompt = "Extract structured information from resumes. Focus on contact details, skills, and work experience."
+        # Use the Candidates schema from resume_upload.py
+        schema = Resume_Data.model_json_schema()
+        parser_client = ResumeParserClient(system_prompt, schema, [pdf])
+        parsed_result = parser_client.parse()
+        # Store the parsed result in parsed_resume field
+        candidate_data["parsed_resume"] = parsed_result
         candidate_in = CandidateCreate(**candidate_data)
         created_candidate = create_candidate(db=db, candidate_in=candidate_in)
         assert created_candidate and created_candidate.email == candidate_data["email"]
