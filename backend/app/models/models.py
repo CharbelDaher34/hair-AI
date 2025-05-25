@@ -158,11 +158,7 @@ class Application(ApplicationBase, TimeBase, table=True):
 
 class MatchBase(SQLModel):
     application_id: int = Field(foreign_key="application.id")
-    match_score: float
-    attribute_scores: Dict = Field(default=None, sa_column=Column(JSON))
-    skills_report: Optional[str] = Field(default=None, sa_column=Column(Text))
-    narrative_explanation: Optional[str] = Field(default=None, sa_column=Column(Text))
-
+    match_result: Dict = Field(default=None, sa_column=Column(JSON))
 
 class Match(MatchBase, TimeBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)

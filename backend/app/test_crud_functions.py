@@ -75,7 +75,7 @@ def run_sequential_crud_tests():
         job_data = {"job_data": {"title": "Software Engineer", "description": "Develop software"}, "status": "open", "form_key_ids": []}
         candidate_data = {"full_name": "Test Candidate", "email": "candidate@example.com", "phone": "1234567890"}
         application_data = {"form_responses": {"experience": "3 years"}}
-        match_data = {"match_score": 0.85, "attribute_scores": {"skills": 0.9}}
+        match_data = {}
         company_data_target = {"name": "TargetLinkCo", "description": "A target company for linking", "is_owner": False}
 
 
@@ -228,19 +228,19 @@ def run_sequential_crud_tests():
         print("\\n--- Testing Match ---")
         match_in_data = {**match_data, "application_id": application_id}
         match_in = MatchCreate(**match_in_data)
-        created_match = create_match(db=db, match_in=match_in)
-        assert created_match and created_match.match_score == match_data["match_score"]
+        created_match, ai_response = create_match(db=db, match_in=match_in)
+        assert created_match and created_match.match_result == ai_response
         print(f"CREATE Match (ID: {created_match.id}) for Application ID: {application_id}")
         match_id = created_match.id
 
         retrieved_match = get_match(db=db, match_id=match_id)
         assert retrieved_match and retrieved_match.id == match_id
-        print(f"READ Match: ID {retrieved_match.id}, Score: {retrieved_match.match_score}")
+        print(f"READ Match: ID {retrieved_match.id}, Score: {retrieved_match.match_result}")
 
-        match_update_data = MatchUpdate(match_score=0.90, narrative_explanation="Excellent fit.")
+        match_update_data = MatchUpdate(match_result=ai_response)
         updated_match = update_match(db=db, db_match=retrieved_match, match_in=match_update_data)
-        assert updated_match and updated_match.match_score == 0.90
-        print(f"UPDATE Match: ID {updated_match.id}, New Score: {updated_match.match_score}")
+        assert updated_match and updated_match.match_result == ai_response
+        print(f"UPDATE Match: ID {updated_match.id}, New Score: {updated_match.match_result}")
 
         # deleted_match = delete_match(db=db, match_id=match_id)
         # assert deleted_match and deleted_match.id == match_id
