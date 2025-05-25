@@ -121,7 +121,7 @@ async def parse_resume(
     """
     if not inputs:
         raise HTTPException(status_code=400, detail="inputs must be provided.")
-    
+    print(inputs)
     api_key = os.environ.get("API_KEY")
     if not api_key:
         raise HTTPException(status_code=500, detail="API_KEY not configured.")
@@ -149,22 +149,27 @@ async def parse_resume(
     
     try:
         for input_item in inputs:
-            if isinstance(input_item, str):
-                processed_inputs.append(input_item)
-            elif isinstance(input_item, UploadFile):
-                files_to_process.append(input_item)
-                processed_inputs.append(None)  # Placeholder to maintain order
+            print(f"input_item: {input_item}, type: {type(input_item)}, filename: {getattr(input_item, 'filename', None)}")
+            if hasattr(input_item, 'filename') and hasattr(input_item, 'read'):
+                if input_item.filename:  # It's a real file
+                    files_to_process.append(input_item)
+                    processed_inputs.append(None)
+                else:  # It's a text field sent as a file
+                    text = (await input_item.read()).decode('utf-8')
+                    processed_inputs.append(text)
+            else:
+                processed_inputs.append(str(input_item))
         
         if files_to_process:
             processed_file_paths, temp_dir_to_clean = await process_uploaded_files(files_to_process)
-            
+           
             # Replace placeholders with actual file paths in order
             file_index = 0
             for i, item in enumerate(processed_inputs):
                 if item is None:
                     processed_inputs[i] = processed_file_paths[file_index]
                     file_index += 1
-        
+ 
         result = await llm_parser.parse_async(processed_inputs)
         return result
     finally:
