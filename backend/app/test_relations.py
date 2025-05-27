@@ -76,7 +76,7 @@ def display_company_relations(db: Session, company_id: int):
                     candidate = get_candidate(db, candidate_id=app.candidate_id)
                     candidate_info = f"Candidate ID: {app.candidate_id}"
                     if candidate:
-                         candidate_info += f", Name: {candidate.full_name}, Email: {candidate.email}"
+                        candidate_info += f", Name: {candidate.full_name}, Email: {candidate.email}, Phone: {candidate.phone}, Resume URL: {candidate.resume_url}"
                     print(f"        - App ID: {app.id}, {candidate_info}")
                     print(f"          Form Responses: {app.form_responses}")
 
@@ -85,7 +85,7 @@ def display_company_relations(db: Session, company_id: int):
                     matches = get_matches_by_application(db, application_id=app.id)
                     if matches:
                         for match_obj in matches: # Renamed to avoid conflict
-                            print(f"            - Match ID: {match_obj.id}, Score: {match_obj.match_score}, Attributes: {match_obj.attribute_scores}")
+                            print(f"            - Match ID: {match_obj.id}, Match Result: {match_obj.match_result}")
                     else:
                         print("            No matches for this application.")
             else:
@@ -159,7 +159,7 @@ def main():
 
     try:
         company_name_to_test = "TestCo" # From test_crud_functions.py
-        company_name_to_test = "eurisko" # From test_crud_functions.py
+        company_name_to_test = "ApiTestCo" # From test_crud_functions.py
         test_company = get_company_by_name(db, name=company_name_to_test)
 
         if test_company:
