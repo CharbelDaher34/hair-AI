@@ -4,12 +4,13 @@ from fastapi.exceptions import RequestValidationError
 import traceback
 
 from core.database import create_db_and_tables, check_db_tables
-from core.middlewares import ErrorTracebackMiddleware
+# from core.auth_middleware import AuthMiddleware
 from contextlib import asynccontextmanager
 import uvicorn
 import os
 
 from api.v1.endpoints import company, hr, recruiter_company_link, form_key, job, job_form_key_constraint, application, match, candidate
+# from api.v1.endpoints import auth as auth_router
 
 # Get debug mode from environment variable, default to True
 DEBUG_MODE = os.getenv("DEBUG_MODE", "True").lower() == "true"
@@ -17,7 +18,7 @@ DEBUG_MODE = os.getenv("DEBUG_MODE", "True").lower() == "true"
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup logic
- 
+    create_db_and_tables()
     all_exist, missing_tables = check_db_tables()
     if not all_exist:
         print("Creating database tables...")
@@ -37,40 +38,43 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Add AuthMiddleware - this should generally be one of the first middlewares
+# app.add_middleware(AuthMiddleware)
+
 # # Add error traceback middleware
 # app.add_middleware(
 #     ErrorTracebackMiddleware,
 #     include_traceback=True,
 #     debug_mode=DEBUG_MODE
-# )
-@app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    tb = traceback.format_exc()
-    print(f"\n=== Validation Error ===\nRequest: {request.method} {request.url}\nErrors: {exc.errors()}\nTraceback:\n{tb}\n========================\n")
-    content = {
-        "detail": exc.errors(),
-        "body": exc.body,
-        "status_code": 422,
-        "path": str(request.url),
-        "traceback": tb.split("\n")
-    }
-    return JSONResponse(status_code=422, content=content)
+# # )
+# @app.exception_handler(RequestValidationError)
+# async def validation_exception_handler(request: Request, exc: RequestValidationError):
+#     tb = traceback.format_exc()
+#     print(f"\n=== Validation Error ===\nRequest: {request.method} {request.url}\nErrors: {exc.errors()}\nTraceback:\n{tb}\n========================\n")
+#     content = {
+#         "detail": exc.errors(),
+#         "status_code": 422,
+#         "path": str(request.url),
+#         "traceback": tb.split("\n") if DEBUG_MODE else "Traceback available in debug mode."
+#     }
+#     return JSONResponse(status_code=422, content=content)
 
 
-@app.exception_handler(HTTPException)
-async def http_exception_handler(request: Request, exc: HTTPException):
-    tb = traceback.format_exc()
-    print(f"\n=== HTTP Exception ===\nRequest: {request.method} {request.url}\nError: {exc.detail}\nTraceback:\n{tb}\n======================\n")
-    content = {
-        "detail": exc.detail,
-        "status_code": exc.status_code,
-        "path": str(request.url),
-        "traceback": tb.split("\n")
-    }
-    return JSONResponse(status_code=exc.status_code, content=content)
+# @app.exception_handler(HTTPException)
+# async def http_exception_handler(request: Request, exc: HTTPException):
+#     tb = traceback.format_exc()
+#     print(f"\n=== HTTP Exception ===\nRequest: {request.method} {request.url}\nError: {exc.detail}\nStatus Code: {exc.status_code}\nTraceback:\n{tb}\n======================\n")
+#     content = {
+#         "detail": exc.detail,
+#         "status_code": exc.status_code,
+#         "path": str(request.url),
+#         "traceback": tb.split("\n") if DEBUG_MODE else "Traceback available in debug mode."
+#     }
+#     return JSONResponse(status_code=exc.status_code, content=content)
 
 
 # Include routers
+# app.include_router(auth_router.router, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(company.router, prefix="/api/v1/companies", tags=["companies"])
 app.include_router(hr.router, prefix="/api/v1/hrs", tags=["hrs"])
 app.include_router(recruiter_company_link.router, prefix="/api/v1/recruiter_company_links", tags=["recruiter_company_links"])
@@ -92,8 +96,9 @@ async def root():
 
 if __name__ == "__main__":
     uvicorn.run(
-        app,
+        "main:app",
         host="0.0.0.0",
         port=8017,
-        log_level="debug" if DEBUG_MODE else "info"
+        log_level="debug" if DEBUG_MODE else "info",
+        # reload=DEBUG_MODE
     )

@@ -1,10 +1,15 @@
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session
-
+import traceback
 from core.database import get_session
 from crud import crud_application
 from schemas import ApplicationCreate, ApplicationUpdate, ApplicationRead
+
+# Import for matching
+from crud import crud_match
+from models.models import Candidate, Job
+from services.matching import match_candidates_client
 
 router = APIRouter()
 
@@ -16,7 +21,12 @@ def create_application(
 ) -> ApplicationRead:
     try:
         application = crud_application.create_application(db=db, application_in=application_in)
+        # Create a match for this application
+        from schemas import MatchCreate
+        match_in = MatchCreate(application_id=application.id)
+        crud_match.create_match(db=db, match_in=match_in)
     except Exception as e:
+        print(traceback.format_exc())
         raise HTTPException(status_code=400, detail=str(e))
     return application
 

@@ -154,11 +154,24 @@ class Application(ApplicationBase, TimeBase, table=True):
     candidate: Optional[Candidate] = Relationship(back_populates="applications")
     job: Optional[Job] = Relationship(back_populates="applications")
     matches: List["Match"] = Relationship(back_populates="application")
+    interviews: List["Interview"] = Relationship(back_populates="application")
+
+
+class Interview(SQLModel, TimeBase, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    application_id: int = Field(foreign_key="application.id")
+    date: datetime
+    type: str  # e.g. phone, zoom, in-person
+    status: str  # scheduled, done, canceled
+    notes: Optional[str] = None
+
+    application: Optional[Application] = Relationship(back_populates="interviews")
 
 
 class MatchBase(SQLModel):
     application_id: int = Field(foreign_key="application.id")
     match_result: Dict = Field(default=None, sa_column=Column(JSON))
+    status: str = Field(default="pending")
 
 class Match(MatchBase, TimeBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)

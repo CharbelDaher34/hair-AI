@@ -1,4 +1,5 @@
 from typing import Any, Dict, Optional, Union, List, Tuple
+from copy import deepcopy
 
 from sqlmodel import Session, select
 
@@ -16,8 +17,9 @@ def get_matches_by_application(db: Session, application_id: int, skip: int = 0, 
     return db.exec(statement).all()
 
 
-def create_match(db: Session, *, match_in: MatchCreate) -> Tuple[Match, Dict]:
+def create_match(db: Session, *, match_in: MatchCreate) -> Match:
     # Fetch application, candidate, and job info
+    print("match_in to create match",match_in)
     application = db.get(Application, match_in.application_id)
     if not application:
         raise ValueError(f"Application with id {match_in.application_id} not found")
@@ -29,7 +31,6 @@ def create_match(db: Session, *, match_in: MatchCreate) -> Tuple[Match, Dict]:
     # Prepare texts for AI matching
     job_description = str(job.job_data)
     candidate_text = str(candidate.parsed_resume)
-    # Fallback to empty string if not available
     candidates = [candidate_text]
 
     # Call the AI matcher
@@ -37,14 +38,23 @@ def create_match(db: Session, *, match_in: MatchCreate) -> Tuple[Match, Dict]:
         job_description=job_description,
         candidates=candidates
     )
-    print("ai_response", ai_response)
-    # Store the AI response in match_result
-    match_in.match_result = ai_response
-    db_match = Match.model_validate(match_in)
+    # Make a copy so we don't mutate the caller's object
+    match_data = match_in.model_dump()
+    match_data["match_result"] = ai_response
+    print("\n\n\nmatch_data",match_data)
+    # Remove any existing match for this application
+    existing_match = db.exec(select(Match).where(Match.application_id == match_in.application_id)).first()
+    if existing_match:
+        db.delete(existing_match)
+        db.flush()
+        print("deleted existing match",existing_match)
+
+    db_match = Match.model_validate(match_data)
+    print("\n\n\nnew match",db_match)
     db.add(db_match)
     db.commit()
     db.refresh(db_match)
-    return db_match, ai_response
+    return db_match
 
 
 def update_match(

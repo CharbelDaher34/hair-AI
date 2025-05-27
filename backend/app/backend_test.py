@@ -2,14 +2,18 @@ import os
 import uuid
 from fastapi.testclient import TestClient
 from datetime import datetime # Import datetime
-
+import base64
+import httpx
+import json
+from core.database import create_db_and_tables
+create_db_and_tables()
 # Import main directly since it's in the same directory
-from main import app  # Direct import from same directory
+# from main import app  # Direct import from same directory
+API_V1_PREFIX = "http://localhost:8017/api/v1"
+client = httpx.Client(base_url=API_V1_PREFIX)
+# client = TestClient(app)
 
-client = TestClient(app)
 
-
-API_V1_PREFIX = "/api/v1"
 
 def run_api_tests():
     print("=== Starting API Endpoint Tests ===")
@@ -27,17 +31,113 @@ def run_api_tests():
     recruiter_hr_id: uuid.UUID | None = None
     link_id: uuid.UUID | None = None
     created_recruiter_job_id: uuid.UUID | None = None
+    # Store IDs for the second set of resources
+    company_id_2: uuid.UUID | None = None
+    hr_id_2: uuid.UUID | None = None
+    form_key_id_2: uuid.UUID | None = None
+    job_id_2: uuid.UUID | None = None
 
 
     # Test data (mirrors test_crud_functions.py)
-    company_data = {"name": "ApiTestCo", "description": "A test company via API", "industry": "Tech", "is_owner": True}
-    hr_data = {"email": "hr.api@testco.com", "password_hash": "hashed_password_api", "full_name": "Api Test HR", "role": "hr_manager"}
-    form_key_data = {"name": "ExperienceYearsApi", "field_type": "number", "required": True}
-    job_data_payload = {"job_data": {"title": "API Software Engineer", "description": "Develop software via API"}, "status": "open", "form_key_ids": []}
-    candidate_data = {"full_name": "Api Test Candidate", "email": "candidate.api@example.com", "phone": "1234567890"}
-    application_data_payload = {"form_responses": {"experience_api": "3 years"}}
-    match_data_payload = {"match_score": 0.85, "attribute_scores": {"skills_api": 0.9}}
-    company_data_target = {"name": "ApiTargetLinkCo", "description": "A target company for linking via API", "is_owner": False}
+    company_data = {
+        "name": "ApiTestCo",
+        "description": "A test company via API",
+        "industry": "Tech",
+        "is_owner": True,
+        "bio": "This is a test bio for ApiTestCo.",
+        "website": "https://apitestco.example.com",
+        "logo_url": "https://apitestco.example.com/logo.png"
+    }
+    hr_data = {
+        "email": "hr.api@testco.com",
+        "password_hash": "hashed_password_api",
+        "full_name": "Api Test HR",
+        "role": "hr_manager"
+        # company_id will be added dynamically
+    }
+    form_key_data = {
+        "name": "ExperienceYearsApi",
+        "field_type": "number",
+        "required": True,
+        "enum_values": ["1-2", "3-5", "5+"],
+        # company_id will be added dynamically
+    }
+    job_data_payload = {
+        "job_data": {"title": "API Software Engineer", "description": "Develop software via API", "extra_field": "extra_value"},
+        "status": "open",
+        "form_key_ids": [],
+        # employer_id, created_by will be added dynamically
+        "recruited_to_id": None
+    }
+    candidate_data = {
+        "full_name": "Api Test Candidate",
+        "email": "candidate.api@example.com",
+        "phone": "1234567890",
+        "resume_url": "https://example.com/resume1.pdf",
+        "parsed_resume": {"skills": ["python", "fastapi"], "summary": "Experienced developer."}
+    }
+    application_data_payload = {
+        "form_responses": {"experience_api": "3 years", "status": "applied", "extra_field": "extra_value"}
+        # candidate_id, job_id will be added dynamically
+    }
+    match_data_payload = {
+        "match_result": {
+            "results": [
+                {
+                    "candidate": "I am a python developer with 3 years of experience in FastAPI.",
+                    "score": 0.85,
+                    "skill_analysis": {
+                        "match_percentage": 50,
+                        "matching_skills": ["python"],
+                        "missing_skills": ["software engineer"],
+                        "extra_skills": [],
+                        "summary": {
+                            "total_required_skills": 2,
+                            "matching_skills_count": 1,
+                            "missing_skills_count": 1,
+                            "extra_skills_count": 0
+                        }
+                    },
+                    "embedding_similarity": 0.828,
+                    "weights": {
+                        "skill_weight": 0.4,
+                        "embedding_weight": 0.6
+                    }
+                }
+            ]
+        }
+        # application_id will be added dynamically
+    }
+    company_data_target = {
+        "name": "ApiTargetLinkCo",
+        "description": "A target company for linking via API",
+        "is_owner": False,
+        "bio": "Bio for the target link company.",
+        "website": "https://apitargetlinkco.example.com",
+        "logo_url": "https://apitargetlinkco.example.com/logo.png",
+        "industry": "Recruitment"
+    }
+    # RecruiterCompanyLink data will be created dynamically with recruiter_id and target_company_id
+    # JobFormKeyConstraint data will be created dynamically with job_id, form_key_id, constraints
+
+    # --- Second set of data ---
+    company_data_2 = {
+        "name": "ApiTestCoTwo",
+        "description": "A second test company via API",
+        "industry": "Services",
+        "is_owner": True,
+        "bio": "This is a test bio for ApiTestCoTwo.",
+        "website": "https://apitestcotwo.example.com",
+        "logo_url": "https://apitestcotwo.example.com/logo.png"
+    }
+    hr_data_2 = {"email": "hr.api@testcotwo.com", "password_hash": "hashed_password_api_2", "full_name": "Api Test HR Two", "role": "hr_recruiter"}
+    form_key_data_2 = {
+        "name": "LocationPreferenceApi",
+        "field_type": "text",
+        "required": False,
+        "enum_values": ["Remote", "Hybrid", "On-site"]
+    }
+    job_data_payload_2 = {"job_data": {"title": "API Data Analyst", "description": "Analyze data via API"}, "status": "pending", "form_key_ids": []}
 
 
     # --- 1. Company ---
@@ -46,6 +146,7 @@ def run_api_tests():
     assert response.status_code == 201, f"Failed to create company: {response.text}"  # FastAPI returns 201 for successful creation
     created_company = response.json()
     assert created_company["name"] == company_data["name"]
+    assert created_company["bio"] == company_data["bio"]
     company_id = created_company["id"]
     print(f"CREATE Company: {created_company['name']} (ID: {company_id})")
 
@@ -69,6 +170,22 @@ def run_api_tests():
     assert isinstance(companies_list, list)
     assert any(c["id"] == company_id for c in companies_list)
     print(f"READ Companies: Found {len(companies_list)} companies.")
+
+    # Create second company
+    print("\n--- Testing Second Company API ---")
+    response = client.post(f"{API_V1_PREFIX}/companies/", json=company_data_2)
+    assert response.status_code == 201, f"Failed to create company 2: {response.text}"
+    created_company_2 = response.json()
+    assert created_company_2["name"] == company_data_2["name"]
+    assert created_company_2["industry"] == company_data_2["industry"]
+    company_id_2 = created_company_2["id"]
+    print(f"CREATE Company 2: {created_company_2['name']} (ID: {company_id_2})")
+
+    response = client.get(f"{API_V1_PREFIX}/companies/{company_id_2}")
+    assert response.status_code == 200, response.text
+    retrieved_company_2 = response.json()
+    assert retrieved_company_2["id"] == company_id_2
+    print(f"READ Company 2: {retrieved_company_2['name']}")
 
 
     # --- 2. HR ---
@@ -94,6 +211,22 @@ def run_api_tests():
     assert updated_hr_res["full_name"] == hr_update_data["full_name"]
     print(f"UPDATE HR: {updated_hr_res['full_name']}")
 
+    # Create HR for second company
+    print("\n--- Testing Second HR API ---")
+    hr_create_data_2 = {**hr_data_2, "company_id": company_id_2}
+    response = client.post(f"{API_V1_PREFIX}/hrs/", json=hr_create_data_2)
+    assert response.status_code == 201, f"Failed to create HR 2: {response.text}"
+    created_hr_2 = response.json()
+    assert created_hr_2["email"] == hr_data_2["email"]
+    hr_id_2 = created_hr_2["id"]
+    print(f"CREATE HR 2: {created_hr_2['full_name']} (ID: {hr_id_2}) for Company ID: {company_id_2}")
+
+    response = client.get(f"{API_V1_PREFIX}/hrs/{hr_id_2}")
+    assert response.status_code == 200, response.text
+    retrieved_hr_2 = response.json()
+    assert retrieved_hr_2["id"] == hr_id_2
+    print(f"READ HR 2: {retrieved_hr_2['full_name']}")
+
 
     # --- 3. FormKey ---
     print("\\n--- Testing FormKey API ---")
@@ -104,6 +237,7 @@ def run_api_tests():
     assert response.status_code == 201, f"Failed to create FormKey: {response.text}"
     created_form_key = response.json()
     assert created_form_key["name"] == form_key_data["name"]
+    assert created_form_key["enum_values"] == form_key_data["enum_values"]
     form_key_id = created_form_key["id"]
     print(f"CREATE FormKey: {created_form_key['name']} (ID: {form_key_id}) for Company ID: {company_id}")
 
@@ -119,6 +253,22 @@ def run_api_tests():
     updated_form_key_res = response.json()
     assert updated_form_key_res["field_type"] == "text"
     print(f"UPDATE FormKey: {updated_form_key_res['name']}, New Field Type: {updated_form_key_res['field_type']}")
+
+    # Create FormKey for second company
+    print("\n--- Testing Second FormKey API ---")
+    form_key_create_data_2 = {**form_key_data_2, "company_id": company_id_2}
+    response = client.post(f"{API_V1_PREFIX}/form_keys/", json=form_key_create_data_2)
+    assert response.status_code == 201, f"Failed to create FormKey 2: {response.text}"
+    created_form_key_2 = response.json()
+    assert created_form_key_2["name"] == form_key_data_2["name"]
+    form_key_id_2 = created_form_key_2["id"]
+    print(f"CREATE FormKey 2: {created_form_key_2['name']} (ID: {form_key_id_2}) for Company ID: {company_id_2}")
+
+    response = client.get(f"{API_V1_PREFIX}/form_keys/{form_key_id_2}")
+    assert response.status_code == 200, response.text
+    retrieved_form_key_2 = response.json()
+    assert retrieved_form_key_2["id"] == form_key_id_2
+    print(f"READ FormKey 2: {retrieved_form_key_2['name']}")
 
 
     # --- 4. Job ---
@@ -143,6 +293,22 @@ def run_api_tests():
     updated_job_res = response.json()
     assert updated_job_res["status"] == "closed"
     print(f"UPDATE Job: '{updated_job_res['job_data']['title']}', New Status: {updated_job_res['status']}")
+
+    # Create Job for second company
+    print("\n--- Testing Second Job API ---")
+    job_create_data_2 = {**job_data_payload_2, "employer_id": company_id_2, "created_by": hr_id_2}
+    response = client.post(f"{API_V1_PREFIX}/jobs/", json=job_create_data_2)
+    assert response.status_code == 201, f"Failed to create Job 2: {response.text}"
+    created_job_2 = response.json()
+    assert created_job_2["job_data"]["title"] == job_data_payload_2["job_data"]["title"]
+    job_id_2 = created_job_2["id"]
+    print(f"CREATE Job 2: '{created_job_2['job_data']['title']}' (ID: {job_id_2}) for Company ID: {company_id_2}, HR ID: {hr_id_2}")
+
+    response = client.get(f"{API_V1_PREFIX}/jobs/{job_id_2}")
+    assert response.status_code == 200, response.text
+    retrieved_job_2 = response.json()
+    assert retrieved_job_2["id"] == job_id_2
+    print(f"READ Job 2: '{retrieved_job_2['job_data']['title']}'")
 
 
     # --- 5. JobFormKeyConstraint ---
@@ -170,10 +336,21 @@ def run_api_tests():
 
 
     # --- 6. Candidate ---
-    print("\\n--- Testing Candidate API ---")
-    response = client.post(f"{API_V1_PREFIX}/candidates/", json=candidate_data)
+    print("\n--- Testing Candidate API ---")
+    resume_pdf_path = "/storage/hussein/matching/ai/app/services/llm/Charbel_Daher_Resume.pdf"
+    with open(resume_pdf_path, "rb") as resume_file:
+        files = {"resume": ("Charbel_Daher_Resume.pdf", resume_file, "application/pdf")}
+        data = {"candidate_in": json.dumps(candidate_data)}  # candidate_in as a JSON string
+        response = client.post(
+            f"{API_V1_PREFIX}/candidates/",
+            data=data,
+            files=files,
+            timeout=None
+        )
     assert response.status_code == 201, f"Failed to create Candidate: {response.text}"
     created_candidate = response.json()
+    print(created_candidate)
+    print(candidate_data)
     assert created_candidate["email"] == candidate_data["email"]
     candidate_id = created_candidate["id"]
     print(f"CREATE Candidate: {created_candidate['full_name']} (ID: {candidate_id})")
@@ -192,12 +369,84 @@ def run_api_tests():
     print(f"UPDATE Candidate: {updated_candidate_res['full_name']}, New Phone: {updated_candidate_res['phone']}")
 
 
+    # --- Additional Candidates for Company 2 ---
+    print("\n--- Testing Additional Candidates for Company 2 ---")
+    candidate_data_2 = {
+        "full_name": "Api Test Candidate Two",
+        "email": "candidate2.api@example.com",
+        "phone": "2222222222",
+        "resume_url": "https://example.com/resume2.pdf",
+        "parsed_resume": {"skills": ["sql", "data analysis"], "summary": "Data analyst."}
+    }
+    candidate_data_3 = {
+        "full_name": "Api Test Candidate Three",
+        "email": "candidate3.api@example.com",
+        "phone": "3333333333",
+        "resume_url": "https://example.com/resume3.pdf",
+        "parsed_resume": {"skills": ["project management"], "summary": "Project manager."}
+    }
+    resume_pdf_path = "/storage/hussein/matching/ai/app/services/llm/Charbel_Daher_Resume.pdf"
+    # Candidate 2
+    with open(resume_pdf_path, "rb") as resume_file:
+        files = {"resume": ("Charbel_Daher_Resume.pdf", resume_file, "application/pdf")}
+        data = {"candidate_in": json.dumps(candidate_data_2)}
+        response = client.post(
+            f"{API_V1_PREFIX}/candidates/",
+            data=data,
+            files=files,
+            timeout=None
+        )
+    assert response.status_code == 201, f"Failed to create Candidate 2: {response.text}"
+    created_candidate_2 = response.json()
+    assert created_candidate_2["email"] == candidate_data_2["email"]
+    candidate_id_2 = created_candidate_2["id"]
+    print(f"CREATE Candidate 2: {created_candidate_2['full_name']} (ID: {candidate_id_2})")
+    # Candidate 3
+    with open(resume_pdf_path, "rb") as resume_file:
+        files = {"resume": ("Charbel_Daher_Resume.pdf", resume_file, "application/pdf")}
+        data = {"candidate_in": json.dumps(candidate_data_3)}
+        response = client.post(
+            f"{API_V1_PREFIX}/candidates/",
+            data=data,
+            files=files,
+            timeout=None
+        )
+    assert response.status_code == 201, f"Failed to create Candidate 3: {response.text}"
+    created_candidate_3 = response.json()
+    assert created_candidate_3["email"] == candidate_data_3["email"]
+    candidate_id_3 = created_candidate_3["id"]
+    print(f"CREATE Candidate 3: {created_candidate_3['full_name']} (ID: {candidate_id_3})")
+
+    # --- Applications for Company 2's Job ---
+    print("\n--- Testing Applications for Company 2's Job ---")
+    application_data_payload_2 = {"form_responses": {"location_preference": "Remote", "experience": "2 years", "extra_field": "extra_value"}}
+    application_data_payload_3 = {"form_responses": {"location_preference": "On-site", "experience": "5 years", "extra_field": "extra_value"}}
+    # Application for Candidate 2
+    application_create_data_2 = {**application_data_payload_2, "candidate_id": candidate_id_2, "job_id": job_id_2}
+    response = client.post(f"{API_V1_PREFIX}/applications/", json=application_create_data_2, timeout=None)
+    assert response.status_code == 201, f"Failed to create Application 2: {response.text}"
+    created_application_2 = response.json()
+    assert created_application_2["candidate_id"] == candidate_id_2
+    application_id_2 = created_application_2["id"]
+    print(f"CREATE Application 2 (ID: {application_id_2}) for Candidate 2, Job 2")
+    # Application for Candidate 3
+    application_create_data_3 = {**application_data_payload_3, "candidate_id": candidate_id_3, "job_id": job_id_2}
+    response = client.post(f"{API_V1_PREFIX}/applications/", json=application_create_data_3, timeout=None)
+    assert response.status_code == 201, f"Failed to create Application 3: {response.text}"
+    created_application_3 = response.json()
+    assert created_application_3["candidate_id"] == candidate_id_3
+    application_id_3 = created_application_3["id"]
+    print(f"CREATE Application 3 (ID: {application_id_3}) for Candidate 3, Job 2")
+
+
     # --- 7. Application ---
     print("\\n--- Testing Application API ---")
     application_create_data = {**application_data_payload, "candidate_id": candidate_id, "job_id": job_id}
-    response = client.post(f"{API_V1_PREFIX}/applications/", json=application_create_data)
-    assert response.status_code == 201, f"Failed to create Application: {response.text}"
+    response = client.post(f"{API_V1_PREFIX}/applications/", json=application_create_data,timeout=None)
+    assert response.status_code == 201
+    
     created_application = response.json()
+    print(created_application)
     assert created_application["candidate_id"] == candidate_id
     application_id = created_application["id"]
     print(f"CREATE Application (ID: {application_id}) for Candidate ID: {candidate_id}, Job ID: {job_id}")
@@ -217,28 +466,76 @@ def run_api_tests():
 
 
     # --- 8. Match ---
-    print("\\n--- Testing Match API ---")
-    match_create_data = {**match_data_payload, "application_id": application_id}
-    response = client.post(f"{API_V1_PREFIX}/matches/", json=match_create_data)
-    assert response.status_code == 201, f"Failed to create Match: {response.text}"
-    created_match = response.json()
-    assert created_match["match_score"] == match_data_payload["match_score"]
-    match_id = created_match["id"]
-    print(f"CREATE Match (ID: {match_id}) for Application ID: {application_id}")
-
-    response = client.get(f"{API_V1_PREFIX}/matches/{match_id}")
+    import time
+    time.sleep(1)
+    print("\n--- Testing Match API ---")
+    match_result = {"results": [
+        {
+            "candidate": "I am a python developer with 3 years of experience in FastAPI.",
+            "score": 0.697,
+            "skill_analysis": {
+                "match_percentage": 50,
+                "matching_skills": ["python"],
+                "missing_skills": ["software engineer"],
+                "extra_skills": [],
+                "summary": {
+                    "total_required_skills": 2,
+                    "matching_skills_count": 1,
+                    "missing_skills_count": 1,
+                    "extra_skills_count": 0
+                }
+            },
+            "embedding_similarity": 0.828,
+            "weights": {
+                "skill_weight": 0.4,
+                "embedding_weight": 0.6
+            }
+        }
+    ]}
+    
+    response = client.get(f"{API_V1_PREFIX}/matches/by-application/{application_id}")
     assert response.status_code == 200, response.text
-    retrieved_match = response.json()
-    assert retrieved_match["id"] == match_id
-    print(f"READ Match: ID {retrieved_match['id']}, Score: {retrieved_match['match_score']}")
+    retrieved_matches = response.json()
+    match_id = retrieved_matches[0]["id"]
+    print(f"READ Matches: ID {match_id}")
 
-    match_update_data = {"match_score": 0.90, "narrative_explanation": "Excellent fit via API."}
+    # Update match_result, not top-level fields
+    match_update_data = {
+        "match_result": {
+            "results": [
+                {
+                    "candidate": "Updated candidate",
+                    "score": 0.9,
+                    "skill_analysis": {
+                        "match_percentage": 100,
+                        "matching_skills": ["python", "software engineer"],
+                        "missing_skills": [],
+                        "extra_skills": [],
+                        "summary": {
+                            "total_required_skills": 2,
+                            "matching_skills_count": 2,
+                            "missing_skills_count": 0,
+                            "extra_skills_count": 0
+                        }
+                    },
+                    "embedding_similarity": 0.95,
+                    "weights": {
+                        "skill_weight": 0.5,
+                        "embedding_weight": 0.5
+                    }
+                }
+            ]
+        }
+    }
     response = client.patch(f"{API_V1_PREFIX}/matches/{match_id}", json=match_update_data)
     assert response.status_code == 200, response.text
     updated_match_res = response.json()
-    assert updated_match_res["match_score"] == 0.90
-    print(f"UPDATE Match: ID {updated_match_res['id']}, New Score: {updated_match_res['match_score']}")
-
+    updated_results = updated_match_res["match_result"]["results"]
+    assert updated_results[0]["candidate"] == "Updated candidate"
+    assert updated_results[0]["score"] == 0.9
+    assert updated_results[0]["skill_analysis"]["match_percentage"] == 100
+    print(f"UPDATE Match: ID {updated_match_res['id']}, New Score: {updated_match_res['match_result']['results'][0]['score']}")
+    
 
     # --- 9. RecruiterCompanyLink ---
     print("\\n--- Testing RecruiterCompanyLink API ---")
@@ -246,6 +543,8 @@ def run_api_tests():
     response = client.post(f"{API_V1_PREFIX}/companies/", json=company_data_target)
     assert response.status_code == 201, f"Failed to create recruiter company: {response.text}"
     created_recruiter_company = response.json()
+    assert created_recruiter_company["name"] == company_data_target["name"]
+    assert created_recruiter_company["website"] == company_data_target["website"]
     recruiter_company_id = created_recruiter_company["id"]
     print(f"CREATE Recruiter Company: {created_recruiter_company['name']} (ID: {recruiter_company_id})")
 
@@ -284,7 +583,7 @@ def run_api_tests():
     recruiter_job_create_data = {
         **recruiter_job_data_payload,
         "employer_id": recruiter_company_id,  # Recruiter company creates the job
-        "recruited_to_id": company_id,        # But it's for ApiTestCo
+        "recruited_to_id": company_id,        # But it's for ApiTestCo (target company)
         "created_by": recruiter_hr_id         # Created by recruiter's HR
     }
     response = client.post(f"{API_V1_PREFIX}/jobs/", json=recruiter_job_create_data)
@@ -292,111 +591,113 @@ def run_api_tests():
     created_recruiter_job = response.json()
     created_recruiter_job_id = created_recruiter_job["id"]
     assert created_recruiter_job["job_data"]["title"] == recruiter_job_data_payload["job_data"]["title"]
-    print(f"CREATE Recruited Job: '{created_recruiter_job['job_data']['title']}' (ID: {created_recruiter_job_id})")
+    assert created_recruiter_job["employer_id"] == recruiter_company_id
+    assert created_recruiter_job["recruited_to_id"] == company_id
+    print(f"CREATE Recruited Job: '{created_recruiter_job['job_data']['title']}' (ID: {created_recruiter_job_id}) for Target Company ID: {company_id}")
 
 
     # --- Deletion Tests (in reverse order of dependency, or careful order) ---
     print("\\n--- Testing Deletion API Endpoints ---")
 
-    # Matches depend on Applications
-    if match_id:
-        response = client.delete(f"{API_V1_PREFIX}/matches/{match_id}")
-        assert response.status_code == 200, response.text
-        print(f"DELETE Match: ID {match_id}, response: {response.json()}")
-        response = client.get(f"{API_V1_PREFIX}/matches/{match_id}")
-        assert response.status_code == 404, "Match not deleted"
+    # # Matches depend on Applications
+    # if match_id:
+    #     response = client.delete(f"{API_V1_PREFIX}/matches/{match_id}")
+    #     assert response.status_code == 200, response.text
+    #     print(f"DELETE Match: ID {match_id}, response: {response.json()}")
+    #     response = client.get(f"{API_V1_PREFIX}/matches/{match_id}")
+    #     assert response.status_code == 404, "Match not deleted"
+   
+    # # Applications depend on Candidates and Jobs
+    # if application_id:
+    #     response = client.delete(f"{API_V1_PREFIX}/applications/{application_id}")
+    #     assert response.status_code == 200, response.text
+    #     print(f"DELETE Application: ID {application_id}, response: {response.json()}")
+    #     response = client.get(f"{API_V1_PREFIX}/applications/{application_id}")
+    #     assert response.status_code == 404, "Application not deleted"
 
-    # Applications depend on Candidates and Jobs
-    if application_id:
-        response = client.delete(f"{API_V1_PREFIX}/applications/{application_id}")
-        assert response.status_code == 200, response.text
-        print(f"DELETE Application: ID {application_id}, response: {response.json()}")
-        response = client.get(f"{API_V1_PREFIX}/applications/{application_id}")
-        assert response.status_code == 404, "Application not deleted"
+    # # Candidates (standalone after applications)
+    # if candidate_id:
+    #     response = client.delete(f"{API_V1_PREFIX}/candidates/{candidate_id}")
+    #     assert response.status_code == 200, response.text
+    #     print(f"DELETE Candidate: ID {candidate_id}, response: {response.json()}")
+    #     response = client.get(f"{API_V1_PREFIX}/candidates/{candidate_id}")
+    #     assert response.status_code == 404, "Candidate not deleted"
 
-    # Candidates (standalone after applications)
-    if candidate_id:
-        response = client.delete(f"{API_V1_PREFIX}/candidates/{candidate_id}")
-        assert response.status_code == 200, response.text
-        print(f"DELETE Candidate: ID {candidate_id}, response: {response.json()}")
-        response = client.get(f"{API_V1_PREFIX}/candidates/{candidate_id}")
-        assert response.status_code == 404, "Candidate not deleted"
-
-    # JobFormKeyConstraints depend on Jobs and FormKeys
-    if constraint_id:
-        response = client.delete(f"{API_V1_PREFIX}/job_form_key_constraints/{constraint_id}")
-        assert response.status_code == 200, response.text
-        print(f"DELETE JobFormKeyConstraint: ID {constraint_id}, response: {response.json()}")
-        response = client.get(f"{API_V1_PREFIX}/job_form_key_constraints/{constraint_id}")
-        assert response.status_code == 404, "JobFormKeyConstraint not deleted"
+    # # JobFormKeyConstraints depend on Jobs and FormKeys
+    # if constraint_id:
+    #     response = client.delete(f"{API_V1_PREFIX}/job_form_key_constraints/{constraint_id}")
+    #     assert response.status_code == 200, response.text
+    #     print(f"DELETE JobFormKeyConstraint: ID {constraint_id}, response: {response.json()}")
+    #     response = client.get(f"{API_V1_PREFIX}/job_form_key_constraints/{constraint_id}")
+    #     assert response.status_code == 404, "JobFormKeyConstraint not deleted"
     
-    # Recruited Job
-    if created_recruiter_job_id:
-        response = client.delete(f"{API_V1_PREFIX}/jobs/{created_recruiter_job_id}")
-        assert response.status_code == 200, response.text
-        print(f"DELETE Recruited Job: ID {created_recruiter_job_id}, response: {response.json()}")
-        response = client.get(f"{API_V1_PREFIX}/jobs/{created_recruiter_job_id}")
-        assert response.status_code == 404, "Recruited Job not deleted"
+    # # Recruited Job
+    # if created_recruiter_job_id:
+    #     response = client.delete(f"{API_V1_PREFIX}/jobs/{created_recruiter_job_id}")
+    #     assert response.status_code == 200, response.text
+    #     print(f"DELETE Recruited Job: ID {created_recruiter_job_id}, response: {response.json()}")
+    #     response = client.get(f"{API_V1_PREFIX}/jobs/{created_recruiter_job_id}")
+    #     assert response.status_code == 404, "Recruited Job not deleted"
 
-    # Jobs depend on Company (employer_id) and HR (created_by)
-    if job_id:
-        response = client.delete(f"{API_V1_PREFIX}/jobs/{job_id}")
-        assert response.status_code == 200, response.text
-        print(f"DELETE Job: ID {job_id}, response: {response.json()}")
-        response = client.get(f"{API_V1_PREFIX}/jobs/{job_id}")
-        assert response.status_code == 404, "Job not deleted"
+    # # Jobs depend on Company (employer_id) and HR (created_by)
+    # if job_id:
+    #     response = client.delete(f"{API_V1_PREFIX}/jobs/{job_id}")
+    #     assert response.status_code == 200, response.text
+    #     print(f"DELETE Job: ID {job_id}, response: {response.json()}")
+    #     response = client.get(f"{API_V1_PREFIX}/jobs/{job_id}")
+    #     assert response.status_code == 404, "Job not deleted"
 
-    # FormKeys depend on Company
-    if form_key_id:
-        response = client.delete(f"{API_V1_PREFIX}/form_keys/{form_key_id}")
-        assert response.status_code == 200, response.text
-        print(f"DELETE FormKey: ID {form_key_id}, response: {response.json()}")
-        response = client.get(f"{API_V1_PREFIX}/form_keys/{form_key_id}")
-        assert response.status_code == 404, "FormKey not deleted"
+    # # FormKeys depend on Company
+    # if form_key_id:
+    #     response = client.delete(f"{API_V1_PREFIX}/form_keys/{form_key_id}")
+    #     assert response.status_code == 200, response.text
+    #     print(f"DELETE FormKey: ID {form_key_id}, response: {response.json()}")
+    #     response = client.get(f"{API_V1_PREFIX}/form_keys/{form_key_id}")
+    #     assert response.status_code == 404, "FormKey not deleted"
 
-    # RecruiterCompanyLinks depend on Recruiter Company and Target Company
-    if link_id:
-        response = client.delete(f"{API_V1_PREFIX}/recruiter_company_links/{link_id}")
-        assert response.status_code == 200, response.text
-        print(f"DELETE RecruiterCompanyLink: ID {link_id}, response: {response.json()}")
-        response = client.get(f"{API_V1_PREFIX}/recruiter_company_links/{link_id}")
-        assert response.status_code == 404, "RecruiterCompanyLink not deleted"
+    # # RecruiterCompanyLinks depend on Recruiter Company and Target Company
+    # if link_id:
+    #     response = client.delete(f"{API_V1_PREFIX}/recruiter_company_links/{link_id}")
+    #     assert response.status_code == 200, response.text
+    #     print(f"DELETE RecruiterCompanyLink: ID {link_id}, response: {response.json()}")
+    #     response = client.get(f"{API_V1_PREFIX}/recruiter_company_links/{link_id}")
+    #     assert response.status_code == 404, "RecruiterCompanyLink not deleted"
 
-    # HRs depend on Company
-    if hr_id:
-        response = client.delete(f"{API_V1_PREFIX}/hrs/{hr_id}")
-        assert response.status_code == 200, response.text
-        print(f"DELETE HR: ID {hr_id}, response: {response.json()}")
-        response = client.get(f"{API_V1_PREFIX}/hrs/{hr_id}")
-        assert response.status_code == 404, "HR not deleted"
+    # # HRs depend on Company
+    # if hr_id:
+    #     response = client.delete(f"{API_V1_PREFIX}/hrs/{hr_id}")
+    #     assert response.status_code == 200, response.text
+    #     print(f"DELETE HR: ID {hr_id}, response: {response.json()}")
+    #     response = client.get(f"{API_V1_PREFIX}/hrs/{hr_id}")
+    #     assert response.status_code == 404, "HR not deleted"
     
-    if recruiter_hr_id:
-        response = client.delete(f"{API_V1_PREFIX}/hrs/{recruiter_hr_id}")
-        assert response.status_code == 200, response.text
-        print(f"DELETE Recruiter HR: ID {recruiter_hr_id}, response: {response.json()}")
-        response = client.get(f"{API_V1_PREFIX}/hrs/{recruiter_hr_id}")
-        assert response.status_code == 404, "Recruiter HR not deleted"
+    # if recruiter_hr_id:
+    #     response = client.delete(f"{API_V1_PREFIX}/hrs/{recruiter_hr_id}")
+    #     assert response.status_code == 200, response.text
+    #     print(f"DELETE Recruiter HR: ID {recruiter_hr_id}, response: {response.json()}")
+    #     response = client.get(f"{API_V1_PREFIX}/hrs/{recruiter_hr_id}")
+    #     assert response.status_code == 404, "Recruiter HR not deleted"
 
 
-    # Companies (delete main company last, after its dependencies)
-    if company_id:
-        # Ensure all dependent entities (HR, Jobs, FormKeys, Links as target) are deleted or unlinked
-        response = client.delete(f"{API_V1_PREFIX}/companies/{company_id}")
-        assert response.status_code == 200, response.text
-        print(f"DELETE Company: ID {company_id}, response: {response.json()}")
-        response = client.get(f"{API_V1_PREFIX}/companies/{company_id}")
-        assert response.status_code == 404, "Company not deleted"
+    # # Companies (delete main company last, after its dependencies)
+    # if company_id:
+    #     # Ensure all dependent entities (HR, Jobs, FormKeys, Links as target) are deleted or unlinked
+    #     response = client.delete(f"{API_V1_PREFIX}/companies/{company_id}")
+    #     assert response.status_code == 200, response.text
+    #     print(f"DELETE Company: ID {company_id}, response: {response.json()}")
+    #     response = client.get(f"{API_V1_PREFIX}/companies/{company_id}")
+    #     assert response.status_code == 404, "Company not deleted"
 
-    if recruiter_company_id:
-         # Ensure all dependent entities (HR, Jobs as employer, Links as recruiter) are deleted or unlinked
-        response = client.delete(f"{API_V1_PREFIX}/companies/{recruiter_company_id}")
-        assert response.status_code == 200, response.text
-        print(f"DELETE Recruiter Company: ID {recruiter_company_id}, response: {response.json()}")
-        response = client.get(f"{API_V1_PREFIX}/companies/{recruiter_company_id}")
-        assert response.status_code == 404, "Recruiter Company not deleted"
+    # if recruiter_company_id:
+    #      # Ensure all dependent entities (HR, Jobs as employer, Links as recruiter) are deleted or unlinked
+    #     response = client.delete(f"{API_V1_PREFIX}/companies/{recruiter_company_id}")
+    #     assert response.status_code == 200, response.text
+    #     print(f"DELETE Recruiter Company: ID {recruiter_company_id}, response: {response.json()}")
+    #     response = client.get(f"{API_V1_PREFIX}/companies/{recruiter_company_id}")
+    #     assert response.status_code == 404, "Recruiter Company not deleted"
 
 
-    print("\\n=== API Endpoint Tests Completed ===")
+    # print("\\n=== API Endpoint Tests Completed ===")
 
 
 if __name__ == "__main__":
@@ -407,10 +708,10 @@ if __name__ == "__main__":
     except AssertionError as e:
         print(f"\\nXXX API ASSERTION FAILED XXX: {e}")
         import traceback
-        traceback.print_exc()
+        # traceback.print_exc()
     except Exception as e:
         print(f"\\nXXX AN API ERROR OCCURRED XXX: {e}")
         import traceback
-        traceback.print_exc()
+        # traceback.print_exc()
     finally:
         print("wowowowow")

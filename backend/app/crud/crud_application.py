@@ -2,7 +2,7 @@ from typing import Any, Dict, Optional, Union, List
 
 from sqlmodel import Session, select
 
-from models.models import Application
+from models.models import Application, Match
 from schemas import ApplicationCreate, ApplicationUpdate
 
 
@@ -47,6 +47,9 @@ def update_application(
 
 def delete_application(db: Session, *, application_id: int) -> Optional[Application]:
     db_application = db.get(Application, application_id)
+    match=db.get(Match,db_application.id)
+    if match:
+        db.delete(match)
     if db_application:
         db.delete(db_application)
         db.commit()

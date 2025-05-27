@@ -17,7 +17,7 @@ def match_candidates_client(
         "embedding_weight": embedding_weight
     }
     with httpx.Client() as client:
-        response = client.post(matcher_url, json=payload)
+        response = client.post(matcher_url, json=payload,timeout=None)
         response.raise_for_status()
         return response.json()
 
