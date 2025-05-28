@@ -1,24 +1,30 @@
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
+from fastapi.security import HTTPBearer
 import traceback
 
 from core.database import create_db_and_tables, check_db_tables
-# from core.auth_middleware import AuthMiddleware
+from core.auth_middleware import AuthMiddleware
 from contextlib import asynccontextmanager
 import uvicorn
 import os
-
-from api.v1.endpoints import company, hr, recruiter_company_link, form_key, job, job_form_key_constraint, application, match, candidate
+from fastapi.middleware.cors import CORSMiddleware
+from api.v1.endpoints import company, hr, recruiter_company_link, form_key, job, job_form_key_constraint, application, match, candidate, auth
 # from api.v1.endpoints import auth as auth_router
 
 # Get debug mode from environment variable, default to True
 DEBUG_MODE = os.getenv("DEBUG_MODE", "True").lower() == "true"
 
+# Define a bearer scheme for Swagger UI. 
+# auto_error=False because our AuthMiddleware handles the actual enforcement.
+# This is primarily for documentation and enabling the "Authorize" button.
+swagger_ui_bearer_scheme = HTTPBearer(auto_error=False, bearerFormat="JWT", scheme_name="JWTBearerAuth")
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup logic
-    create_db_and_tables()
+    # create_db_and_tables()
     all_exist, missing_tables = check_db_tables()
     if not all_exist:
         print("Creating database tables...")
@@ -33,13 +39,21 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Matching API",
-    description="API for the matching application",
+    description="API for the matching application with JWT Bearer authentication.",
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
+    dependencies=[Depends(swagger_ui_bearer_scheme)] # Add as global dependency for Swagger UI
 )
 
-# Add AuthMiddleware - this should generally be one of the first middlewares
-# app.add_middleware(AuthMiddleware)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+# Add AuthMiddleware - this should generally be after CORS but before most route-specific logic
+app.add_middleware(AuthMiddleware)
 
 # # Add error traceback middleware
 # app.add_middleware(
@@ -74,7 +88,7 @@ app = FastAPI(
 
 
 # Include routers
-# app.include_router(auth_router.router, prefix="/api/v1/auth", tags=["auth"])
+app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(company.router, prefix="/api/v1/companies", tags=["companies"])
 app.include_router(hr.router, prefix="/api/v1/hrs", tags=["hrs"])
 app.include_router(recruiter_company_link.router, prefix="/api/v1/recruiter_company_links", tags=["recruiter_company_links"])
@@ -85,7 +99,7 @@ app.include_router(application.router, prefix="/api/v1/applications", tags=["app
 app.include_router(match.router, prefix="/api/v1/matches", tags=["matches"])
 app.include_router(candidate.router, prefix="/api/v1/candidates", tags=["candidates"])
 
-@app.get("/")
+@app.get("/", summary="Root endpoint for API health and info")
 async def root():
     return {
         "message": "Welcome to the Matching API",

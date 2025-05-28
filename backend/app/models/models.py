@@ -18,6 +18,7 @@ class CompanyBase(SQLModel):
     website: Optional[str] = None
     logo_url: Optional[str] = None
     is_owner: bool = Field(default=False)
+    domain: Optional[str] = Field(default=None,description="The domain of the company example: @gmail.com")
 
 
 class Company(CompanyBase, TimeBase, table=True):
@@ -45,7 +46,7 @@ class Company(CompanyBase, TimeBase, table=True):
 
 class HRBase(SQLModel):
     email: str = Field(index=True, unique=True)
-    password_hash: str
+    password: str
     full_name: str
     company_id: int = Field(foreign_key="company.id")
     role: str
@@ -156,14 +157,16 @@ class Application(ApplicationBase, TimeBase, table=True):
     matches: List["Match"] = Relationship(back_populates="application")
     interviews: List["Interview"] = Relationship(back_populates="application")
 
-
-class Interview(SQLModel, TimeBase, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
+class InterviewBase(SQLModel):
     application_id: int = Field(foreign_key="application.id")
     date: datetime
     type: str  # e.g. phone, zoom, in-person
     status: str  # scheduled, done, canceled
     notes: Optional[str] = None
+
+
+class Interview(InterviewBase, TimeBase, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
 
     application: Optional[Application] = Relationship(back_populates="interviews")
 

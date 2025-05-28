@@ -70,7 +70,7 @@ def run_sequential_crud_tests():
     try:
         # Test data
         company_data = {"name": "TestCo", "description": "A test company", "industry": "Tech", "is_owner": True}
-        hr_data = {"email": "hr@testco.com", "password_hash": "hashed_password", "full_name": "Test HR", "role": "hr_manager"}
+        hr_data = {"email": "hr@testco.com", "password": "hashed_password", "full_name": "Test HR", "role": "hr_manager"}
         form_key_data = {"name": "ExperienceYears", "field_type": "number", "required": True}
         job_data = {"job_data": {"title": "Software Engineer", "description": "Develop software"}, "status": "open", "form_key_ids": []}
         candidate_data = {"full_name": "Test Candidate", "email": "candidate@example.com", "phone": "1234567890"}

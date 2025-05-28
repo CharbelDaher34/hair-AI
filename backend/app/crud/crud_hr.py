@@ -4,7 +4,7 @@ from sqlmodel import Session, select
 
 from models.models import HR
 from schemas import HRCreate, HRUpdate
-
+from core.security import get_password_hash
 
 def get_hr(db: Session, hr_id: int) -> Optional[HR]:
     return db.get(HR, hr_id)
@@ -29,6 +29,7 @@ def create_hr(db: Session, *, hr_in: HRCreate) -> HR:
     # Here you might want to add password hashing before saving
     # For now, assuming password_hash is already hashed
     db_hr = HR.model_validate(hr_in)
+    db_hr.password = get_password_hash(hr_in.password)
     db.add(db_hr)
     db.commit()
     db.refresh(db_hr)

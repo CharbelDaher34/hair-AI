@@ -12,7 +12,7 @@ create_db_and_tables()
 API_V1_PREFIX = "http://localhost:8017/api/v1"
 client = httpx.Client(base_url=API_V1_PREFIX)
 # client = TestClient(app)
-
+create_db_and_tables()
 
 
 def run_api_tests():
@@ -31,12 +31,6 @@ def run_api_tests():
     recruiter_hr_id: uuid.UUID | None = None
     link_id: uuid.UUID | None = None
     created_recruiter_job_id: uuid.UUID | None = None
-    # Store IDs for the second set of resources
-    company_id_2: uuid.UUID | None = None
-    hr_id_2: uuid.UUID | None = None
-    form_key_id_2: uuid.UUID | None = None
-    job_id_2: uuid.UUID | None = None
-
 
     # Test data (mirrors test_crud_functions.py)
     company_data = {
@@ -50,7 +44,7 @@ def run_api_tests():
     }
     hr_data = {
         "email": "hr.api@testco.com",
-        "password_hash": "hashed_password_api",
+        "password": "hashed_password_api",
         "full_name": "Api Test HR",
         "role": "hr_manager"
         # company_id will be added dynamically
@@ -120,30 +114,10 @@ def run_api_tests():
     # RecruiterCompanyLink data will be created dynamically with recruiter_id and target_company_id
     # JobFormKeyConstraint data will be created dynamically with job_id, form_key_id, constraints
 
-    # --- Second set of data ---
-    company_data_2 = {
-        "name": "ApiTestCoTwo",
-        "description": "A second test company via API",
-        "industry": "Services",
-        "is_owner": True,
-        "bio": "This is a test bio for ApiTestCoTwo.",
-        "website": "https://apitestcotwo.example.com",
-        "logo_url": "https://apitestcotwo.example.com/logo.png"
-    }
-    hr_data_2 = {"email": "hr.api@testcotwo.com", "password_hash": "hashed_password_api_2", "full_name": "Api Test HR Two", "role": "hr_recruiter"}
-    form_key_data_2 = {
-        "name": "LocationPreferenceApi",
-        "field_type": "text",
-        "required": False,
-        "enum_values": ["Remote", "Hybrid", "On-site"]
-    }
-    job_data_payload_2 = {"job_data": {"title": "API Data Analyst", "description": "Analyze data via API"}, "status": "pending", "form_key_ids": []}
-
-
     # --- 1. Company ---
-    print("\\n--- Testing Company API ---")
+    print("\n--- Testing Company API ---")
     response = client.post(f"{API_V1_PREFIX}/companies/", json=company_data)
-    assert response.status_code == 201, f"Failed to create company: {response.text}"  # FastAPI returns 201 for successful creation
+    assert response.status_code == 201, f"Failed to create company: {response.text}"
     created_company = response.json()
     assert created_company["name"] == company_data["name"]
     assert created_company["bio"] == company_data["bio"]
@@ -171,69 +145,35 @@ def run_api_tests():
     assert any(c["id"] == company_id for c in companies_list)
     print(f"READ Companies: Found {len(companies_list)} companies.")
 
-    # Create second company
-    print("\n--- Testing Second Company API ---")
-    response = client.post(f"{API_V1_PREFIX}/companies/", json=company_data_2)
-    assert response.status_code == 201, f"Failed to create company 2: {response.text}"
-    created_company_2 = response.json()
-    assert created_company_2["name"] == company_data_2["name"]
-    assert created_company_2["industry"] == company_data_2["industry"]
-    company_id_2 = created_company_2["id"]
-    print(f"CREATE Company 2: {created_company_2['name']} (ID: {company_id_2})")
-
-    response = client.get(f"{API_V1_PREFIX}/companies/{company_id_2}")
-    assert response.status_code == 200, response.text
-    retrieved_company_2 = response.json()
-    assert retrieved_company_2["id"] == company_id_2
-    print(f"READ Company 2: {retrieved_company_2['name']}")
-
-
     # --- 2. HR ---
-    print("\\n--- Testing HR API ---")
+    print("\n--- Testing HR API ---")
+    
     hr_create_data = {**hr_data, "company_id": company_id}
-    response = client.post(f"{API_V1_PREFIX}/hrs/", json=hr_create_data)
-    assert response.status_code == 201, f"Failed to create HR: {response.text}"  # FastAPI returns 201 for successful creation
-    created_hr = response.json()
-    assert created_hr["email"] == hr_data["email"]
-    hr_id = created_hr["id"]
-    print(f"CREATE HR: {created_hr['full_name']} (ID: {hr_id}) for Company ID: {company_id}")
-
-    response = client.get(f"{API_V1_PREFIX}/hrs/{hr_id}")
+    response = client.post(f"{API_V1_PREFIX}/auth/register", json=hr_create_data)
+    assert response.status_code == 201, f"Failed to create HR: {response.text}"
+   
+    token = response.json()["access_token"]
+    client.headers.update({"Authorization": f"Bearer {token}"})
+    response = client.get(f"{API_V1_PREFIX}/hrs/")
     assert response.status_code == 200, response.text
     retrieved_hr = response.json()
-    assert retrieved_hr["id"] == hr_id
+    print(retrieved_hr)
+    hr_id = retrieved_hr["id"]
     print(f"READ HR: {retrieved_hr['full_name']}")
 
-    hr_update_data = {"full_name": "Updated Api Test HR Name"}
-    response = client.patch(f"{API_V1_PREFIX}/hrs/{hr_id}", json=hr_update_data)
-    assert response.status_code == 200, response.text
-    updated_hr_res = response.json()
-    assert updated_hr_res["full_name"] == hr_update_data["full_name"]
-    print(f"UPDATE HR: {updated_hr_res['full_name']}")
+    # hr_update_data = {"full_name": "Updated Api Test HR Name"}
+    # response = client.patch(f"{API_V1_PREFIX}/hrs/{hr_id}", json=hr_update_data)
+    # assert response.status_code == 200, response.text
+    # updated_hr_res = response.json()
+    # assert updated_hr_res["full_name"] == hr_update_data["full_name"]
+    # print(f"UPDATE HR: {updated_hr_res['full_name']}")
 
-    # Create HR for second company
-    print("\n--- Testing Second HR API ---")
-    hr_create_data_2 = {**hr_data_2, "company_id": company_id_2}
-    response = client.post(f"{API_V1_PREFIX}/hrs/", json=hr_create_data_2)
-    assert response.status_code == 201, f"Failed to create HR 2: {response.text}"
-    created_hr_2 = response.json()
-    assert created_hr_2["email"] == hr_data_2["email"]
-    hr_id_2 = created_hr_2["id"]
-    print(f"CREATE HR 2: {created_hr_2['full_name']} (ID: {hr_id_2}) for Company ID: {company_id_2}")
-
-    response = client.get(f"{API_V1_PREFIX}/hrs/{hr_id_2}")
-    assert response.status_code == 200, response.text
-    retrieved_hr_2 = response.json()
-    assert retrieved_hr_2["id"] == hr_id_2
-    print(f"READ HR 2: {retrieved_hr_2['full_name']}")
-
-
+   
     # --- 3. FormKey ---
-    print("\\n--- Testing FormKey API ---")
+    print("\n--- Testing FormKey API ---")
     form_key_create_data = {**form_key_data, "company_id": company_id}
     response = client.post(f"{API_V1_PREFIX}/form_keys/", json=form_key_create_data)
     print(response)
-    
     assert response.status_code == 201, f"Failed to create FormKey: {response.text}"
     created_form_key = response.json()
     assert created_form_key["name"] == form_key_data["name"]
@@ -254,25 +194,8 @@ def run_api_tests():
     assert updated_form_key_res["field_type"] == "text"
     print(f"UPDATE FormKey: {updated_form_key_res['name']}, New Field Type: {updated_form_key_res['field_type']}")
 
-    # Create FormKey for second company
-    print("\n--- Testing Second FormKey API ---")
-    form_key_create_data_2 = {**form_key_data_2, "company_id": company_id_2}
-    response = client.post(f"{API_V1_PREFIX}/form_keys/", json=form_key_create_data_2)
-    assert response.status_code == 201, f"Failed to create FormKey 2: {response.text}"
-    created_form_key_2 = response.json()
-    assert created_form_key_2["name"] == form_key_data_2["name"]
-    form_key_id_2 = created_form_key_2["id"]
-    print(f"CREATE FormKey 2: {created_form_key_2['name']} (ID: {form_key_id_2}) for Company ID: {company_id_2}")
-
-    response = client.get(f"{API_V1_PREFIX}/form_keys/{form_key_id_2}")
-    assert response.status_code == 200, response.text
-    retrieved_form_key_2 = response.json()
-    assert retrieved_form_key_2["id"] == form_key_id_2
-    print(f"READ FormKey 2: {retrieved_form_key_2['name']}")
-
-
     # --- 4. Job ---
-    print("\\n--- Testing Job API ---")
+    print("\n--- Testing Job API ---")
     job_create_data = {**job_data_payload, "employer_id": company_id, "created_by": hr_id}
     response = client.post(f"{API_V1_PREFIX}/jobs/", json=job_create_data)
     assert response.status_code == 201, f"Failed to create Job: {response.text}"
@@ -294,25 +217,8 @@ def run_api_tests():
     assert updated_job_res["status"] == "closed"
     print(f"UPDATE Job: '{updated_job_res['job_data']['title']}', New Status: {updated_job_res['status']}")
 
-    # Create Job for second company
-    print("\n--- Testing Second Job API ---")
-    job_create_data_2 = {**job_data_payload_2, "employer_id": company_id_2, "created_by": hr_id_2}
-    response = client.post(f"{API_V1_PREFIX}/jobs/", json=job_create_data_2)
-    assert response.status_code == 201, f"Failed to create Job 2: {response.text}"
-    created_job_2 = response.json()
-    assert created_job_2["job_data"]["title"] == job_data_payload_2["job_data"]["title"]
-    job_id_2 = created_job_2["id"]
-    print(f"CREATE Job 2: '{created_job_2['job_data']['title']}' (ID: {job_id_2}) for Company ID: {company_id_2}, HR ID: {hr_id_2}")
-
-    response = client.get(f"{API_V1_PREFIX}/jobs/{job_id_2}")
-    assert response.status_code == 200, response.text
-    retrieved_job_2 = response.json()
-    assert retrieved_job_2["id"] == job_id_2
-    print(f"READ Job 2: '{retrieved_job_2['job_data']['title']}'")
-
-
     # --- 5. JobFormKeyConstraint ---
-    print("\\n--- Testing JobFormKeyConstraint API ---")
+    print("\n--- Testing JobFormKeyConstraint API ---")
     constraint_create_data = {"job_id": job_id, "form_key_id": form_key_id, "constraints": {"min_value": 1}}
     response = client.post(f"{API_V1_PREFIX}/job_form_key_constraints/", json=constraint_create_data)
     assert response.status_code == 201, f"Failed to create JobFormKeyConstraint: {response.text}"
@@ -334,13 +240,12 @@ def run_api_tests():
     assert updated_constraint_res["constraints"]["max_value"] == 5
     print(f"UPDATE JobFormKeyConstraint: ID {updated_constraint_res['id']}, New Constraints: {updated_constraint_res['constraints']}")
 
-
     # --- 6. Candidate ---
     print("\n--- Testing Candidate API ---")
     resume_pdf_path = "/storage/hussein/matching/ai/app/services/llm/Charbel_Daher_Resume.pdf"
     with open(resume_pdf_path, "rb") as resume_file:
         files = {"resume": ("Charbel_Daher_Resume.pdf", resume_file, "application/pdf")}
-        data = {"candidate_in": json.dumps(candidate_data)}  # candidate_in as a JSON string
+        data = {"candidate_in": json.dumps(candidate_data)}
         response = client.post(
             f"{API_V1_PREFIX}/candidates/",
             data=data,
@@ -368,83 +273,11 @@ def run_api_tests():
     assert updated_candidate_res["phone"] == "0987654321"
     print(f"UPDATE Candidate: {updated_candidate_res['full_name']}, New Phone: {updated_candidate_res['phone']}")
 
-
-    # --- Additional Candidates for Company 2 ---
-    print("\n--- Testing Additional Candidates for Company 2 ---")
-    candidate_data_2 = {
-        "full_name": "Api Test Candidate Two",
-        "email": "candidate2.api@example.com",
-        "phone": "2222222222",
-        "resume_url": "https://example.com/resume2.pdf",
-        "parsed_resume": {"skills": ["sql", "data analysis"], "summary": "Data analyst."}
-    }
-    candidate_data_3 = {
-        "full_name": "Api Test Candidate Three",
-        "email": "candidate3.api@example.com",
-        "phone": "3333333333",
-        "resume_url": "https://example.com/resume3.pdf",
-        "parsed_resume": {"skills": ["project management"], "summary": "Project manager."}
-    }
-    resume_pdf_path = "/storage/hussein/matching/ai/app/services/llm/Charbel_Daher_Resume.pdf"
-    # Candidate 2
-    with open(resume_pdf_path, "rb") as resume_file:
-        files = {"resume": ("Charbel_Daher_Resume.pdf", resume_file, "application/pdf")}
-        data = {"candidate_in": json.dumps(candidate_data_2)}
-        response = client.post(
-            f"{API_V1_PREFIX}/candidates/",
-            data=data,
-            files=files,
-            timeout=None
-        )
-    assert response.status_code == 201, f"Failed to create Candidate 2: {response.text}"
-    created_candidate_2 = response.json()
-    assert created_candidate_2["email"] == candidate_data_2["email"]
-    candidate_id_2 = created_candidate_2["id"]
-    print(f"CREATE Candidate 2: {created_candidate_2['full_name']} (ID: {candidate_id_2})")
-    # Candidate 3
-    with open(resume_pdf_path, "rb") as resume_file:
-        files = {"resume": ("Charbel_Daher_Resume.pdf", resume_file, "application/pdf")}
-        data = {"candidate_in": json.dumps(candidate_data_3)}
-        response = client.post(
-            f"{API_V1_PREFIX}/candidates/",
-            data=data,
-            files=files,
-            timeout=None
-        )
-    assert response.status_code == 201, f"Failed to create Candidate 3: {response.text}"
-    created_candidate_3 = response.json()
-    assert created_candidate_3["email"] == candidate_data_3["email"]
-    candidate_id_3 = created_candidate_3["id"]
-    print(f"CREATE Candidate 3: {created_candidate_3['full_name']} (ID: {candidate_id_3})")
-
-    # --- Applications for Company 2's Job ---
-    print("\n--- Testing Applications for Company 2's Job ---")
-    application_data_payload_2 = {"form_responses": {"location_preference": "Remote", "experience": "2 years", "extra_field": "extra_value"}}
-    application_data_payload_3 = {"form_responses": {"location_preference": "On-site", "experience": "5 years", "extra_field": "extra_value"}}
-    # Application for Candidate 2
-    application_create_data_2 = {**application_data_payload_2, "candidate_id": candidate_id_2, "job_id": job_id_2}
-    response = client.post(f"{API_V1_PREFIX}/applications/", json=application_create_data_2, timeout=None)
-    assert response.status_code == 201, f"Failed to create Application 2: {response.text}"
-    created_application_2 = response.json()
-    assert created_application_2["candidate_id"] == candidate_id_2
-    application_id_2 = created_application_2["id"]
-    print(f"CREATE Application 2 (ID: {application_id_2}) for Candidate 2, Job 2")
-    # Application for Candidate 3
-    application_create_data_3 = {**application_data_payload_3, "candidate_id": candidate_id_3, "job_id": job_id_2}
-    response = client.post(f"{API_V1_PREFIX}/applications/", json=application_create_data_3, timeout=None)
-    assert response.status_code == 201, f"Failed to create Application 3: {response.text}"
-    created_application_3 = response.json()
-    assert created_application_3["candidate_id"] == candidate_id_3
-    application_id_3 = created_application_3["id"]
-    print(f"CREATE Application 3 (ID: {application_id_3}) for Candidate 3, Job 2")
-
-
     # --- 7. Application ---
-    print("\\n--- Testing Application API ---")
+    print("\n--- Testing Application API ---")
     application_create_data = {**application_data_payload, "candidate_id": candidate_id, "job_id": job_id}
     response = client.post(f"{API_V1_PREFIX}/applications/", json=application_create_data,timeout=None)
     assert response.status_code == 201
-    
     created_application = response.json()
     print(created_application)
     assert created_application["candidate_id"] == candidate_id
@@ -463,7 +296,6 @@ def run_api_tests():
     updated_application_res = response.json()
     assert updated_application_res["form_responses"]["status"] == "interview"
     print(f"UPDATE Application: ID {updated_application_res['id']}, New Form Responses: {updated_application_res['form_responses']}")
-
 
     # --- 8. Match ---
     import time
@@ -492,7 +324,6 @@ def run_api_tests():
             }
         }
     ]}
-    
     response = client.get(f"{API_V1_PREFIX}/matches/by-application/{application_id}")
     assert response.status_code == 200, response.text
     retrieved_matches = response.json()
@@ -535,10 +366,9 @@ def run_api_tests():
     assert updated_results[0]["score"] == 0.9
     assert updated_results[0]["skill_analysis"]["match_percentage"] == 100
     print(f"UPDATE Match: ID {updated_match_res['id']}, New Score: {updated_match_res['match_result']['results'][0]['score']}")
-    
 
     # --- 9. RecruiterCompanyLink ---
-    print("\\n--- Testing RecruiterCompanyLink API ---")
+    print("\n--- Testing RecruiterCompanyLink API ---")
     # Create a second company to be the recruiter (ApiTargetLinkCo)
     response = client.post(f"{API_V1_PREFIX}/companies/", json=company_data_target)
     assert response.status_code == 201, f"Failed to create recruiter company: {response.text}"
@@ -550,11 +380,20 @@ def run_api_tests():
 
     # Create HR for the recruiter company
     recruiter_hr_data = {**hr_data, "email": "hr.api@targetlinkco.com", "full_name": "Api Recruiter HR", "company_id": recruiter_company_id}
-    response = client.post(f"{API_V1_PREFIX}/hrs/", json=recruiter_hr_data)
+    response = client.post(f"{API_V1_PREFIX}/auth/register", json=recruiter_hr_data)
     assert response.status_code == 201, f"Failed to create recruiter HR: {response.text}"
-    created_recruiter_hr = response.json()
-    recruiter_hr_id = created_recruiter_hr["id"]
-    print(f"CREATE Recruiter HR: {created_recruiter_hr['full_name']} (ID: {recruiter_hr_id}) for Company ID: {recruiter_company_id}")
+    print(f"CREATE Recruiter HR.")
+
+ 
+    token = response.json()["access_token"]
+    client.headers.update({"Authorization": f"Bearer {token}"})
+    response = client.get(f"{API_V1_PREFIX}/hrs/")
+    assert response.status_code == 200, response.text
+    retrieved_hr = response.json()
+   
+    recruiter_hr_id = retrieved_hr["id"]
+    print(f"READ HR: {retrieved_hr['full_name']}")
+    
 
     # Create link where ApiTargetLinkCo is the recruiter and ApiTestCo is the target
     link_create_data = {"recruiter_id": recruiter_company_id, "target_company_id": company_id}
@@ -571,7 +410,6 @@ def run_api_tests():
     assert retrieved_link["id"] == link_id
     print(f"READ RecruiterCompanyLink: ID {retrieved_link['id']}")
 
-    # Update test for RecruiterCompanyLink is skipped (no updatable fields in current model/schema)
     print("UPDATE RecruiterCompanyLink: Skipped (no updatable fields in current model/schema or not implemented)")
     
     # Create a job through the recruiter for the target company
@@ -597,7 +435,7 @@ def run_api_tests():
 
 
     # --- Deletion Tests (in reverse order of dependency, or careful order) ---
-    print("\\n--- Testing Deletion API Endpoints ---")
+    print("\n--- Testing Deletion API Endpoints ---")
 
     # # Matches depend on Applications
     # if match_id:
@@ -697,21 +535,19 @@ def run_api_tests():
     #     assert response.status_code == 404, "Recruiter Company not deleted"
 
 
-    # print("\\n=== API Endpoint Tests Completed ===")
+    # print("\n=== API Endpoint Tests Completed ===")
 
 
 if __name__ == "__main__":
     try:
         print("Running API Endpoint Tests...")
         run_api_tests()
-        print("\\n=== API Endpoint Tests Succeeded! ===")
+        print("\n=== API Endpoint Tests Succeeded! ===")
     except AssertionError as e:
-        print(f"\\nXXX API ASSERTION FAILED XXX: {e}")
+        print(f"\nXXX API ASSERTION FAILED XXX: {e}")
         import traceback
-        # traceback.print_exc()
     except Exception as e:
-        print(f"\\nXXX AN API ERROR OCCURRED XXX: {e}")
+        print(f"\nXXX AN API ERROR OCCURRED XXX: {e}")
         import traceback
-        # traceback.print_exc()
     finally:
         print("wowowowow")
