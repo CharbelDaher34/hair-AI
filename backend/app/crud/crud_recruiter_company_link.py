@@ -16,8 +16,8 @@ def get_recruiter_company_links_by_recruiter(db: Session, recruiter_id: int, ski
     return db.exec(statement).all()
 
 
-def get_recruiter_company_links_by_target_company(db: Session, target_company_id: int, skip: int = 0, limit: int = 100) -> List[RecruiterCompanyLink]:
-    statement = select(RecruiterCompanyLink).where(RecruiterCompanyLink.target_company_id == target_company_id).offset(skip).limit(limit)
+def get_recruiter_company_links_by_target_company(db: Session, target_employer_id: int, skip: int = 0, limit: int = 100) -> List[RecruiterCompanyLink]:
+    statement = select(RecruiterCompanyLink).where(RecruiterCompanyLink.target_employer_id == target_employer_id).offset(skip).limit(limit)
     return db.exec(statement).all()
 
 

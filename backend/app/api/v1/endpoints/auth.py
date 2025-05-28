@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm # For form data
 from sqlmodel import Session
-
+import time
 from core.database import get_session
 from core.security import (
     create_access_token, verify_password, Token, get_password_hash # Added get_password_hash
@@ -33,15 +33,9 @@ async def register_hr_and_get_token(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already registered"
         )
-
-    # Hash the password before creating the HR entry
-    hashed_password = get_password_hash(form_data.password)
-    
-    form_data.password = hashed_password
-
-  
+    print(f"form_data: {form_data.password}")
     created_hr_user: HR = crud_create_hr(db=db, hr_in=form_data) # Pass the HR model instance
-    
+    print(f"created_hr_user: {created_hr_user}")
     if not created_hr_user:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -49,7 +43,7 @@ async def register_hr_and_get_token(
         )
     
     access_token = create_access_token(
-        data={"sub": created_hr_user.email, "user_type": "hr", "id": created_hr_user.id, "company_id": created_hr_user.company_id}
+        data={"sub": created_hr_user.email, "user_type": "hr", "id": created_hr_user.id, "employer_id": created_hr_user.employer_id}
     )
     return Token(
         access_token=access_token, 
@@ -74,24 +68,22 @@ async def login_for_access_token(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    # Assuming HR model stores password_hash in a field named 'password_hash'
-    # The test file had 'hr_user.password' which might be a property or a direct field if not hashed.
-    # For consistency with registration, password should be hashed in DB.
-    if not verify_password(form_data.password, hr_user.password_hash): 
+    # Verify the plain password against the stored hashed password
+    if not verify_password(form_data.password, hr_user.password): 
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    if not hr_user.id or not hasattr(hr_user, 'company_id') or not hr_user.company_id:
+    if not hr_user.id or not hasattr(hr_user, 'employer_id') or not hr_user.employer_id:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="User data is incomplete (missing ID or company_id)."
+            detail="User data is incomplete (missing ID or employer_id)."
         )
 
     access_token = create_access_token(
-        data={"sub": hr_user.email, "user_type": "hr", "id": hr_user.id, "company_id": hr_user.company_id}
+        data={"sub": hr_user.email, "user_type": "hr", "id": hr_user.id, "employer_id": hr_user.employer_id}
     )
     
     return Token(access_token=access_token, token_type="bearer")

@@ -85,18 +85,18 @@ def read_hr_by_email(
         )
     return hr
 
-@router.get("/by-company/{company_id}", response_model=List[HRRead])
+@router.get("/by-company/{employer_id}", response_model=List[HRRead])
 def read_hrs_by_company(
     *,
     db: Session = Depends(get_session),
-    company_id: int,
+    employer_id: int,
     skip: int = 0,
     limit: int = 100
 ) -> List[HRRead]:
     """
     Get all HR users for a specific company with pagination.
     """
-    hrs = crud_hr.get_hrs_by_company(db=db, company_id=company_id, skip=skip, limit=limit)
+    hrs = crud_hr.get_hrs_by_company(db=db, employer_id=employer_id, skip=skip, limit=limit)
     return hrs
 
 @router.patch("/{hr_id}", response_model=HRRead)

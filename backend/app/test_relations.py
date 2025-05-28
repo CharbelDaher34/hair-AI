@@ -23,10 +23,10 @@ from crud import (
     get_recruiter_company_links_by_target_company
 )
 
-def display_company_relations(db: Session, company_id: int):
-    company = get_company(db, company_id=company_id)
+def display_company_relations(db: Session, employer_id: int):
+    company = get_company(db, employer_id=employer_id)
     if not company:
-        print(f"Company with ID {company_id} not found.")
+        print(f"Company with ID {employer_id} not found.")
         return
 
     print(f"--- Relations for Company: {company.name} (ID: {company.id}) ---")
@@ -36,7 +36,7 @@ def display_company_relations(db: Session, company_id: int):
 
     # HRs
     print("\n  HRs:")
-    hrs = get_hrs_by_company(db, company_id=company.id)
+    hrs = get_hrs_by_company(db, employer_id=company.id)
     if hrs:
         for hr_obj in hrs: # Renamed to avoid conflict with crud.get_hr
             print(f"    - HR ID: {hr_obj.id}, Name: {hr_obj.full_name}, Email: {hr_obj.email}, Role: {hr_obj.role}")
@@ -45,7 +45,7 @@ def display_company_relations(db: Session, company_id: int):
 
     # FormKeys owned by this Company
     print("\n  FormKeys Owned:")
-    form_keys_owned = get_form_keys_by_company(db, company_id=company.id)
+    form_keys_owned = get_form_keys_by_company(db, employer_id=company.id)
     if form_keys_owned:
         for fk in form_keys_owned:
             print(f"    - FormKey ID: {fk.id}, Name: {fk.name}, Type: {fk.field_type}")
@@ -63,7 +63,7 @@ def display_company_relations(db: Session, company_id: int):
                 print(f"      Created By HR: {hr_creator.full_name} (ID: {hr_creator.id})")
             
             if job.recruited_to_id:
-                recruited_to_company = get_company(db, company_id=job.recruited_to_id)
+                recruited_to_company = get_company(db, employer_id=job.recruited_to_id)
                 if recruited_to_company:
                     print(f"      Recruited For (Client): {recruited_to_company.name} (ID: {recruited_to_company.id})")
 
@@ -111,7 +111,7 @@ def display_company_relations(db: Session, company_id: int):
     print("\n  Jobs Recruited For This Company (this company is the client):")
     if company.recruited_jobs: # SQLAlchemy relationship
         for job in company.recruited_jobs:
-            employer_company = get_company(db, company_id=job.employer_id) # This is the recruiter company
+            employer_company = get_company(db, employer_id=job.employer_id) # This is the recruiter company
             employer_info = f"Recruiter: {employer_company.name} (ID: {employer_company.id})" if employer_company else "Unknown Recruiter"
             hr_creator = get_hr(db, hr_id=job.created_by)
             creator_info = f"Created by HR: {hr_creator.full_name} (ID: {hr_creator.id}) at {employer_company.name}" if hr_creator and employer_company else ""
@@ -130,8 +130,8 @@ def display_company_relations(db: Session, company_id: int):
     recruiter_links = get_recruiter_company_links_by_recruiter(db, recruiter_id=company.id)
     if recruiter_links:
         for link in recruiter_links:
-            target_co = get_company(db, company_id=link.target_company_id)
-            target_info = f"Target/Client Company ID: {link.target_company_id}"
+            target_co = get_company(db, employer_id=link.target_employer_id)
+            target_info = f"Target/Client Company ID: {link.target_employer_id}"
             if target_co:
                 target_info += f" (Name: {target_co.name})"
             print(f"    - Link ID: {link.id}, Links to: {target_info}")
@@ -140,10 +140,10 @@ def display_company_relations(db: Session, company_id: int):
 
     # Recruited-To Links (Company is Target/Client for a recruiter)
     print("\n  Recruited-To Links (this company is the target/client of a recruiter):")
-    recruited_to_links = get_recruiter_company_links_by_target_company(db, target_company_id=company.id)
+    recruited_to_links = get_recruiter_company_links_by_target_company(db, target_employer_id=company.id)
     if recruited_to_links:
         for link in recruited_to_links:
-            recruiter_co = get_company(db, company_id=link.recruiter_id)
+            recruiter_co = get_company(db, employer_id=link.recruiter_id)
             recruiter_info = f"Recruiter Company ID: {link.recruiter_id}"
             if recruiter_co:
                 recruiter_info += f" (Name: {recruiter_co.name})"
@@ -164,7 +164,7 @@ def main():
 
         if test_company:
             print(f"Found company '{test_company.name}' with ID {test_company.id}. Fetching relations...")
-            display_company_relations(db, company_id=test_company.id)
+            display_company_relations(db, employer_id=test_company.id)
         else:
             print(f"Company with name '{company_name_to_test}' not found.")
             print("Attempting to fetch the first available company...")
@@ -172,7 +172,7 @@ def main():
             if all_companies:
                 first_company = all_companies[0]
                 print(f"Found first company: {first_company.name} (ID: {first_company.id}). Fetching relations...")
-                display_company_relations(db, company_id=first_company.id)
+                display_company_relations(db, employer_id=first_company.id)
             else:
                 print("No companies found in the database. Please ensure test data exists (e.g., by running test_crud_functions.py).")
 

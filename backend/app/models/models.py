@@ -1,6 +1,7 @@
+from enum import Enum
 from typing import Optional, List, Dict, Union
 from sqlmodel import SQLModel, Field, Relationship, Column, Text
-from sqlalchemy import Boolean, JSON
+from sqlalchemy import Boolean, JSON, Enum as SQLAlchemyEnum
 from datetime import datetime
 from pydantic import validator
 
@@ -36,7 +37,7 @@ class Company(CompanyBase, TimeBase, table=True):
     )
     recruited_to_links: List["RecruiterCompanyLink"] = Relationship(
         back_populates="target_company",
-        sa_relationship_kwargs={"foreign_keys": "RecruiterCompanyLink.target_company_id"}
+        sa_relationship_kwargs={"foreign_keys": "RecruiterCompanyLink.target_employer_id"}
     )
     recruited_jobs: List["Job"] = Relationship(
         back_populates="recruited_to",
@@ -48,7 +49,7 @@ class HRBase(SQLModel):
     email: str = Field(index=True, unique=True)
     password: str
     full_name: str
-    company_id: int = Field(foreign_key="company.id")
+    employer_id: int = Field(foreign_key="company.id")
     role: str
 
 
@@ -61,7 +62,7 @@ class HR(HRBase, TimeBase, table=True):
 
 class RecruiterCompanyLinkBase(SQLModel):
     recruiter_id: int = Field(foreign_key="company.id")
-    target_company_id: int = Field(foreign_key="company.id")
+    target_employer_id: int = Field(foreign_key="company.id")
 
 
 class RecruiterCompanyLink(RecruiterCompanyLinkBase, TimeBase, table=True):
@@ -73,17 +74,28 @@ class RecruiterCompanyLink(RecruiterCompanyLinkBase, TimeBase, table=True):
     )
     target_company: Optional[Company] = Relationship(
         back_populates="recruited_to_links",
-        sa_relationship_kwargs={"foreign_keys": "RecruiterCompanyLink.target_company_id"}
+        sa_relationship_kwargs={"foreign_keys": "RecruiterCompanyLink.target_employer_id"}
     )
 
+class FieldType(str,Enum):
+    TEXT = "text"
+    NUMBER = "number"
+    EMAIL = "email"
+    DATE = "date"
+    SELECT = "select"
+    TEXTAREA = "textarea"
+    CHECKBOX = "checkbox"
 
-class FormKeyBase(SQLModel):
-    company_id: int = Field(foreign_key="company.id")
+class FormKeyBase(SQLModel):    
+    employer_id: int = Field(foreign_key="company.id")
     name: str
-    field_type: str
+    # field_type: FieldType = Field(default=FieldType.TEXT, sa_column=Column(SQLAlchemyEnum(FieldType)))
     enum_values: Optional[List[str]] = Field(default=None, sa_column=Column(JSON))
     required: bool = Field(default=False)
-
+    field_type: FieldType = Field(
+        default=FieldType.TEXT,
+        sa_column=Column(SQLAlchemyEnum(FieldType, name="fieldtype_enum", create_type=True))
+    )
 
 class FormKey(FormKeyBase, TimeBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -110,7 +122,7 @@ class JobBase(SQLModel):
     recruited_to_id: Optional[int] = Field(default=None, foreign_key="company.id")
     job_data: Dict = Field(sa_column=Column(JSON))
     status: str
-    created_by: int = Field(foreign_key="hr.id")
+    created_by_hr_id: int = Field(foreign_key="hr.id")
 
 
 class Job(JobBase, TimeBase, table=True):

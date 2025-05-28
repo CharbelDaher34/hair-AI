@@ -6,8 +6,8 @@ from models.models import Company
 from schemas import CompanyCreate, CompanyUpdate
 
 
-def get_company(db: Session, company_id: int) -> Optional[Company]:
-    return db.get(Company, company_id)
+def get_company(db: Session, employer_id: int) -> Optional[Company]:
+    return db.get(Company, employer_id)
 
 
 def get_company_by_name(db: Session, name: str) -> Optional[Company]:
@@ -45,8 +45,8 @@ def update_company(
     return db_company
 
 
-def delete_company(db: Session, *, company_id: int) -> Optional[Company]:
-    db_company = db.get(Company, company_id)
+def delete_company(db: Session, *, employer_id: int) -> Optional[Company]:
+    db_company = db.get(Company, employer_id)
     if db_company:
         db.delete(db_company)
         db.commit()

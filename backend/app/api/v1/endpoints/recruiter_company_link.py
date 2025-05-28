@@ -41,15 +41,15 @@ def read_links_by_recruiter(
 ) -> List[RecruiterCompanyLinkRead]:
     return crud_recruiter_company_link.get_recruiter_company_links_by_recruiter(db=db, recruiter_id=recruiter_id, skip=skip, limit=limit)
 
-@router.get("/by-target-company/{target_company_id}", response_model=List[RecruiterCompanyLinkRead])
+@router.get("/by-target-company/{target_employer_id}", response_model=List[RecruiterCompanyLinkRead])
 def read_links_by_target_company(
     *,
     db: Session = Depends(get_session),
-    target_company_id: int,
+    target_employer_id: int,
     skip: int = 0,
     limit: int = 100
 ) -> List[RecruiterCompanyLinkRead]:
-    return crud_recruiter_company_link.get_recruiter_company_links_by_target_company(db=db, target_company_id=target_company_id, skip=skip, limit=limit)
+    return crud_recruiter_company_link.get_recruiter_company_links_by_target_company(db=db, target_employer_id=target_employer_id, skip=skip, limit=limit)
 
 @router.patch("/{link_id}", response_model=RecruiterCompanyLinkRead)
 def update_recruiter_company_link(
