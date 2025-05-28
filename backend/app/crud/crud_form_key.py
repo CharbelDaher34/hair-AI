@@ -10,8 +10,8 @@ def get_form_key(db: Session, form_key_id: int) -> Optional[FormKey]:
     return db.get(FormKey, form_key_id)
 
 
-def get_form_keys_by_company(db: Session, company_id: int, skip: int = 0, limit: int = 100) -> List[FormKey]:
-    statement = select(FormKey).where(FormKey.company_id == company_id).offset(skip).limit(limit)
+def get_form_keys_by_company(db: Session, employer_id: int, skip: int = 0, limit: int = 100) -> List[FormKey]:
+    statement = select(FormKey).where(FormKey.employer_id == employer_id).offset(skip).limit(limit)
     return db.exec(statement).all()
 
 

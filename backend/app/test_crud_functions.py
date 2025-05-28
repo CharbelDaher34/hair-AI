@@ -85,10 +85,10 @@ def run_sequential_crud_tests():
         created_company = create_company(db=db, company_in=company_in)
         assert created_company and created_company.name == company_data["name"] and created_company.is_owner == company_data["is_owner"]
         print(f"CREATE Company: {created_company.name} (ID: {created_company.id})")
-        company_id = created_company.id
+        employer_id = created_company.id
 
-        retrieved_company = get_company(db=db, company_id=company_id)
-        assert retrieved_company and retrieved_company.id == company_id
+        retrieved_company = get_company(db=db, employer_id=employer_id)
+        assert retrieved_company and retrieved_company.id == employer_id
         print(f"READ Company: {retrieved_company.name}")
 
         company_update_data = CompanyUpdate(description="Updated company description.")
@@ -99,11 +99,11 @@ def run_sequential_crud_tests():
 
         # --- 2. HR ---
         print("\\n--- Testing HR ---")
-        hr_in_data = {**hr_data, "company_id": company_id}
+        hr_in_data = {**hr_data, "employer_id": employer_id}
         hr_in = HRCreate(**hr_in_data)
         created_hr = create_hr(db=db, hr_in=hr_in)
         assert created_hr and created_hr.email == hr_data["email"]
-        print(f"CREATE HR: {created_hr.full_name} (ID: {created_hr.id}) for Company ID: {company_id}")
+        print(f"CREATE HR: {created_hr.full_name} (ID: {created_hr.id}) for Company ID: {employer_id}")
         hr_id = created_hr.id
 
         retrieved_hr = get_hr(db=db, hr_id=hr_id)
@@ -118,11 +118,11 @@ def run_sequential_crud_tests():
 
         # --- 3. FormKey ---
         print("\\n--- Testing FormKey ---")
-        form_key_in_data = {**form_key_data, "company_id": company_id}
+        form_key_in_data = {**form_key_data, "employer_id": employer_id}
         form_key_in = FormKeyCreate(**form_key_in_data)
         created_form_key = create_form_key(db=db, form_key_in=form_key_in)
         assert created_form_key and created_form_key.name == form_key_data["name"]
-        print(f"CREATE FormKey: {created_form_key.name} (ID: {created_form_key.id}) for Company ID: {company_id}")
+        print(f"CREATE FormKey: {created_form_key.name} (ID: {created_form_key.id}) for Company ID: {employer_id}")
         form_key_id = created_form_key.id
 
         retrieved_form_key = get_form_key(db=db, form_key_id=form_key_id)
@@ -137,11 +137,11 @@ def run_sequential_crud_tests():
 
         # --- 4. Job ---
         print("\\n--- Testing Job ---")
-        job_in_data = {**job_data, "employer_id": company_id, "created_by": hr_id}
+        job_in_data = {**job_data, "employer_id": employer_id, "created_by": hr_id}
         job_in = JobCreate(**job_in_data)
         created_job = create_job(db=db, job_in=job_in)
         assert created_job and created_job.job_data["title"] == job_data["job_data"]["title"]
-        print(f"CREATE Job: '{created_job.job_data['title']}' (ID: {created_job.id}) for Company ID: {company_id}, HR ID: {hr_id}")
+        print(f"CREATE Job: '{created_job.job_data['title']}' (ID: {created_job.id}) for Company ID: {employer_id}, HR ID: {hr_id}")
         job_id = created_job.id
 
         retrieved_job = get_job(db=db, job_id=job_id)
@@ -254,11 +254,11 @@ def run_sequential_crud_tests():
         created_recruiter_company = create_company(db=db, company_in=recruiter_company_in)
         assert created_recruiter_company and created_recruiter_company.name == company_data_target["name"]
         print(f"CREATE Recruiter Company: {created_recruiter_company.name} (ID: {created_recruiter_company.id})")
-        recruiter_company_id = created_recruiter_company.id
+        recruiter_employer_id = created_recruiter_company.id
 
         # Create HR for the recruiter company
         recruiter_hr_data = {**hr_data, "email": "hr@targetlinkco.com", "full_name": "Recruiter HR"}
-        recruiter_hr_in_data = {**recruiter_hr_data, "company_id": recruiter_company_id}
+        recruiter_hr_in_data = {**recruiter_hr_data, "employer_id": recruiter_employer_id}
         recruiter_hr_in = HRCreate(**recruiter_hr_in_data)
         created_recruiter_hr = create_hr(db=db, hr_in=recruiter_hr_in)
         assert created_recruiter_hr and created_recruiter_hr.email == recruiter_hr_data["email"]
@@ -266,11 +266,11 @@ def run_sequential_crud_tests():
         recruiter_hr_id = created_recruiter_hr.id
 
         # Create link where TargetLinkCo is the recruiter and TestCo is the target
-        link_data = {"recruiter_id": recruiter_company_id, "target_company_id": company_id}
+        link_data = {"recruiter_id": recruiter_employer_id, "target_employer_id": employer_id}
         link_in = RecruiterCompanyLinkCreate(**link_data)
         created_link = create_recruiter_company_link(db=db, link_in=link_in)
-        assert created_link and created_link.target_company_id == company_id
-        print(f"CREATE RecruiterCompanyLink (ID: {created_link.id}) from Recruiter {recruiter_company_id} to Target {company_id}")
+        assert created_link and created_link.target_employer_id == employer_id
+        print(f"CREATE RecruiterCompanyLink (ID: {created_link.id}) from Recruiter {recruiter_employer_id} to Target {employer_id}")
         link_id = created_link.id
 
         # Create a job through the recruiter for the target company
@@ -281,8 +281,8 @@ def run_sequential_crud_tests():
         }
         recruiter_job_in_data = {
             **recruiter_job_data,
-            "employer_id": recruiter_company_id,  # Recruiter company creates the job
-            "recruited_to_id": company_id,        # But it's for TestCo
+            "employer_id": recruiter_employer_id,  # Recruiter company creates the job
+            "recruited_to_id": employer_id,        # But it's for TestCo
             "created_by": recruiter_hr_id         # Created by recruiter's HR
         }
         recruiter_job_in = JobCreate(**recruiter_job_in_data)
@@ -308,10 +308,10 @@ def run_sequential_crud_tests():
         # print(f"DELETE RecruiterCompanyLink: ID {deleted_link.id}")
 
         # # Clean up the target company created for the link
-        # deleted_target_company = delete_company(db=db, company_id=target_company_id)
-        # assert deleted_target_company and deleted_target_company.id == target_company_id
-        # assert get_company(db=db, company_id=target_company_id) is None
-        # print(f"DELETE Target Company for Link: {deleted_target_company.name} (ID: {target_company_id})")
+        # deleted_target_company = delete_company(db=db, employer_id=target_employer_id)
+        # assert deleted_target_company and deleted_target_company.id == target_employer_id
+        # assert get_company(db=db, employer_id=target_employer_id) is None
+        # print(f"DELETE Target Company for Link: {deleted_target_company.name} (ID: {target_employer_id})")
 
         # --- Final Cleanup (in reverse order of creation due to dependencies) ---
         print("\\n--- Final Cleanup ---")
@@ -352,11 +352,11 @@ def run_sequential_crud_tests():
         #     assert get_hr(db=db, hr_id=hr_id) is None
         #     print(f"DELETE HR: ID {hr_id}")
 
-        # if 'company_id' in locals() and get_company(db=db, company_id=company_id):
-        #     deleted_company = delete_company(db=db, company_id=company_id)
-        #     assert deleted_company and deleted_company.id == company_id
-        #     assert get_company(db=db, company_id=company_id) is None
-        #     print(f"DELETE Company: ID {company_id}")
+        # if 'employer_id' in locals() and get_company(db=db, employer_id=employer_id):
+        #     deleted_company = delete_company(db=db, employer_id=employer_id)
+        #     assert deleted_company and deleted_company.id == employer_id
+        #     assert get_company(db=db, employer_id=employer_id) is None
+        #     print(f"DELETE Company: ID {employer_id}")
 
         print("\\n=== Sequential CRUD Tests Completed Successfully! ===")
 

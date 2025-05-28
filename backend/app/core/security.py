@@ -23,7 +23,7 @@ class TokenData(BaseModel):
     email: Optional[EmailStr] = None
     user_type: Optional[str] = None # Should be 'hr'
     id: Optional[int] = None
-    company_id: Optional[int] = None
+    employer_id: Optional[int] = None
 
 # Removed GoogleUserInfo class
 
@@ -52,11 +52,11 @@ def decode_access_token(token: str) -> Optional[TokenData]:
         email: Optional[str] = payload.get("sub")
         user_type: Optional[str] = payload.get("user_type")
         user_id: Optional[int] = payload.get("id")
-        company_id: Optional[int] = payload.get("company_id")
-        if email is None or user_type != "hr" or user_id is None or company_id is None:
-            # Consider if company_id is strictly required for all token types or just HR
+        employer_id: Optional[int] = payload.get("employer_id")
+        if email is None or user_type != "hr" or user_id is None or employer_id is None:
+            # Consider if employer_id is strictly required for all token types or just HR
             return None
-        return TokenData(email=email, user_type=user_type, id=user_id, company_id=company_id)
+        return TokenData(email=email, user_type=user_type, id=user_id, employer_id=employer_id)
     except JWTError:
         return None
 

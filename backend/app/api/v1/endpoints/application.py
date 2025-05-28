@@ -19,15 +19,14 @@ def create_application(
     db: Session = Depends(get_session),
     application_in: ApplicationCreate
 ) -> ApplicationRead:
+    application = crud_application.create_application(db=db, application_in=application_in)
     try:
-        application = crud_application.create_application(db=db, application_in=application_in)
         # Create a match for this application
         from schemas import MatchCreate
         match_in = MatchCreate(application_id=application.id)
         crud_match.create_match(db=db, match_in=match_in)
     except Exception as e:
-        print(traceback.format_exc())
-        raise HTTPException(status_code=400, detail=str(e))
+        print("No match created for application",application.id)
     return application
 
 @router.get("/{application_id}", response_model=ApplicationRead)

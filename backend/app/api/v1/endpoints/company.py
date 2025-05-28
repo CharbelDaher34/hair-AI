@@ -25,16 +25,16 @@ def create_company(
         raise e
     return company
 
-@router.get("/{company_id}", response_model=CompanyRead)
+@router.get("/{employer_id}", response_model=CompanyRead)
 def read_company(
     *,
     db: Session = Depends(get_session),
-    company_id: int
+    employer_id: int
 ) -> CompanyRead:
     """
     Get a specific company by ID.
     """
-    company = crud_company.get_company(db=db, company_id=company_id)
+    company = crud_company.get_company(db=db, employer_id=employer_id)
     if not company:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -72,17 +72,17 @@ def read_company_by_name(
         )
     return company
 
-@router.patch("/{company_id}", response_model=CompanyRead)
+@router.patch("/{employer_id}", response_model=CompanyRead)
 def update_company(
     *,
     db: Session = Depends(get_session),
-    company_id: int,
+    employer_id: int,
     company_in: CompanyUpdate
 ) -> CompanyRead:
     """
     Update a company.
     """
-    company = crud_company.get_company(db=db, company_id=company_id)
+    company = crud_company.get_company(db=db, employer_id=employer_id)
     if not company:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -91,16 +91,16 @@ def update_company(
     company = crud_company.update_company(db=db, db_company=company, company_in=company_in)
     return company
 
-@router.delete("/{company_id}", response_model=CompanyRead)
+@router.delete("/{employer_id}", response_model=CompanyRead)
 def delete_company(
     *,
     db: Session = Depends(get_session),
-    company_id: int
+    employer_id: int
 ) -> CompanyRead:
     """
     Delete a company.
     """
-    company = crud_company.delete_company(db=db, company_id=company_id)
+    company = crud_company.delete_company(db=db, employer_id=employer_id)
     if not company:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

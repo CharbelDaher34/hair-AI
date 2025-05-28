@@ -20,8 +20,8 @@ def get_hrs(db: Session, skip: int = 0, limit: int = 100) -> List[HR]:
     return db.exec(statement).all()
 
 
-def get_hrs_by_company(db: Session, company_id: int, skip: int = 0, limit: int = 100) -> List[HR]:
-    statement = select(HR).where(HR.company_id == company_id).offset(skip).limit(limit)
+def get_hrs_by_company(db: Session, employer_id: int, skip: int = 0, limit: int = 100) -> List[HR]:
+    statement = select(HR).where(HR.employer_id == employer_id).offset(skip).limit(limit)
     return db.exec(statement).all()
 
 

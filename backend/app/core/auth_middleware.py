@@ -26,6 +26,11 @@ class AuthMiddleware(BaseHTTPMiddleware):
     ) -> Response:
         request.state.user = None  # Initialize user in request state
 
+        # Skip authentication for OPTIONS requests (CORS preflight)
+        if request.method == "OPTIONS":
+            response = await call_next(request)
+            return response
+
         # Check if the current path is public
         is_public_path = False
         current_path = request.url.path
@@ -47,14 +52,36 @@ class AuthMiddleware(BaseHTTPMiddleware):
                     is_public_path = True
 
         if is_public_path:
+            print(f"is_public_path: {is_public_path}")
             # For public paths, proceed without authentication enforcement
             response = await call_next(request)
             return response
         else:
+            print(f"is_public_path: {is_public_path}")
             # For non-public paths, enforce authentication
             credentials: Optional[HTTPAuthorizationCredentials] = await bearer_scheme(request)
-            
+            # print(f"credentials: {credentials}")
+            # print(request.headers.get("Authorization"))
             if not credentials:
+                # Fallback: try to extract token manually
+                auth_header = request.headers.get("authorization") or request.headers.get("Authorization")
+                if auth_header and auth_header.startswith("Bearer "):
+                    token = auth_header.split(" ", 1)[1]
+                    
+                    token_data: Optional[TokenData] = decode_access_token(token)
+                    
+                    if token_data is None:
+                        return JSONResponse(
+                            status_code=status.HTTP_401_UNAUTHORIZED,
+                            content={"detail": "Invalid or expired token, or insufficient permissions."},
+                            headers={"WWW-Authenticate": "Bearer"},
+                        )
+                    
+                    # Token is valid, attach user data to request state
+                    request.state.user = token_data
+                    response = await call_next(request)
+                    return response
+                
                 return JSONResponse(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     content={"detail": "Not authenticated. Authorization header missing or invalid."},
@@ -63,8 +90,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
             
             token = credentials.credentials
             token_data: Optional[TokenData] = decode_access_token(token)
-            
-            # decode_access_token itself checks for user_type == 'hr' and presence of company_id
+            # decode_access_token itself checks for user_type == 'hr' and presence of employer_id
             if token_data is None: 
                 return JSONResponse(
                     status_code=status.HTTP_401_UNAUTHORIZED,

@@ -11,11 +11,12 @@ def get_job(db: Session, job_id: int) -> Optional[Job]:
 
 def get_jobs(db: Session, skip: int = 0, limit: int = 100) -> List[Job]:
     statement = select(Job).offset(skip).limit(limit)
+
     return db.exec(statement).all()
 
 
 def get_jobs_by_employer(db: Session, employer_id: int, skip: int = 0, limit: int = 100) -> List[Job]:
-    statement = select(Job).where(Job.employer_id == employer_id).offset(skip).limit(limit)
+    statement = select(Job).where(Job.recruited_to_id == employer_id).offset(skip).limit(limit)
     return db.exec(statement).all()
 
 

@@ -1,5 +1,5 @@
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlmodel import Session
 
 from core.database import get_session
@@ -14,6 +14,7 @@ def create_job(
     db: Session = Depends(get_session),
     job_in: JobCreate
 ) -> JobRead:
+    print(f"job_in: {job_in}")
     try:
         job = crud_job.create_job(db=db, job_in=job_in)
     except Exception as e:
@@ -24,9 +25,13 @@ def create_job(
 def read_job(
     *,
     db: Session = Depends(get_session),
-    job_id: int
+    job_id: int,
+    request: Request
 ) -> JobRead:
+    user = request.state.user
     job = crud_job.get_job(db=db, job_id=job_id)
+    if job.recruited_to_id != user.employer_id:
+        raise HTTPException(status_code=403, detail="You are not authorized to access this job")
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     return job
@@ -36,8 +41,11 @@ def read_jobs(
     *,
     db: Session = Depends(get_session),
     skip: int = 0,
-    limit: int = 100
+    limit: int = 100,
+    request: Request
 ) -> List[JobRead]:
+    user = request.state.user
+    print(f"user: {user}")
     return crud_job.get_jobs(db=db, skip=skip, limit=limit)
 
 @router.get("/by-employer/{employer_id}", response_model=List[JobRead])
@@ -46,8 +54,12 @@ def read_jobs_by_employer(
     db: Session = Depends(get_session),
     employer_id: int,
     skip: int = 0,
-    limit: int = 100
+    limit: int = 100,
+    request: Request
 ) -> List[JobRead]:
+    user = request.state.user
+    if employer_id != user.employer_id:
+        raise HTTPException(status_code=403, detail="You are not authorized to access this job")
     return crud_job.get_jobs_by_employer(db=db, employer_id=employer_id, skip=skip, limit=limit)
 
 @router.get("/by-status/{status}", response_model=List[JobRead])
