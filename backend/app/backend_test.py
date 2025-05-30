@@ -57,11 +57,18 @@ def run_api_tests():
         # employer_id will be added dynamically
     }
     job_data_payload = {
-        "job_data": {"title": "API Software Engineer", "description": "Develop software via API", "extra_field": "extra_value"},
-        "status": "open",
-        "form_key_ids": [],
-        # employer_id, created_by will be added dynamically
-        "recruited_to_id": None
+        "title": "API Software Engineer",
+        "description": "Develop software via API",
+        "location": "Remote",
+        "salary_min": 100000,
+        "salary_max": 150000,
+        "experience_level": "1-3_years",
+        "seniority_level": "entry",
+        "status": "published",
+        "job_type": "full_time",
+        "job_category": "software_engineering",
+        "recruited_to_id": None,
+        "job_data": {}
     }
     candidate_data = {
         "full_name": "Api Test Candidate",
@@ -196,26 +203,33 @@ def run_api_tests():
 
     # --- 4. Job ---
     print("\n--- Testing Job API ---")
-    job_create_data = {**job_data_payload, "employer_id": employer_id, "created_by_hr_id": hr_id, "recruited_to_id": employer_id}
+    job_create_data = {**job_data_payload, "recruited_to_id": employer_id}
     response = client.post(f"{API_V1_PREFIX}/jobs/", json=job_create_data)
     assert response.status_code == 201, f"Failed to create Job: {response.text}"
     created_job = response.json()
-    assert created_job["job_data"]["title"] == job_data_payload["job_data"]["title"]
+    assert created_job["title"] == job_data_payload["title"]
+    assert created_job["description"] == job_data_payload["description"]
+    assert created_job["location"] == job_data_payload["location"]
+    assert created_job["salary_min"] == job_data_payload["salary_min"]
+    assert created_job["salary_max"] == job_data_payload["salary_max"]
+    assert created_job["experience_level"] == job_data_payload["experience_level"]
+    assert created_job["seniority_level"] == job_data_payload["seniority_level"]
+    assert created_job["job_type"] == job_data_payload["job_type"]
     job_id = created_job["id"]
-    print(f"CREATE Job: '{created_job['job_data']['title']}' (ID: {job_id}) for Company ID: {employer_id}, HR ID: {hr_id}")
+    print(f"CREATE Job: '{created_job['title']}' (ID: {job_id}) for Company ID: {employer_id}, HR ID: {hr_id}")
 
     response = client.get(f"{API_V1_PREFIX}/jobs/{job_id}")
     assert response.status_code == 200, response.text
     retrieved_job = response.json()
     assert retrieved_job["id"] == job_id
-    print(f"READ Job: '{retrieved_job['job_data']['title']}'")
+    print(f"READ Job: '{retrieved_job['title']}'")
 
     job_update_data = {"status": "closed"}
     response = client.patch(f"{API_V1_PREFIX}/jobs/{job_id}", json=job_update_data)
     assert response.status_code == 200, response.text
     updated_job_res = response.json()
     assert updated_job_res["status"] == "closed"
-    print(f"UPDATE Job: '{updated_job_res['job_data']['title']}', New Status: {updated_job_res['status']}")
+    print(f"UPDATE Job: '{updated_job_res['title']}', New Status: {updated_job_res['status']}")
 
     # --- 5. JobFormKeyConstraint ---
     print("\n--- Testing JobFormKeyConstraint API ---")
@@ -415,25 +429,37 @@ def run_api_tests():
     
     # Create a job through the recruiter for the target company
     recruiter_job_data_payload = {
-        "job_data": {"title": "Senior API Software Engineer", "description": "Recruited position for ApiTestCo"},
-        "status": "open",
-        "form_key_ids": []
+        "title": "Senior API Software Engineer",
+        "description": "Recruited position for ApiTestCo",
+        "location": "Remote",
+        "salary_min": 100000,
+        "salary_max": 150000,
+        "experience_level": "1-3_years",
+        "seniority_level": "entry",
+        "status": "published",
+        "job_type": "full_time",
+        "job_category": "software_engineering",
+        "recruited_to_id": employer_id,
+        "job_data": {}
     }
     
     recruiter_job_create_data = {
         **recruiter_job_data_payload,
-        "employer_id": recruiter_employer_id,  # Recruiter company creates the job
-        "recruited_to_id": employer_id,        # But it's for ApiTestCo (target company)
-        "created_by_hr_id": recruiter_hr_id         # Created by recruiter's HR
     }
     response = client.post(f"{API_V1_PREFIX}/jobs/", json=recruiter_job_create_data)
     assert response.status_code == 201, f"Failed to create recruited job: {response.text}"
     created_recruiter_job = response.json()
     created_recruiter_job_id = created_recruiter_job["id"]
-    assert created_recruiter_job["job_data"]["title"] == recruiter_job_data_payload["job_data"]["title"]
-    assert created_recruiter_job["employer_id"] == recruiter_employer_id
-    assert created_recruiter_job["recruited_to_id"] == employer_id
-    print(f"CREATE Recruited Job: '{created_recruiter_job['job_data']['title']}' (ID: {created_recruiter_job_id}) for Target Company ID: {employer_id}")
+    assert created_recruiter_job["title"] == recruiter_job_data_payload["title"]
+    assert created_recruiter_job["description"] == recruiter_job_data_payload["description"]
+    assert created_recruiter_job["location"] == recruiter_job_data_payload["location"]
+    assert created_recruiter_job["salary_min"] == recruiter_job_data_payload["salary_min"]
+    assert created_recruiter_job["salary_max"] == recruiter_job_data_payload["salary_max"]
+    assert created_recruiter_job["experience_level"] == recruiter_job_data_payload["experience_level"]
+    assert created_recruiter_job["seniority_level"] == recruiter_job_data_payload["seniority_level"]
+    assert created_recruiter_job["job_type"] == recruiter_job_data_payload["job_type"]
+    assert created_recruiter_job["job_category"] == recruiter_job_data_payload["job_category"]
+    print(f"CREATE Recruited Job: '{created_recruiter_job['title']}' (ID: {created_recruiter_job_id}) for Target Company ID: {employer_id}")
 
 
     # --- Deletion Tests (in reverse order of dependency, or careful order) ---

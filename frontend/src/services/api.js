@@ -80,6 +80,14 @@ class ApiService {
     return this.request('/companies/');
   }
 
+  async getRecruitToCompanies() {
+    return this.request('/companies/recruit_to');
+  }
+
+  async getCurrentCompany() {
+    return this.request('/companies/by_hr/');
+  }
+
   // HR endpoints
   async createHR(hrData) {
     return this.request('/hrs/', {
@@ -245,6 +253,10 @@ class ApiService {
     return this.request(`/job_form_key_constraints/${constraintId}`);
   }
 
+  async getConstraintsByJob(jobId, skip = 0, limit = 100) {
+    return this.request(`/job_form_key_constraints/by-job/${jobId}?skip=${skip}&limit=${limit}`);
+  }
+
   async updateJobFormKeyConstraint(constraintId, updateData) {
     return this.request(`/job_form_key_constraints/${constraintId}`, {
       method: 'PATCH',
@@ -307,6 +319,17 @@ class ApiService {
 
   async getJobsByStatus(status, skip = 0, limit = 100) {
     return this.request(`/jobs/by-status/${status}?skip=${skip}&limit=${limit}`);
+  }
+
+  async changePassword(passwordData) {
+    return this.request('/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify(passwordData),
+    });
+  }
+
+  async getCurrentUser() {
+    return this.request('/hrs/');
   }
 }
 

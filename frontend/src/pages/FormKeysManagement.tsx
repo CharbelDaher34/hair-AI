@@ -92,11 +92,12 @@ const FormKeysManagement = () => {
         name: formData.name,
         field_type: formData.field_type,
         required: formData.required,
-        enum_values: enum_array,
+        enum_values: enum_array
         // employer_id is no longer needed - extracted from token on backend
       };
 
       if (editingKey) {
+        console.log("form_key_data", form_key_data);
         const updated_key = await apiService.updateFormKey(editingKey.id, form_key_data);
         setFormKeys(formKeys.map(key => 
           key.id === editingKey.id ? updated_key : key
@@ -105,6 +106,7 @@ const FormKeysManagement = () => {
           description: "Form key updated successfully.",
         });
       } else {
+        console.log("form_key_data", form_key_data);
         const new_key = await apiService.createFormKey(form_key_data);
         setFormKeys([...formKeys, new_key]);
         toast.success("Success", {

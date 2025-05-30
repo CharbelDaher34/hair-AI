@@ -1,8 +1,8 @@
-"""Initial database creation
+"""break job data
 
-Revision ID: fd7c2abdbb9d
+Revision ID: fb858d7a57e3
 Revises: 
-Create Date: 2025-05-28 14:45:56.457454
+Create Date: 2025-05-29 13:10:14.828031
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 import sqlmodel
 
 # revision identifiers, used by Alembic.
-revision: str = 'fd7c2abdbb9d'
+revision: str = 'fb858d7a57e3'
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -51,7 +51,7 @@ def upgrade() -> None:
     op.create_table('formkey',
     sa.Column('created_at', sa.DateTime(), nullable=False),
     sa.Column('updated_at', sa.DateTime(), nullable=False),
-    sa.Column('employer_id', sa.Integer(), nullable=False),
+    sa.Column('employer_id', sa.Integer(), nullable=True),
     sa.Column('name', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('enum_values', sa.JSON(), nullable=True),
     sa.Column('required', sa.Boolean(), nullable=False),
@@ -88,9 +88,18 @@ def upgrade() -> None:
     sa.Column('updated_at', sa.DateTime(), nullable=False),
     sa.Column('employer_id', sa.Integer(), nullable=False),
     sa.Column('recruited_to_id', sa.Integer(), nullable=True),
-    sa.Column('job_data', sa.JSON(), nullable=True),
-    sa.Column('status', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('created_by_hr_id', sa.Integer(), nullable=False),
+    sa.Column('job_data', sa.JSON(), nullable=True),
+    sa.Column('status', sa.Enum('DRAFT', 'PUBLISHED', 'CLOSED', name='status_enum'), nullable=True),
+    sa.Column('title', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+    sa.Column('description', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+    sa.Column('location', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+    sa.Column('salary_min', sa.Integer(), nullable=True),
+    sa.Column('salary_max', sa.Integer(), nullable=True),
+    sa.Column('experience_level', sa.Enum('NO_EXPERIENCE', 'ONE_TO_THREE_YEARS', 'THREE_TO_FIVE_YEARS', 'FIVE_TO_SEVEN_YEARS', 'SEVEN_TO_TEN_YEARS', 'TEN_PLUS_YEARS', name='experiencelevel_enum'), nullable=True),
+    sa.Column('seniority_level', sa.Enum('ENTRY', 'MID', 'SENIOR', name='senioritylevel_enum'), nullable=True),
+    sa.Column('job_type', sa.Enum('FULL_TIME', 'PART_TIME', 'CONTRACT', 'INTERNSHIP', name='jobtype_enum'), nullable=True),
+    sa.Column('job_category', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
     sa.Column('id', sa.Integer(), nullable=False),
     sa.ForeignKeyConstraint(['created_by_hr_id'], ['hr.id'], ),
     sa.ForeignKeyConstraint(['employer_id'], ['company.id'], ),

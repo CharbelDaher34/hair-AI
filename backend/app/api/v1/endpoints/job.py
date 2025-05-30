@@ -1,10 +1,11 @@
-from typing import List
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlmodel import Session
 
 from core.database import get_session
 from crud import crud_job
 from schemas import JobCreate, JobUpdate, JobRead
+from core.security import TokenData
 
 router = APIRouter()
 
@@ -12,9 +13,20 @@ router = APIRouter()
 def create_job(
     *,
     db: Session = Depends(get_session),
-    job_in: JobCreate
+    job_in: JobCreate,
+    request: Request
 ) -> JobRead:
-    print(f"job_in: {job_in}")
+    current_user: Optional[TokenData] = request.state.user
+    if not current_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials"
+        )
+    
+    # Create job data with employer_id and created_by_hr_id from token
+    job_in.employer_id = current_user.employer_id
+    job_in.created_by_hr_id = current_user.id
+    print(f"job_data: {job_in}")
     try:
         job = crud_job.create_job(db=db, job_in=job_in)
     except Exception as e:

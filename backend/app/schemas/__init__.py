@@ -31,4 +31,5 @@ __all__ = [
     "MatchRead",
     "RecruiterCompanyLinkCreate",
     "RecruiterCompanyLinkUpdate",
+    "RecruiterCompanyLinkRead",
 ]

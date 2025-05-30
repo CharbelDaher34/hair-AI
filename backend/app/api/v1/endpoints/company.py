@@ -1,10 +1,11 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlmodel import Session
 
 from core.database import get_session
 from crud import crud_company
 from schemas import CompanyCreate, CompanyUpdate, CompanyRead
+from core.security import TokenData
 
 router = APIRouter()
 
@@ -24,6 +25,27 @@ def create_company(
         print(f"Error creating company: {e}")
         raise e
     return company
+
+@router.get("/recruit_to", response_model=List[CompanyRead])
+def read_recruit_to_companies(
+    *,
+    db: Session = Depends(get_session),
+    request: Request
+) -> List[CompanyRead]:
+    """
+    Get all companies that the current user can recruit to.
+    """
+    current_user: Optional[TokenData] = request.state.user
+    if not current_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials"
+        )
+    
+    employer_id = current_user.employer_id
+    print(f"employer_id: {employer_id}")
+    companies = crud_company.get_recruit_to_companies(db=db, target_employer_id=employer_id)
+    return companies
 
 @router.get("/{employer_id}", response_model=CompanyRead)
 def read_company(
@@ -106,4 +128,22 @@ def delete_company(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Company not found"
         )
+    return company
+
+@router.get("/by_hr/", response_model=CompanyRead)
+def get_current_company(
+    *,
+    db: Session = Depends(get_session),
+    request: Request
+) -> CompanyRead:
+    """
+    Get the current company.
+    """
+    current_user: Optional[TokenData] = request.state.user
+    if not current_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials"
+        )
+    company = crud_company.get_company(db=db, employer_id=current_user.employer_id)
     return company
