@@ -7,7 +7,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
-import { Building2, User, Save, Edit3, Eye, EyeOff } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Building2, User, Save, Edit3, Eye, EyeOff, Plus, Trash2 } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import apiService from "@/services/api";
 
@@ -32,13 +34,27 @@ interface HRData {
   updated_at?: string;
 }
 
+interface RecruiterCompanyLink {
+  id: number;
+  recruiter_id: number;
+  target_employer_id: number;
+  created_at: string;
+  updated_at: string;
+}
+
+interface RecruiterCompanyLinkWithCompany extends RecruiterCompanyLink {
+  target_company?: CompanyData;
+}
+
 const Profile = () => {
   const [company_data, set_company_data] = useState<CompanyData | null>(null);
   const [hr_data, set_hr_data] = useState<HRData | null>(null);
+  const [recruitable_companies, set_recruitable_companies] = useState<RecruiterCompanyLinkWithCompany[]>([]);
   const [is_loading, set_is_loading] = useState(true);
   const [is_saving, set_is_saving] = useState(false);
   const [is_editing_company, set_is_editing_company] = useState(false);
   const [is_editing_personal, set_is_editing_personal] = useState(false);
+  const [is_add_company_open, set_is_add_company_open] = useState(false);
   
   // Form states
   const [company_form, set_company_form] = useState<Partial<CompanyData>>({});
@@ -47,6 +63,14 @@ const Profile = () => {
     current_password: "",
     new_password: "",
     confirm_password: "",
+  });
+  const [new_company_form, set_new_company_form] = useState({
+    name: "",
+    domain: "",
+    description: "",
+    industry: "",
+    website: "",
+    bio: "",
   });
   const [show_passwords, set_show_passwords] = useState({
     current: false,
@@ -78,12 +102,36 @@ const Profile = () => {
       set_hr_data(hr_response);
       set_personal_form(hr_response);
 
+      // Load recruitable companies
+      await load_recruitable_companies();
+
     } catch (error: any) {
       toast.error("Failed to load profile data", {
         description: error?.message || "An unexpected error occurred.",
       });
     } finally {
       set_is_loading(false);
+    }
+  };
+
+  const load_recruitable_companies = async () => {
+    try {
+      const links = await apiService.getRecruiterCompanyLinksByRecruiter();
+      // For each link, we need to get the target company details
+      const links_with_companies = await Promise.all(
+        links.map(async (link: RecruiterCompanyLink) => {
+          try {
+            const target_company = await apiService.getCompany(link.target_employer_id);
+            return { ...link, target_company };
+          } catch (error) {
+            console.error(`Failed to load company ${link.target_employer_id}:`, error);
+            return link;
+          }
+        })
+      );
+      set_recruitable_companies(links_with_companies);
+    } catch (error: any) {
+      console.error("Failed to load recruitable companies:", error);
     }
   };
 
@@ -97,6 +145,10 @@ const Profile = () => {
 
   const handle_password_form_change = (field: string, value: string) => {
     set_password_form(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handle_new_company_form_change = (field: string, value: string) => {
+    set_new_company_form(prev => ({ ...prev, [field]: value }));
   };
 
   const save_company_changes = async () => {
@@ -166,6 +218,79 @@ const Profile = () => {
     }
   };
 
+  const add_recruitable_company = async () => {
+    if (!new_company_form.name.trim()) {
+      toast.error("Company name is required");
+      return;
+    }
+
+    if (!hr_data?.employer_id) {
+      toast.error("Current company ID not found");
+      return;
+    }
+
+    set_is_saving(true);
+    try {
+      // First create the company
+      const company_payload = {
+        name: new_company_form.name,
+        description: new_company_form.description || "",
+        industry: new_company_form.industry || "",
+        website: new_company_form.website || "",
+        bio: new_company_form.bio || "",
+        ...(new_company_form.domain && { domain: new_company_form.domain }),
+      };
+
+      const created_company = await apiService.createCompany(company_payload);
+
+      // Then create the recruiter company link
+      const link_payload = {
+        employer_id: hr_data.employer_id,
+        recruiter_id: hr_data.employer_id,
+        target_employer_id: created_company.id,
+      };
+
+      await apiService.createRecruiterCompanyLink(link_payload);
+
+      // Reset form and close dialog
+      set_new_company_form({
+        name: "",
+        domain: "",
+        description: "",
+        industry: "",
+        website: "",
+        bio: "",
+      });
+      set_is_add_company_open(false);
+
+      // Reload recruitable companies
+      await load_recruitable_companies();
+
+      toast.success("Recruitable company added successfully!");
+    } catch (error: any) {
+      toast.error("Failed to add recruitable company", {
+        description: error?.message || "An unexpected error occurred.",
+      });
+    } finally {
+      set_is_saving(false);
+    }
+  };
+
+  const remove_recruitable_company = async (link_id: number) => {
+    set_is_saving(true);
+    try {
+      await apiService.deleteRecruiterCompanyLink(link_id);
+      await load_recruitable_companies();
+      toast.success("Recruitable company removed successfully!");
+    } catch (error: any) {
+      toast.error("Failed to remove recruitable company", {
+        description: error?.message || "An unexpected error occurred.",
+      });
+    } finally {
+      set_is_saving(false);
+    }
+  };
+
   const cancel_company_edit = () => {
     set_company_form(company_data || {});
     set_is_editing_company(false);
@@ -196,7 +321,7 @@ const Profile = () => {
         </div>
 
         <Tabs defaultValue="company" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="company" className="flex items-center gap-2">
               <Building2 className="h-4 w-4" />
               Company
@@ -205,6 +330,7 @@ const Profile = () => {
               <User className="h-4 w-4" />
               Personal
             </TabsTrigger>
+            <TabsTrigger value="recruitable">Recruitable</TabsTrigger>
             <TabsTrigger value="security">Security</TabsTrigger>
           </TabsList>
 
@@ -406,6 +532,178 @@ const Profile = () => {
                       Cancel
                     </Button>
                   </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="recruitable">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Recruitable Companies</CardTitle>
+                    <CardDescription>
+                      Manage companies that your organization can recruit for
+                    </CardDescription>
+                  </div>
+                  <Dialog open={is_add_company_open} onOpenChange={set_is_add_company_open}>
+                    <DialogTrigger asChild>
+                      <Button>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Company
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-2xl">
+                      <DialogHeader>
+                        <DialogTitle>Add Recruitable Company</DialogTitle>
+                        <DialogDescription>
+                          Create a new company that your organization can recruit for.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="new_company_name">Company Name *</Label>
+                            <Input
+                              id="new_company_name"
+                              value={new_company_form.name}
+                              onChange={(e) => handle_new_company_form_change("name", e.target.value)}
+                              placeholder="Enter company name"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="new_company_domain">Domain</Label>
+                            <Input
+                              id="new_company_domain"
+                              value={new_company_form.domain}
+                              onChange={(e) => handle_new_company_form_change("domain", e.target.value)}
+                              placeholder="company.com"
+                            />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="new_industry">Industry</Label>
+                            <Select
+                              value={new_company_form.industry}
+                              onValueChange={(value) => handle_new_company_form_change("industry", value)}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select industry" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="technology">Technology</SelectItem>
+                                <SelectItem value="healthcare">Healthcare</SelectItem>
+                                <SelectItem value="finance">Finance</SelectItem>
+                                <SelectItem value="education">Education</SelectItem>
+                                <SelectItem value="retail">Retail</SelectItem>
+                                <SelectItem value="manufacturing">Manufacturing</SelectItem>
+                                <SelectItem value="other">Other</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="new_website">Website</Label>
+                            <Input
+                              id="new_website"
+                              type="url"
+                              value={new_company_form.website}
+                              onChange={(e) => handle_new_company_form_change("website", e.target.value)}
+                              placeholder="https://company.com"
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="new_description">Description</Label>
+                          <Textarea
+                            id="new_description"
+                            value={new_company_form.description}
+                            onChange={(e) => handle_new_company_form_change("description", e.target.value)}
+                            placeholder="Brief description of the company"
+                            rows={3}
+                          />
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button
+                          variant="outline"
+                          onClick={() => set_is_add_company_open(false)}
+                          disabled={is_saving}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          onClick={add_recruitable_company}
+                          disabled={is_saving}
+                        >
+                          {is_saving ? "Adding..." : "Add Company"}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {recruitable_companies.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Building2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-medium mb-2">No recruitable companies</h3>
+                    <p className="text-muted-foreground mb-4">
+                      Add companies that your organization can recruit for.
+                    </p>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Company Name</TableHead>
+                        <TableHead>Industry</TableHead>
+                        <TableHead>Website</TableHead>
+                        <TableHead>Added</TableHead>
+                        <TableHead></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {recruitable_companies.map((link) => (
+                        <TableRow key={link.id}>
+                          <TableCell className="font-medium">
+                            {link.target_company?.name || "Unknown Company"}
+                          </TableCell>
+                          <TableCell>
+                            {link.target_company?.industry || "-"}
+                          </TableCell>
+                          <TableCell>
+                            {link.target_company?.website ? (
+                              <a
+                                href={link.target_company.website}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-primary hover:underline"
+                              >
+                                {link.target_company.website}
+                              </a>
+                            ) : (
+                              "-"
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {new Date(link.created_at).toLocaleDateString()}
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => remove_recruitable_company(link.id)}
+                              disabled={is_saving}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 )}
               </CardContent>
             </Card>

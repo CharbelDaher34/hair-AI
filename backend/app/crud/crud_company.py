@@ -53,21 +53,22 @@ def delete_company(db: Session, *, employer_id: int) -> Optional[Company]:
     return db_company
 
 
-def get_recruit_to_companies(db: Session, target_employer_id: int) -> List[CompanyRead]:
+def get_recruit_to_companies(db: Session, employer_id: int) -> List[CompanyRead]:
     """Get all companies that are recruited to by a given employer_id (recruiter_id)"""
-    print(f"recruited_to_id: {target_employer_id}")
+    print(f"recruited_to_id: {employer_id}")
     statement = select(RecruiterCompanyLink).where(
-        RecruiterCompanyLink.target_employer_id == target_employer_id
+        RecruiterCompanyLink.recruiter_id == employer_id
     )
     
-    recruiter_company_links = db.exec(statement).all()
-    recruiter_ids = [link.recruiter_id for link in recruiter_company_links]
-    statement = select(Company).where(Company.id.in_(recruiter_ids))
+    recruited_to_links = db.exec(statement).all()
+    target_employer_ids = [link.target_employer_id for link in recruited_to_links]
+    statement = select(Company).where(Company.id.in_(target_employer_ids))
     companies = db.exec(statement).all()
     
-    statement = select(Company).where(Company.id == target_employer_id)
-    target_company = db.exec(statement).first()
-    companies.append(target_company)
+    current_company = get_company(db, employer_id)
+    if current_company:
+        companies.append(current_company)
+    
     return [CompanyRead.model_validate(company) for company in companies]
   
 
