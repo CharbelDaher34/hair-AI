@@ -1,9 +1,11 @@
 from typing import List, Optional
+from schemas.form_key import FormKeyRead
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlmodel import Session
+from pydantic import BaseModel
 
 from core.database import get_session
-from crud import crud_job
+from crud import crud_job, crud_form_key
 from schemas import JobCreate, JobUpdate, JobRead
 from core.security import TokenData
 
@@ -106,3 +108,59 @@ def delete_job(
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     return job
+
+class JobFormData(BaseModel):
+    job: JobRead
+    form_keys: List[FormKeyRead]
+
+@router.get("/form-data/{job_id}", response_model=JobFormData)
+def get_form_data(
+    *,
+    db: Session = Depends(get_session),
+    job_id: int,
+    request: Request
+) -> JobFormData:
+    """Get job data along with its associated form keys"""
+    current_user: Optional[TokenData] = request.state.user
+    if not current_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials"
+        )
+    
+    job = crud_job.get_job(db=db, job_id=job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    # Check if user has access to this job
+    if job.employer_id != current_user.employer_id and job.recruited_to_id != current_user.employer_id:
+        raise HTTPException(status_code=403, detail="You are not authorized to access this job")
+    
+    form_keys = crud_form_key.get_form_keys(db=db, job_id=job_id)
+    
+    return JobFormData(
+        job=job,
+        form_keys=form_keys
+    )
+
+@router.get("/public/form-data/{job_id}", response_model=JobFormData)
+def get_public_form_data(
+    *,
+    db: Session = Depends(get_session),
+    job_id: int
+) -> JobFormData:
+    """Public endpoint to get job data along with its associated form keys for application forms"""
+    job = crud_job.get_job(db=db, job_id=job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    # Only allow access to active jobs
+    if job.status != "published":
+        raise HTTPException(status_code=404, detail="Job not available for applications")
+    
+    form_keys = crud_form_key.get_form_keys(db=db, job_id=job_id)
+    
+    return JobFormData(
+        job=job,
+        form_keys=form_keys
+    )
