@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Link, useNavigate } from "react-router-dom";
 import { Building2, Eye, EyeOff, ArrowLeft, ArrowRight, Check } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
-import apiService from "@/services/api";
+import apiService from "../services/api";
 
 const SignUp = () => {
   const [current_step, set_current_step] = useState(1);

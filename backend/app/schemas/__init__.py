@@ -1,4 +1,4 @@
-from .application import ApplicationCreate, ApplicationUpdate, ApplicationRead
+from .application import ApplicationCreate, ApplicationUpdate, ApplicationRead, ApplicationWithDetails
 from .candidate import CandidateCreate, CandidateUpdate, CandidateRead
 from .company import CompanyCreate, CompanyUpdate, CompanyRead
 from .form_key import FormKeyCreate, FormKeyUpdate, FormKeyRead
@@ -12,6 +12,7 @@ __all__ = [
     "ApplicationCreate",
     "ApplicationUpdate",
     "ApplicationRead",
+    "ApplicationWithDetails",
     "CandidateCreate",
     "CandidateUpdate",
     "CandidateRead",

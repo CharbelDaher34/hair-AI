@@ -23,6 +23,7 @@ PUBLIC_PATHS_PREFIXES = [
 AUTH_REQUIRED_PATHS_PREFIXES = [
     "/api/v1/companies/recruit_to",
     "/api/v1/companies/by_hr",
+    "/api/v1/applications/employer-applications",
 ]
 
 # HTTPBearer scheme for extracting token

@@ -1,14 +1,14 @@
 from enum import Enum
 from typing import Optional, List, Dict, Union
 from sqlmodel import SQLModel, Field, Relationship, Column, Text
-from sqlalchemy import Boolean, JSON, Enum as SQLAlchemyEnum
+from sqlalchemy import Boolean, JSON, Enum as SQLAlchemyEnum, UniqueConstraint
 from datetime import datetime
 from pydantic import validator
 
 
 class TimeBase(SQLModel):
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: Optional[datetime] = Field(default_factory=datetime.utcnow)
+    updated_at: Optional[datetime] = Field(default_factory=datetime.utcnow)
 
 
 class CompanyBase(TimeBase):
@@ -102,13 +102,15 @@ class FormKey(FormKeyBase, table=True):
     company: Optional[Company] = Relationship(back_populates="form_keys")
     job_constraints: List["JobFormKeyConstraint"] = Relationship(back_populates="form_key")
 
-
+    
 class JobFormKeyConstraintBase(TimeBase):
     job_id: int = Field(foreign_key="job.id")
     form_key_id: int = Field(foreign_key="formkey.id")
     constraints: Dict = Field(sa_column=Column(JSON))
 
-
+    __table_args__ = (
+        UniqueConstraint("job_id", "form_key_id", name="uq_job_formkey"),
+    )
 class JobFormKeyConstraint(JobFormKeyConstraintBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
 

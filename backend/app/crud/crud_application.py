@@ -1,9 +1,10 @@
 from typing import Any, Dict, Optional, Union, List
 
-from sqlmodel import Session, select
+from sqlmodel import Session, select, func
 
-from models.models import Application, Match
+from models.models import Application, Match, Job, Candidate
 from schemas import ApplicationCreate, ApplicationUpdate
+from .crud_job import get_job
 
 
 def get_application(db: Session, application_id: int) -> Optional[Application]:
@@ -18,6 +19,32 @@ def get_applications_by_job(db: Session, job_id: int, skip: int = 0, limit: int 
 def get_applications_by_candidate(db: Session, candidate_id: int, skip: int = 0, limit: int = 100) -> List[Application]:
     statement = select(Application).where(Application.candidate_id == candidate_id).offset(skip).limit(limit)
     return db.exec(statement).all()
+
+
+def get_random_applications_by_employer(db: Session, employer_id: int, skip: int = 0, limit: int = 100) -> List[Application]:
+    """Get random applications for jobs belonging to an employer with pagination"""
+    statement = (
+        select(Application)
+        .join(Job, Application.job_id == Job.id)
+        .where(Job.employer_id == employer_id)
+        .order_by(func.random())
+        .offset(skip)
+        .limit(limit)
+    )
+    return db.exec(statement).all()
+
+
+def get_application_with_details(db: Session, application_id: int) -> Optional[Application]:
+    """Get application with candidate and job details"""
+    statement = (
+        select(Application)
+        .where(Application.id == application_id)
+    )
+    application = db.exec(statement).first()
+    if application:
+        # Load relationships
+        db.refresh(application, ["candidate", "job"])
+    return application
 
 
 def create_application(db: Session, *, application_in: ApplicationCreate) -> Application:

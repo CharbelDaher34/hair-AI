@@ -163,6 +163,10 @@ class ApiService {
     });
   }
 
+  async getEmployerApplications(skip = 0, limit = 100) {
+    return this.request(`/applications/employer-applications?skip=${skip}&limit=${limit}`);
+  }
+
   // Candidate endpoints
   async createCandidate(candidateData, resumeFile = null) {
     const formData = new FormData();

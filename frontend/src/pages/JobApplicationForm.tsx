@@ -72,6 +72,8 @@ const JobApplicationForm = () => {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const data = await response.json();
+      console.log('Received job data:', data);
+      console.log('Form keys:', data.form_keys);
       set_job_data(data);
     } catch (error: any) {
       toast.error("Failed to load job information", {
