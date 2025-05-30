@@ -94,7 +94,7 @@ const JobDetails = () => {
   }, [id]);
 
   const copy_url = () => {
-    const url = generated_url || `${window.location.origin}/apply/job-${id}`;
+    const url = generated_url || `${window.location.origin}/apply/${id}`;
     navigator.clipboard.writeText(url);
     toast({
       title: "URL Copied!",
@@ -103,7 +103,7 @@ const JobDetails = () => {
   };
 
   const generate_url = () => {
-    const url = `${window.location.origin}/apply/job-${id}`;
+    const url = `${window.location.origin}/apply/${id}`;
     set_generated_url(url);
     copy_url();
   };

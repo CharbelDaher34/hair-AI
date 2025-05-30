@@ -14,6 +14,9 @@ PUBLIC_PATHS_PREFIXES = [
     "/api/v1/auth",  # All routes under /api/v1/auth/ (e.g., /login, /register)
     "/",             # The root path
     "/api/v1/companies",
+    "/api/v1/jobs/public",  # Public job endpoints for application forms
+    "/api/v1/candidates",   # Public candidate creation
+    "/api/v1/applications", # Public application creation
 ]
 
 # Define paths that require authentication

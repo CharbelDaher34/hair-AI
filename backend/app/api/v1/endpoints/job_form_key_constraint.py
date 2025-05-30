@@ -1,5 +1,6 @@
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import List, Optional
+from core.security import TokenData
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlmodel import Session
 
 from core.database import get_session
@@ -12,8 +13,15 @@ router = APIRouter()
 def create_job_form_key_constraint(
     *,
     db: Session = Depends(get_session),
-    constraint_in: JobFormKeyConstraintCreate
+    constraint_in: JobFormKeyConstraintCreate,
+    request: Request
 ) -> JobFormKeyConstraintRead:
+    current_user: Optional[TokenData] = request.state.user
+    if not current_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials"
+        )
     try:
         constraint = crud_job_form_key_constraint.create_job_form_key_constraint(db=db, constraint_in=constraint_in)
     except Exception as e:

@@ -22,6 +22,7 @@ import MatchedCandidates from "./pages/MatchedCandidates";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import Profile from "./pages/Profile";
+import JobApplicationForm from "./pages/JobApplicationForm";
 
 const queryClient = new QueryClient();
 
@@ -53,8 +54,10 @@ const App = () => (
       <SonnerToaster />
       <BrowserRouter>
         <Routes>
+          {/* Public Routes */}
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
+          <Route path="/apply/:job_id" element={<JobApplicationForm />} />
           
           {/* Authenticated Routes */}
           <Route element={<AuthenticatedLayout />}>

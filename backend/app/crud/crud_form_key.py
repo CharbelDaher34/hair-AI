@@ -2,7 +2,7 @@ from typing import Any, Dict, Optional, Union, List
 
 from sqlmodel import Session, select
 
-from models.models import FormKey
+from models.models import FormKey, JobFormKeyConstraint
 from schemas import FormKeyCreate, FormKeyUpdate
 
 
@@ -46,3 +46,22 @@ def delete_form_key(db: Session, *, form_key_id: int) -> Optional[FormKey]:
         db.delete(db_form_key)
         db.commit()
     return db_form_key 
+
+def get_form_keys(db: Session, job_id: int) -> List[FormKey]:
+    """Get all form keys associated with a specific job through JobFormKeyConstraint"""
+    statement = (
+        select(FormKey)
+        .join(JobFormKeyConstraint, FormKey.id == JobFormKeyConstraint.form_key_id)
+        .where(JobFormKeyConstraint.job_id == job_id)
+    )
+    return db.exec(statement).all()
+
+
+def get_form_keys_with_constraints(db: Session, job_id: int) -> List[tuple[FormKey, JobFormKeyConstraint]]:
+    """Get all form keys with their constraints for a specific job"""
+    statement = (
+        select(FormKey, JobFormKeyConstraint)
+        .join(JobFormKeyConstraint, FormKey.id == JobFormKeyConstraint.form_key_id)
+        .where(JobFormKeyConstraint.job_id == job_id)
+    )
+    return db.exec(statement).all()
