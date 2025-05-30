@@ -282,6 +282,10 @@ class ApiService {
     return this.request(`/recruiter_company_links/${linkId}`);
   }
 
+  async getRecruiterCompanyLinksByRecruiter(skip = 0, limit = 100) {
+    return this.request(`/recruiter_company_links/by-recruiter/?skip=${skip}&limit=${limit}`);
+  }
+
   async deleteRecruiterCompanyLink(linkId) {
     return this.request(`/recruiter_company_links/${linkId}`, {
       method: 'DELETE',

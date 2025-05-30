@@ -33,7 +33,7 @@ const Index = () => {
             <Link to="/jobs/create">Create Job</Link>
           </Button>
           <Button variant="outline" asChild>
-            <Link to="/onboarding">Setup Guide</Link>
+            <Link to="/profile">Profile</Link>
           </Button>
         </div>
       </div>

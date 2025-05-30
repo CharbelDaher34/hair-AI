@@ -44,7 +44,7 @@ def read_recruit_to_companies(
     
     employer_id = current_user.employer_id
     print(f"employer_id: {employer_id}")
-    companies = crud_company.get_recruit_to_companies(db=db, target_employer_id=employer_id)
+    companies = crud_company.get_recruit_to_companies(db=db, employer_id=employer_id)
     return companies
 
 @router.get("/{employer_id}", response_model=CompanyRead)
