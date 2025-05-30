@@ -350,7 +350,7 @@ const JobApplicationForm = () => {
                 <div className="flex items-center gap-4 text-muted-foreground mb-4">
                   <div className="flex items-center gap-1">
                     <Building2 className="h-4 w-4" />
-                    <span>Company</span>
+                    <span>{job_data.company.name}</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <MapPin className="h-4 w-4" />
