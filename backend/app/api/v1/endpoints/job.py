@@ -1,4 +1,5 @@
 from typing import List, Optional
+from crud import crud_company
 from schemas.form_key import FormKeyRead
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlmodel import Session
@@ -6,7 +7,7 @@ from pydantic import BaseModel
 
 from core.database import get_session
 from crud import crud_job, crud_form_key
-from schemas import JobCreate, JobUpdate, JobRead
+from schemas import JobCreate, JobUpdate, JobRead, CompanyRead
 from core.security import TokenData
 
 router = APIRouter()
@@ -112,6 +113,7 @@ def delete_job(
 class JobFormData(BaseModel):
     job: JobRead
     form_keys: List[FormKeyRead]
+    company: CompanyRead
 
 @router.get("/form-data/{job_id}", response_model=JobFormData)
 def get_form_data(
@@ -159,8 +161,9 @@ def get_public_form_data(
         raise HTTPException(status_code=404, detail="Job not available for applications")
     
     form_keys = crud_form_key.get_form_keys(db=db, job_id=job_id)
-    
+    company = crud_company.get_company(db=db, employer_id=job.employer_id)
     return JobFormData(
         job=job,
-        form_keys=form_keys
+        form_keys=form_keys,
+        company=company
     )
