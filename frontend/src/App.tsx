@@ -5,7 +5,7 @@ import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import Index from "./pages/Index";
-import Signup from "./pages/OnboardingFlow";
+import Signup from "./pages/SignUp";
 import JobDashboard from "./pages/JobDashboard";
 import FormKeysManagement from "./pages/FormKeysManagement";
 import CreateEditJob from "./pages/CreateEditJob";
@@ -21,6 +21,7 @@ import ChatBot from "./pages/ChatBot";
 import MatchedCandidates from "./pages/MatchedCandidates";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
+import Profile from "./pages/Profile";
 
 const queryClient = new QueryClient();
 
@@ -57,6 +58,7 @@ const App = () => (
           
           {/* Authenticated Routes */}
           <Route element={<AuthenticatedLayout />}>
+            <Route path="/profile" element={<Profile />} />
             <Route path="/" element={<Index />} />
             <Route path="/jobs" element={<JobDashboard />} />
             <Route path="/jobs/create" element={<CreateEditJob />} />

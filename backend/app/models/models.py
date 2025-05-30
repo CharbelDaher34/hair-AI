@@ -11,7 +11,7 @@ class TimeBase(SQLModel):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 
-class CompanyBase(SQLModel):
+class CompanyBase(TimeBase):
     name: str
     description: Optional[str] = None
     industry: Optional[str] = None
@@ -22,7 +22,7 @@ class CompanyBase(SQLModel):
     domain: Optional[str] = Field(default=None,description="The domain of the company example: @gmail.com")
 
 
-class Company(CompanyBase, TimeBase, table=True):
+class Company(CompanyBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
 
     hrs: List["HR"] = Relationship(back_populates="company")
@@ -45,7 +45,7 @@ class Company(CompanyBase, TimeBase, table=True):
     )
 
 
-class HRBase(SQLModel):
+class HRBase(TimeBase):
     email: str = Field(index=True, unique=True)
     password: str
     full_name: str
@@ -53,19 +53,19 @@ class HRBase(SQLModel):
     role: str
 
 
-class HR(HRBase, TimeBase, table=True):
+class HR(HRBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
 
     company: Optional[Company] = Relationship(back_populates="hrs")
     jobs: List["Job"] = Relationship(back_populates="created_by_hr")
 
 
-class RecruiterCompanyLinkBase(SQLModel):
+class RecruiterCompanyLinkBase(TimeBase):
     recruiter_id: int = Field(foreign_key="company.id")
     target_employer_id: int = Field(foreign_key="company.id")
 
 
-class RecruiterCompanyLink(RecruiterCompanyLinkBase, TimeBase, table=True):
+class RecruiterCompanyLink(RecruiterCompanyLinkBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
 
     recruiter: Optional[Company] = Relationship(
@@ -86,10 +86,9 @@ class FieldType(str,Enum):
     TEXTAREA = "textarea"
     CHECKBOX = "checkbox"
 
-class FormKeyBase(SQLModel):    
-    employer_id: int = Field(foreign_key="company.id")
+class FormKeyBase(TimeBase):    
+    employer_id: int = Field(default=None, foreign_key="company.id")
     name: str
-    # field_type: FieldType = Field(default=FieldType.TEXT, sa_column=Column(SQLAlchemyEnum(FieldType)))
     enum_values: Optional[List[str]] = Field(default=None, sa_column=Column(JSON))
     required: bool = Field(default=False)
     field_type: FieldType = Field(
@@ -97,35 +96,64 @@ class FormKeyBase(SQLModel):
         sa_column=Column(SQLAlchemyEnum(FieldType, name="fieldtype_enum", create_type=True))
     )
 
-class FormKey(FormKeyBase, TimeBase, table=True):
+class FormKey(FormKeyBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
 
     company: Optional[Company] = Relationship(back_populates="form_keys")
     job_constraints: List["JobFormKeyConstraint"] = Relationship(back_populates="form_key")
 
 
-class JobFormKeyConstraintBase(SQLModel):
+class JobFormKeyConstraintBase(TimeBase):
     job_id: int = Field(foreign_key="job.id")
     form_key_id: int = Field(foreign_key="formkey.id")
     constraints: Dict = Field(sa_column=Column(JSON))
 
 
-class JobFormKeyConstraint(JobFormKeyConstraintBase, TimeBase, table=True):
+class JobFormKeyConstraint(JobFormKeyConstraintBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
 
     job: Optional["Job"] = Relationship(back_populates="form_key_constraints")
     form_key: Optional[FormKey] = Relationship(back_populates="job_constraints")
 
+class Status(str,Enum):
+    DRAFT = "draft"
+    PUBLISHED = "published"
+    CLOSED = "closed"
+class JobType(str,Enum):
+    FULL_TIME = "full_time"
+    PART_TIME = "part_time"
+    CONTRACT = "contract"
+    INTERNSHIP = "internship"
+class SeniorityLevel(str,Enum):
+    ENTRY = "entry"
+    MID = "mid"
+    SENIOR = "senior"
+class ExperienceLevel(str,Enum):
+    NO_EXPERIENCE = "no_experience"
+    ONE_TO_THREE_YEARS = "1-3_years"
+    THREE_TO_FIVE_YEARS = "3-5_years"
+    FIVE_TO_SEVEN_YEARS = "5-7_years"
+    SEVEN_TO_TEN_YEARS = "7-10_years"
+    TEN_PLUS_YEARS = "10_plus_years"
 
-class JobBase(SQLModel):
+class JobBase(TimeBase):
     employer_id: int = Field(foreign_key="company.id")
     recruited_to_id: Optional[int] = Field(default=None, foreign_key="company.id")
-    job_data: Dict = Field(sa_column=Column(JSON))
-    status: str
     created_by_hr_id: int = Field(foreign_key="hr.id")
+    job_data: Dict = Field(sa_column=Column(JSON))
+    status: Status = Field(default=Status.DRAFT,sa_column=Column(SQLAlchemyEnum(Status, name="status_enum", create_type=True)))
+    title: str
+    description: str
+    location: str
+    salary_min: Optional[int] = Field(default=None)
+    salary_max: Optional[int] = Field(default=None)
+    experience_level: ExperienceLevel = Field(default=ExperienceLevel.NO_EXPERIENCE,sa_column=Column(SQLAlchemyEnum(ExperienceLevel, name="experiencelevel_enum", create_type=True)))
+    seniority_level: SeniorityLevel = Field(default=SeniorityLevel.ENTRY,sa_column=Column(SQLAlchemyEnum(SeniorityLevel, name="senioritylevel_enum", create_type=True)))
+    job_type: JobType = Field(default=JobType.FULL_TIME,sa_column=Column(SQLAlchemyEnum(JobType, name="jobtype_enum", create_type=True)))
+    job_category: Optional[str] = Field(default=None)
 
 
-class Job(JobBase, TimeBase, table=True):
+class Job(JobBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
 
     employer: Optional[Company] = Relationship(
@@ -141,7 +169,7 @@ class Job(JobBase, TimeBase, table=True):
     form_key_constraints: List[JobFormKeyConstraint] = Relationship(back_populates="job")
 
 
-class CandidateBase(SQLModel):
+class CandidateBase(TimeBase):
     full_name: str
     email: str = Field(unique=True)
     phone: Optional[str] = Field(unique=True)
@@ -149,19 +177,19 @@ class CandidateBase(SQLModel):
     parsed_resume: Optional[Dict] = Field(default=None, sa_column=Column(JSON))
 
 
-class Candidate(CandidateBase, TimeBase, table=True):
+class Candidate(CandidateBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
 
     applications: List["Application"] = Relationship(back_populates="candidate")
 
 
-class ApplicationBase(SQLModel):
+class ApplicationBase(TimeBase):
     candidate_id: int = Field(foreign_key="candidate.id")
     job_id: int = Field(foreign_key="job.id")
     form_responses: Dict = Field(default=None, sa_column=Column(JSON))
 
 
-class Application(ApplicationBase, TimeBase, table=True):
+class Application(ApplicationBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
 
     candidate: Optional[Candidate] = Relationship(back_populates="applications")
@@ -169,7 +197,7 @@ class Application(ApplicationBase, TimeBase, table=True):
     matches: List["Match"] = Relationship(back_populates="application")
     interviews: List["Interview"] = Relationship(back_populates="application")
 
-class InterviewBase(SQLModel):
+class InterviewBase(TimeBase):
     application_id: int = Field(foreign_key="application.id")
     date: datetime
     type: str  # e.g. phone, zoom, in-person
@@ -177,18 +205,18 @@ class InterviewBase(SQLModel):
     notes: Optional[str] = None
 
 
-class Interview(InterviewBase, TimeBase, table=True):
+class Interview(InterviewBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
 
     application: Optional[Application] = Relationship(back_populates="interviews")
 
 
-class MatchBase(SQLModel):
+class MatchBase(TimeBase):
     application_id: int = Field(foreign_key="application.id")
     match_result: Dict = Field(default=None, sa_column=Column(JSON))
     status: str = Field(default="pending")
 
-class Match(MatchBase, TimeBase, table=True):
+class Match(MatchBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     
     application: Optional[Application] = Relationship(back_populates="matches")

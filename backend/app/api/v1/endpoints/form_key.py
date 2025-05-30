@@ -23,10 +23,11 @@ def create_form_key(
             detail="Could not validate credentials"
         )
     
-    # Override employer_id from token
     form_key_in.employer_id = current_user.employer_id
     
+    print("form_key_data", form_key_in)
     try:
+        form_key_in = FormKeyCreate(**form_key_in.model_dump())
         form_key = crud_form_key.create_form_key(db=db, form_key_in=form_key_in)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

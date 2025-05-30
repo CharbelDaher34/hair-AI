@@ -16,9 +16,37 @@ PUBLIC_PATHS_PREFIXES = [
     "/api/v1/companies",
 ]
 
+# Define paths that require authentication
+AUTH_REQUIRED_PATHS_PREFIXES = [
+    "/api/v1/companies/recruit_to",
+    "/api/v1/companies/by_hr",
+]
+
 # HTTPBearer scheme for extracting token
 # auto_error=False allows us to manually handle missing token or errors
 bearer_scheme = HTTPBearer(auto_error=False)
+
+def normalize_path(path: str) -> str:
+    """Normalize path by removing trailing slash except for root path"""
+    if path == "/" or path == "":
+        return "/"
+    return path.rstrip("/")
+
+def path_matches_prefix(current_path: str, prefix: str) -> bool:
+    """Check if current_path matches the prefix, handling trailing slashes consistently"""
+    normalized_current = normalize_path(current_path)
+    normalized_prefix = normalize_path(prefix)
+    
+    # Exact match for root path
+    if normalized_prefix == "/" and normalized_current == "/":
+        return True
+    
+    # For non-root paths, check if current path starts with prefix
+    if normalized_prefix != "/":
+        return (normalized_current == normalized_prefix or 
+                normalized_current.startswith(normalized_prefix + "/"))
+    
+    return False
 
 class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(
@@ -36,21 +64,26 @@ class AuthMiddleware(BaseHTTPMiddleware):
         current_path = request.url.path
 
         for public_prefix in PUBLIC_PATHS_PREFIXES:
-            if public_prefix == "/" and current_path == "/": # Exact match for root
-                is_public_path = True
-                break
-            # Check if current_path starts with public_prefix or is exactly public_prefix (for /docs, /openapi.json etc)
-            if public_prefix != "/" and (current_path.startswith(public_prefix + "/") or current_path == public_prefix):
+            if path_matches_prefix(current_path, public_prefix):
                 is_public_path = True
                 break
         
         # Special handling for /openapi.json if requested by /docs or /redoc for schema loading
-        if current_path == "/openapi.json":
+        if normalize_path(current_path) == "/openapi.json":
             referer = request.headers.get("referer")
             if referer:
                 if referer.endswith("/docs") or referer.endswith("/redoc"):
                     is_public_path = True
-
+        
+        print(f"current_path: {current_path}")
+        
+        # Check for auth-required paths (these override public paths)
+        for auth_prefix in AUTH_REQUIRED_PATHS_PREFIXES:
+            if path_matches_prefix(current_path, auth_prefix):
+                print(f"auth_prefix: {auth_prefix}")
+                is_public_path = False
+                break
+    
         if is_public_path:
             print(f"is_public_path: {is_public_path}")
             # For public paths, proceed without authentication enforcement
@@ -103,3 +136,4 @@ class AuthMiddleware(BaseHTTPMiddleware):
             
             response = await call_next(request)
             return response 
+       

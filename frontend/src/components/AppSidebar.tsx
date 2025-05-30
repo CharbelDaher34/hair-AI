@@ -9,7 +9,8 @@ import {
   Settings,
   Home,
   BrainCircuit,
-  LogOut
+  LogOut,
+  User
 } from "lucide-react";
 import {
   Sidebar,
@@ -63,6 +64,11 @@ const menuItems = [
     title: "AI Assistant",
     url: "/chatbot",
     icon: BrainCircuit,
+  },
+  {
+    title: "Profile",
+    url: "/profile",
+    icon: User,
   },
 ];
 

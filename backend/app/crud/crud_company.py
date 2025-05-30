@@ -2,8 +2,8 @@ from typing import Any, Dict, Optional, Union, List
 
 from sqlmodel import Session, select
 
-from models.models import Company
-from schemas import CompanyCreate, CompanyUpdate
+from models.models import Company, RecruiterCompanyLink
+from schemas import CompanyCreate, CompanyUpdate, CompanyRead
 
 
 def get_company(db: Session, employer_id: int) -> Optional[Company]:
@@ -51,3 +51,25 @@ def delete_company(db: Session, *, employer_id: int) -> Optional[Company]:
         db.delete(db_company)
         db.commit()
     return db_company
+
+
+def get_recruit_to_companies(db: Session, target_employer_id: int) -> List[CompanyRead]:
+    """Get all companies that are recruited to by a given employer_id (recruiter_id)"""
+    print(f"recruited_to_id: {target_employer_id}")
+    statement = select(RecruiterCompanyLink).where(
+        RecruiterCompanyLink.target_employer_id == target_employer_id
+    )
+    
+    recruiter_company_links = db.exec(statement).all()
+    recruiter_ids = [link.recruiter_id for link in recruiter_company_links]
+    statement = select(Company).where(Company.id.in_(recruiter_ids))
+    companies = db.exec(statement).all()
+    
+    statement = select(Company).where(Company.id == target_employer_id)
+    target_company = db.exec(statement).first()
+    companies.append(target_company)
+    return [CompanyRead.model_validate(company) for company in companies]
+  
+
+  
+

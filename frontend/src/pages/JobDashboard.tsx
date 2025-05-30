@@ -187,6 +187,7 @@ const JobDashboard = () => {
               </TableHeader>
               <TableBody>
                 {filteredJobs.map((job) => (
+                  console.log(job),
                   <TableRow key={job.id}>
                     <TableCell className="font-medium">{getJobTitle(job)}</TableCell>
                     <TableCell>{formatDate(job.created_at)}</TableCell>
