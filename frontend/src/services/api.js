@@ -215,6 +215,55 @@ class ApiService {
     });
   }
 
+  async getCandidateResume(candidateId) {
+    const url = `${this.baseURL}/candidates/${candidateId}/resume`;
+    
+    // Get token from localStorage
+    const token = localStorage.getItem('token');
+    
+    const headers = {
+      'Accept': 'application/pdf',
+    };
+    
+    // Add Authorization header if token exists
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers,
+      });
+      
+      if (!response.ok) {
+        // Handle 401 Unauthorized - token might be expired
+        if (response.status === 401) {
+          localStorage.removeItem('token');
+          if (window.location.pathname !== '/login' && window.location.pathname !== '/signup') {
+            window.location.href = '/login';
+          }
+        }
+        throw new Error(`Failed to fetch resume: ${response.status} ${response.statusText}`);
+      }
+      
+      // Check if the response is actually a PDF
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/pdf')) {
+        throw new Error('Response is not a PDF file');
+      }
+      
+      return await response.blob();
+    } catch (error) {
+      console.error('API request failed:', error);
+      throw error;
+    }
+  }
+
+  async getCandidateParsingStatus(candidateId) {
+    return this.request(`/candidates/${candidateId}/parsing-status`);
+  }
+
   // Form Key endpoints
   async createFormKey(formKeyData) {
     // Remove employer_id from the data since it's extracted from token on backend

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, HTTPException, Depends
+from fastapi import FastAPI, Request, HTTPException, Depends, BackgroundTasks
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.security import HTTPBearer
@@ -12,6 +12,11 @@ import os
 from fastapi.middleware.cors import CORSMiddleware
 from api.v1.endpoints import company, hr, recruiter_company_link, form_key, job, job_form_key_constraint, application, match, candidate, auth, interview
 # from api.v1.endpoints import auth as auth_router
+
+# Import batch processing function
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), 'scripts'))
+from resume_parser_batch import process_all_candidates
 
 # Get debug mode from environment variable, default to True
 DEBUG_MODE = os.getenv("DEBUG_MODE", "True").lower() == "true"
@@ -108,6 +113,46 @@ async def root():
         "redoc_url": "/redoc",
         "debug_mode": DEBUG_MODE
     }
+
+@app.post("/api/v1/admin/batch-parse-resumes", summary="Run batch resume parsing")
+async def run_batch_resume_parsing(background_tasks: BackgroundTasks):
+    """
+    Run batch processing to parse all candidate resumes that haven't been processed yet.
+    This runs in the background and returns immediately.
+    """
+    def run_batch_processing():
+        try:
+            result = process_all_candidates()
+            print(f"[API] Batch processing completed: {result}")
+        except Exception as e:
+            print(f"[API] Batch processing failed: {str(e)}")
+            import traceback
+            print(f"[API] Full traceback: {traceback.format_exc()}")
+    
+    background_tasks.add_task(run_batch_processing)
+    
+    return {
+        "message": "Batch resume parsing started in background",
+        "status": "processing"
+    }
+
+@app.get("/api/v1/admin/batch-parse-resumes/status", summary="Get batch parsing status")
+async def get_batch_parsing_status():
+    """
+    Get the current status of candidates that need resume parsing.
+    """
+    try:
+        # Import here to avoid circular imports
+        from scripts.resume_parser_batch import get_candidates_without_parsed_resume
+        
+        candidates = get_candidates_without_parsed_resume()
+        
+        return {
+            "candidates_needing_parsing": len(candidates),
+            "status": "ready" if candidates else "all_processed"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error checking batch status: {str(e)}")
 
 if __name__ == "__main__":
     uvicorn.run(
