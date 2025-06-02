@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { FileText, Mail, Phone, User, Calendar, Star, ExternalLink } from "lucide-react";
+import { FileText, Mail, Phone, User, Calendar, Star, ExternalLink, X, Loader2 } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
 import apiService from "@/services/api";
 
@@ -14,6 +14,8 @@ const ViewApplication = () => {
   const navigate = useNavigate();
   const [application_data, set_application_data] = useState<any>(null);
   const [loading, set_loading] = useState(true);
+  const [resume_pdf_url, set_resume_pdf_url] = useState<string | null>(null);
+  const [pdf_loading, set_pdf_loading] = useState(false);
 
   useEffect(() => {
     const fetch_application = async () => {
@@ -29,6 +31,42 @@ const ViewApplication = () => {
     };
     fetch_application();
   }, [id]);
+
+  const handle_view_resume = async () => {
+    if (!application_data.candidate?.id) return;
+    
+    set_pdf_loading(true);
+    try {
+      const blob = await apiService.getCandidateResume(application_data.candidate.id);
+      
+      // Ensure the blob has the correct MIME type
+      const pdf_blob = new Blob([blob], { type: 'application/pdf' });
+      const pdf_url = URL.createObjectURL(pdf_blob);
+      
+      set_resume_pdf_url(pdf_url);
+    } catch (error) {
+      console.error('Error fetching resume:', error);
+      alert('Failed to load resume. Please try again.');
+    } finally {
+      set_pdf_loading(false);
+    }
+  };
+
+  const handle_close_pdf = () => {
+    if (resume_pdf_url) {
+      URL.revokeObjectURL(resume_pdf_url);
+      set_resume_pdf_url(null);
+    }
+  };
+
+  // Cleanup object URL on component unmount
+  useEffect(() => {
+    return () => {
+      if (resume_pdf_url) {
+        URL.revokeObjectURL(resume_pdf_url);
+      }
+    };
+  }, [resume_pdf_url]);
 
   if (loading) return <div>Loading...</div>;
   if (!application_data) return <div>Application not found.</div>;
@@ -92,18 +130,89 @@ const ViewApplication = () => {
                   <Label>Resume</Label>
                   <div className="flex items-center gap-2 mt-1">
                     <FileText className="h-4 w-4 text-muted-foreground" />
-                    <a
-                      href={application_data.candidate?.resume_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-primary hover:underline flex items-center gap-1"
-                    >
-                      View Resume
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
+                    {application_data.candidate?.id && (
+                      <Button 
+                        variant="link"
+                        className="p-0 h-auto text-primary hover:underline flex items-center gap-1"
+                        onClick={handle_view_resume}
+                        disabled={pdf_loading}
+                      >
+                        {pdf_loading ? (
+                          <>
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                            Loading...
+                          </>
+                        ) : (
+                          <>
+                            View Resume
+                            <ExternalLink className="h-3 w-3" />
+                          </>
+                        )}
+                      </Button>
+                    )}
+                    {!application_data.candidate?.id && application_data.candidate?.resume_url && (
+                       <a 
+                         href={application_data.candidate?.resume_url} 
+                         target="_blank" 
+                         rel="noopener noreferrer"
+                         className="text-primary hover:underline flex items-center gap-1"
+                       >
+                         View Resume (URL)
+                         <ExternalLink className="h-3 w-3" /> 
+                       </a>
+                    )}
+                    {!application_data.candidate?.id && !application_data.candidate?.resume_url && (
+                        <span>No resume available</span>
+                    )}
                   </div>
                 </div>
               </div>
+
+              {/* PDF Viewer Section */}
+              {resume_pdf_url && (
+                <div className="mt-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <Label>Resume Preview</Label>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={handle_close_pdf}
+                      className="flex items-center gap-1"
+                    >
+                      <X className="h-4 w-4" />
+                      Close
+                    </Button>
+                  </div>
+                  <div className="border rounded-lg overflow-hidden bg-gray-100">
+                    <object
+                      data={resume_pdf_url}
+                      type="application/pdf"
+                      width="100%"
+                      height="600px"
+                      className="border-0"
+                    >
+                      <div className="flex items-center justify-center h-96 text-center p-4">
+                        <div>
+                          <p className="text-muted-foreground mb-2">
+                            Unable to display PDF in browser.
+                          </p>
+                          <Button 
+                            variant="outline" 
+                            onClick={() => {
+                              const link = document.createElement('a');
+                              link.href = resume_pdf_url;
+                              link.download = `${application_data.candidate?.name || 'candidate'}_resume.pdf`;
+                              link.click();
+                            }}
+                          >
+                            Download PDF
+                          </Button>
+                        </div>
+                      </div>
+                    </object>
+                  </div>
+                </div>
+              )}
 
               <Separator />
 

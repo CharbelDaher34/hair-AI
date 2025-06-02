@@ -24,6 +24,7 @@ dependencies = [
     "python-jose[cryptography]>=3.4.0",
     "python-multipart>=0.0.20",
     "requests>=2.32.3",
+    "schedule>=1.2.2",
     "sqlalchemy>=2.0.41",
     "sqlalchemy-schemadisplay>=2.0",
     "sqlmodel>=0.0.24",
