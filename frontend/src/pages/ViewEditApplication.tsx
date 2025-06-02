@@ -1,81 +1,48 @@
-
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { FileText, Mail, Phone, User, Calendar, Star, ExternalLink } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
-import { toast } from "@/hooks/use-toast";
+import apiService from "@/services/api";
 
-const ViewEditApplication = () => {
+const ViewApplication = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [isEditing, setIsEditing] = useState(false);
+  const [application_data, set_application_data] = useState<any>(null);
+  const [loading, set_loading] = useState(true);
 
-  // Mock application data
-  const [applicationData, setApplicationData] = useState({
-    id: 1,
-    candidate: {
-      name: "John Doe",
-      email: "john.doe@email.com",
-      phone: "+1 234 567 8900",
-      resumeUrl: "https://example.com/resume.pdf",
-      parsedResume: {
-        skills: ["React", "TypeScript", "Node.js", "AWS"],
-        experience: "5 years",
-        education: "Bachelor's in Computer Science",
-        summary: "Experienced full-stack developer with expertise in modern web technologies.",
-      },
-    },
-    job: {
-      title: "Senior Frontend Developer",
-      company: "TechCorp Inc.",
-    },
-    status: "review",
-    submissionDate: "2024-01-20",
-    formResponses: {
-      "experience_years": "5",
-      "portfolio_url": "https://johndoe.dev",
-      "availability": "Immediate",
-      "expected_salary": "$120,000",
-    },
-    matchScore: 85,
-    interviews: [
-      {
-        id: 1,
-        date: "2024-01-25",
-        time: "14:00",
-        interviewer: "Sarah Wilson",
-        type: "Technical",
-        result: "Pending",
-      },
-    ],
-  });
+  useEffect(() => {
+    const fetch_application = async () => {
+      set_loading(true);
+      try {
+        const data = await apiService.getApplicationWithDetails(id);
+        set_application_data(data);
+      } catch (error) {
+        // Optionally handle error
+      } finally {
+        set_loading(false);
+      }
+    };
+    fetch_application();
+  }, [id]);
 
-  const handleStatusChange = (newStatus: string) => {
-    setApplicationData({
-      ...applicationData,
-      status: newStatus,
-    });
-    toast({
-      title: "Status Updated",
-      description: `Application status changed to ${newStatus}`,
-    });
-  };
+  if (loading) return <div>Loading...</div>;
+  if (!application_data) return <div>Application not found.</div>;
 
-  const handleSave = () => {
-    setIsEditing(false);
-    toast({
-      title: "Application Updated",
-      description: "Changes have been saved successfully.",
-    });
-  };
+  // Helper to safely get parsed_resume
+  let parsed_resume = undefined;
+  try {
+    parsed_resume = application_data.candidate?.parsed_resume;
+    if (!parsed_resume || typeof parsed_resume !== 'object') {
+      parsed_resume = undefined;
+    }
+  } catch {
+    parsed_resume = undefined;
+  }
 
   return (
     <div className="flex-1 space-y-8 p-8">
@@ -83,24 +50,10 @@ const ViewEditApplication = () => {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Application Details</h1>
           <p className="text-muted-foreground">
-            {applicationData.candidate.name} • {applicationData.job.title}
+            {application_data.candidate?.name} • {application_data.job?.title}
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => navigate("/applications")}>
-            Back to Applications
-          </Button>
-          {isEditing ? (
-            <>
-              <Button variant="outline" onClick={() => setIsEditing(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleSave}>Save Changes</Button>
-            </>
-          ) : (
-            <Button onClick={() => setIsEditing(true)}>Edit Application</Button>
-          )}
-        </div>
+        <Button variant="outline" onClick={() => navigate("/applications")}>Back to Applications</Button>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -118,21 +71,21 @@ const ViewEditApplication = () => {
                   <Label>Full Name</Label>
                   <div className="flex items-center gap-2 mt-1">
                     <User className="h-4 w-4 text-muted-foreground" />
-                    <span>{applicationData.candidate.name}</span>
+                    <span>{application_data.candidate?.name}</span>
                   </div>
                 </div>
                 <div>
                   <Label>Email</Label>
                   <div className="flex items-center gap-2 mt-1">
                     <Mail className="h-4 w-4 text-muted-foreground" />
-                    <span>{applicationData.candidate.email}</span>
+                    <span>{application_data.candidate?.email}</span>
                   </div>
                 </div>
                 <div>
                   <Label>Phone</Label>
                   <div className="flex items-center gap-2 mt-1">
                     <Phone className="h-4 w-4 text-muted-foreground" />
-                    <span>{applicationData.candidate.phone}</span>
+                    <span>{application_data.candidate?.phone}</span>
                   </div>
                 </div>
                 <div>
@@ -140,7 +93,7 @@ const ViewEditApplication = () => {
                   <div className="flex items-center gap-2 mt-1">
                     <FileText className="h-4 w-4 text-muted-foreground" />
                     <a
-                      href={applicationData.candidate.resumeUrl}
+                      href={application_data.candidate?.resume_url}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-primary hover:underline flex items-center gap-1"
@@ -154,35 +107,85 @@ const ViewEditApplication = () => {
 
               <Separator />
 
-              <div>
-                <Label>Parsed Resume Summary</Label>
-                <div className="mt-2 space-y-3">
-                  <div>
-                    <span className="font-medium">Skills:</span>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {applicationData.candidate.parsedResume.skills.map((skill, index) => (
-                        <Badge key={index} variant="secondary">
-                          {skill}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <span className="font-medium">Experience:</span>
-                    <span className="ml-2">{applicationData.candidate.parsedResume.experience}</span>
-                  </div>
-                  <div>
-                    <span className="font-medium">Education:</span>
-                    <span className="ml-2">{applicationData.candidate.parsedResume.education}</span>
-                  </div>
-                  <div>
-                    <span className="font-medium">Summary:</span>
-                    <p className="mt-1 text-muted-foreground">
-                      {applicationData.candidate.parsedResume.summary}
-                    </p>
+              {/* Parsed Resume Section - only if valid */}
+              {parsed_resume && (
+                <div>
+                  <Label>Parsed Resume Summary</Label>
+                  <div className="mt-2 space-y-3">
+                    {/* Skills */}
+                    {Array.isArray(parsed_resume.skills) && parsed_resume.skills.length > 0 && (
+                      <div>
+                        <span className="font-medium">Skills:</span>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {parsed_resume.skills.map((skill: any, idx: number) => (
+                            <Badge key={idx} variant="secondary">
+                              {typeof skill === 'string' ? skill : skill.name}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {/* Education */}
+                    {Array.isArray(parsed_resume.education) && parsed_resume.education.length > 0 && (
+                      <div>
+                        <span className="font-medium">Education:</span>
+                        <div className="mt-1 space-y-2">
+                          {parsed_resume.education.map((edu: any, idx: number) => (
+                            <div key={idx} className="mb-2 p-2 bg-muted rounded">
+                              <div>
+                                <b>{edu.level}</b> - {edu.degree_type} in {edu.subject}
+                              </div>
+                              <div>
+                                {edu.institution} ({edu.start_date} - {edu.end_date || "Present"})
+                              </div>
+                              {edu.gpa && <div>GPA: {edu.gpa}</div>}
+                              {edu.summary && <div>{edu.summary}</div>}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {/* Work History */}
+                    {Array.isArray(parsed_resume.work_history) && parsed_resume.work_history.length > 0 && (
+                      <div>
+                        <span className="font-medium">Work History:</span>
+                        <div className="mt-1 space-y-2">
+                          {parsed_resume.work_history.map((job: any, idx: number) => (
+                            <div key={idx} className="mb-2 p-2 bg-muted rounded">
+                              <div>
+                                <b>{job.job_title}</b> at {job.employer} ({job.start_date} - {job.end_date || "Present"})
+                              </div>
+                              <div>{job.location} | {job.employment_type}</div>
+                              <div>{job.summary}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {/* Certifications */}
+                    {Array.isArray(parsed_resume.certifications) && parsed_resume.certifications.length > 0 && (
+                      <div>
+                        <span className="font-medium">Certifications:</span>
+                        <div className="mt-1 space-y-2">
+                          {parsed_resume.certifications.map((cert: any, idx: number) => (
+                            <div key={idx} className="mb-2 p-2 bg-muted rounded">
+                              <div>
+                                <b>{cert.certification}</b> {cert.issued_by && <>by {cert.issued_by}</>}
+                                {cert.issue_date && <> ({cert.issue_date})</>}
+                              </div>
+                              {cert.url && (
+                                <a href={cert.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                                  View Certificate
+                                </a>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
-              </div>
+              )}
             </CardContent>
           </Card>
 
@@ -193,30 +196,15 @@ const ViewEditApplication = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {Object.entries(applicationData.formResponses).map(([key, value]) => (
-                  <div key={key}>
-                    <Label className="capitalize">
-                      {key.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())}
-                    </Label>
-                    {isEditing ? (
-                      <Input
-                        value={value}
-                        onChange={(e) => {
-                          setApplicationData({
-                            ...applicationData,
-                            formResponses: {
-                              ...applicationData.formResponses,
-                              [key]: e.target.value,
-                            },
-                          });
-                        }}
-                        className="mt-1"
-                      />
-                    ) : (
-                      <div className="mt-1 p-2 bg-muted rounded-md">{value}</div>
-                    )}
-                  </div>
-                ))}
+                {application_data.form_responses &&
+                  Object.entries(application_data.form_responses).map(([key, value]) => (
+                    <div key={key}>
+                      <Label className="capitalize">
+                        {key.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())}
+                      </Label>
+                      <div className="mt-1 p-2 bg-muted rounded-md">{String(value)}</div>
+                    </div>
+                  ))}
               </div>
             </CardContent>
           </Card>
@@ -229,7 +217,7 @@ const ViewEditApplication = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {applicationData.interviews.length > 0 ? (
+              {application_data.interviews?.length > 0 ? (
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -240,7 +228,7 @@ const ViewEditApplication = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {applicationData.interviews.map((interview) => (
+                    {application_data.interviews.map((interview: any) => (
                       <TableRow key={interview.id}>
                         <TableCell>
                           {new Date(interview.date).toLocaleDateString()} at {interview.time}
@@ -271,43 +259,26 @@ const ViewEditApplication = () => {
             <CardContent className="space-y-4">
               <div>
                 <Label>Current Status</Label>
-                {isEditing ? (
-                  <Select
-                    value={applicationData.status}
-                    onValueChange={(value) => setApplicationData({...applicationData, status: value})}
-                  >
-                    <SelectTrigger className="mt-1">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="review">Under Review</SelectItem>
-                      <SelectItem value="interview">Interview Scheduled</SelectItem>
-                      <SelectItem value="hired">Hired</SelectItem>
-                      <SelectItem value="rejected">Rejected</SelectItem>
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <div className="mt-1">
-                    <Badge variant="outline" className="capitalize">
-                      {applicationData.status}
-                    </Badge>
-                  </div>
-                )}
+                <div className="mt-1">
+                  <Badge variant="outline" className="capitalize">
+                    {application_data.status}
+                  </Badge>
+                </div>
               </div>
               <div>
                 <Label>Submitted</Label>
                 <div className="mt-1 text-muted-foreground">
-                  {new Date(applicationData.submissionDate).toLocaleDateString()}
+                  {application_data.submission_date && new Date(application_data.submission_date).toLocaleDateString()}
                 </div>
               </div>
               <div>
                 <Label>Job Position</Label>
-                <div className="mt-1 font-medium">{applicationData.job.title}</div>
+                <div className="mt-1 font-medium">{application_data.job?.title}</div>
               </div>
             </CardContent>
           </Card>
 
-          {applicationData.matchScore && (
+          {application_data.match_score && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -318,49 +289,17 @@ const ViewEditApplication = () => {
               <CardContent>
                 <div className="text-center">
                   <div className="text-3xl font-bold text-primary">
-                    {applicationData.matchScore}%
+                    {application_data.match_score}%
                   </div>
                   <p className="text-muted-foreground">Compatibility with job requirements</p>
                 </div>
               </CardContent>
             </Card>
           )}
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Quick Actions</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <Button
-                variant="outline"
-                className="w-full justify-start"
-                onClick={() => handleStatusChange("interview")}
-                disabled={applicationData.status === "interview"}
-              >
-                Schedule Interview
-              </Button>
-              <Button
-                variant="outline"
-                className="w-full justify-start"
-                onClick={() => handleStatusChange("hired")}
-                disabled={applicationData.status === "hired"}
-              >
-                Mark as Hired
-              </Button>
-              <Button
-                variant="outline"
-                className="w-full justify-start text-destructive hover:text-destructive"
-                onClick={() => handleStatusChange("rejected")}
-                disabled={applicationData.status === "rejected"}
-              >
-                Reject Application
-              </Button>
-            </CardContent>
-          </Card>
         </div>
       </div>
     </div>
   );
 };
 
-export default ViewEditApplication;
+export default ViewApplication;

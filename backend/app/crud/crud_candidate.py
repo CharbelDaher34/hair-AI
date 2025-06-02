@@ -2,7 +2,7 @@ from typing import Any, Dict, Optional, Union, List
 
 from sqlmodel import Session, select
 
-from models.models import Candidate
+from models.models import Candidate, Application, Job
 from schemas import CandidateCreate, CandidateUpdate
 
 
@@ -51,3 +51,19 @@ def delete_candidate(db: Session, *, candidate_id: int) -> Optional[Candidate]:
         db.delete(db_candidate)
         db.commit()
     return db_candidate
+
+def get_candidates_by_company(db: Session, *, employer_id: int):
+    statement_1 = (
+        select(Candidate)
+        .join(Application, Application.candidate_id == Candidate.id)
+        .join(Job, Job.id == Application.job_id)
+        .where(Job.employer_id == employer_id)
+    )
+    statement_2 = (
+        select(Candidate)
+        .where(Candidate.employer_id == employer_id)
+    )
+    candidates_1 = db.exec(statement_1).all()
+    candidates_2 = db.exec(statement_2).all()
+    unique_candidates = {candidate.id: candidate for candidate in candidates_1 + candidates_2}
+    return list(unique_candidates.values())

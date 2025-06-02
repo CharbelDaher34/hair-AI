@@ -24,6 +24,7 @@ AUTH_REQUIRED_PATHS_PREFIXES = [
     "/api/v1/companies/recruit_to",
     "/api/v1/companies/by_hr",
     "/api/v1/applications/employer-applications",
+    "/api/v1/companies/candidates",
 ]
 
 # HTTPBearer scheme for extracting token
@@ -51,6 +52,13 @@ def path_matches_prefix(current_path: str, prefix: str) -> bool:
                 normalized_current.startswith(normalized_prefix + "/"))
     
     return False
+
+def get_token_data_from_request(request: Request) -> Optional[TokenData]:
+    auth_header = request.headers.get("authorization") or request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.split(" ", 1)[1]
+        return decode_access_token(token)
+    return None
 
 class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(
@@ -87,57 +95,27 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 print(f"auth_prefix: {auth_prefix}")
                 is_public_path = False
                 break
-    
+
+        token_data: Optional[TokenData] = get_token_data_from_request(request)
+
         if is_public_path:
             print(f"is_public_path: {is_public_path}")
             # For public paths, proceed without authentication enforcement
+            if token_data:
+                request.state.user = token_data
             response = await call_next(request)
             return response
         else:
             print(f"is_public_path: {is_public_path}")
             # For non-public paths, enforce authentication
-            credentials: Optional[HTTPAuthorizationCredentials] = await bearer_scheme(request)
-            # print(f"credentials: {credentials}")
-            # print(request.headers.get("Authorization"))
-            if not credentials:
-                # Fallback: try to extract token manually
-                auth_header = request.headers.get("authorization") or request.headers.get("Authorization")
-                if auth_header and auth_header.startswith("Bearer "):
-                    token = auth_header.split(" ", 1)[1]
-                    
-                    token_data: Optional[TokenData] = decode_access_token(token)
-                    
-                    if token_data is None:
-                        return JSONResponse(
-                            status_code=status.HTTP_401_UNAUTHORIZED,
-                            content={"detail": "Invalid or expired token, or insufficient permissions."},
-                            headers={"WWW-Authenticate": "Bearer"},
-                        )
-                    
-                    # Token is valid, attach user data to request state
-                    request.state.user = token_data
-                    response = await call_next(request)
-                    return response
-                
+            if not token_data:
                 return JSONResponse(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     content={"detail": "Not authenticated. Authorization header missing or invalid."},
                     headers={"WWW-Authenticate": "Bearer"},
                 )
-            
-            token = credentials.credentials
-            token_data: Optional[TokenData] = decode_access_token(token)
-            # decode_access_token itself checks for user_type == 'hr' and presence of employer_id
-            if token_data is None: 
-                return JSONResponse(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    content={"detail": "Invalid or expired token, or insufficient permissions."},
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
-            
             # Token is valid, attach user data to request state
             request.state.user = token_data
-            
             response = await call_next(request)
             return response 
        

@@ -1,6 +1,6 @@
 from functools import reduce
 from typing import List, Annotated
-from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Form
+from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Form, Request
 import shutil
 import tempfile
 import os
@@ -8,7 +8,8 @@ from sqlmodel import Session
 import base64
 import time
 import json
-
+from typing import Optional
+from core.auth_middleware import TokenData
 from core.database import get_session
 from crud import crud_candidate
 from schemas import CandidateCreate, CandidateUpdate, CandidateRead
@@ -42,14 +43,21 @@ def create_candidate(
     *,
     db: Session = Depends(get_session),
     candidate_in: Annotated[str,  Form()],
-    resume: UploadFile = File(...),
+    resume: Optional[UploadFile] = File(None),
+    request: Request
 ) -> CandidateRead:
+    token_data: Optional[TokenData] = request.state.user
+
     temp_resume_path = None
     try:
         candidateData = json.loads(candidate_in)
         candidateObj = CandidateCreate(**candidateData)
         
         candidate_data = candidateObj.model_dump()
+        print(f"[Candidate API] Token data: {token_data}")
+        if token_data:
+            candidate_data["employer_id"] = token_data.employer_id
+            print(f"[Candidate API] Employer ID: {token_data.employer_id}")
         parsed_result = None
         if resume:
             try:

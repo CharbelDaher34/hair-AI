@@ -26,9 +26,20 @@ def create_application(
    
     return application
 
+
 class ApplicationDashboardResponse(BaseModel):
     applications: List[ApplicationWithDetails]
     total: int
+
+@router.get("/{application_id}/details", response_model=ApplicationWithDetails)
+def get_application_with_details(
+    *,
+    db: Session = Depends(get_session),
+    application_id: int
+) -> ApplicationWithDetails:
+    application = crud_application.get_application_with_details(db=db, application_id=application_id)
+
+    return application
 
 @router.get("/employer-applications", response_model=ApplicationDashboardResponse)
 def get_employer_applications(
@@ -59,20 +70,9 @@ def get_employer_applications(
     applications_with_details = []
     for app in applications:
         # Load relationships if not already loaded
-        if not app.candidate:
-            db.refresh(app, ["candidate"])
-        if not app.job:
-            db.refresh(app, ["job"])
+        application = crud_application.get_application_with_details(db=db, application_id=app.id)
             
-        app_detail = ApplicationWithDetails(
-            id=app.id,
-            candidate_id=app.candidate_id,
-            job_id=app.job_id,
-            form_responses=app.form_responses,
-            candidate=app.candidate,
-            job=app.job
-        )
-        applications_with_details.append(app_detail)
+        applications_with_details.append(application)
     
     # For now, we'll return the count of applications returned
     # In a real scenario, you might want to get the total count separately

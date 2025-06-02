@@ -1,4 +1,6 @@
 from typing import List, Optional
+from crud import crud_candidate
+from schemas.candidate import CandidateRead
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlmodel import Session
 
@@ -147,3 +149,22 @@ def get_current_company(
         )
     company = crud_company.get_company(db=db, employer_id=current_user.employer_id)
     return company
+
+
+@router.get("/candidates/", response_model=List[CandidateRead])
+def get_candidates_by_company(
+    *,
+    db: Session = Depends(get_session),
+    request: Request
+) -> CandidateRead:
+    """
+    Get all candidates.
+    """
+    current_user: Optional[TokenData] = request.state.user
+    if not current_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials"
+        )
+    candidates = crud_candidate.get_candidates_by_company(db=db, employer_id=current_user.employer_id)
+    return candidates

@@ -11,18 +11,21 @@ class ApiService {
     // Get token from localStorage and include it in headers if it exists
     const token = localStorage.getItem('token');
     
-    // Start with default headers
-    const headers = {
-      'Content-Type': 'application/json',
-    };
+    // Only set Content-Type if body is not FormData
+    const headers = {};
+    if (!(options.body instanceof FormData)) {
+      headers['Content-Type'] = 'application/json';
+    }
     
     // Add Authorization header if token exists
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
     
-    // Merge with any custom headers from options (this will override defaults)
-    Object.assign(headers, options.headers || {});
+    // Only merge if options.headers is provided and not empty
+    if (options.headers && Object.keys(options.headers).length > 0) {
+      Object.assign(headers, options.headers);
+    }
     
     const config = {
       headers,
@@ -88,6 +91,10 @@ class ApiService {
     return this.request('/companies/by_hr/');
   }
 
+  async getCandidatesForCurrentCompany() {
+    return this.request('/companies/candidates/');
+  }
+
   // HR endpoints
   async createHR(hrData) {
     return this.request('/hrs/', {
@@ -138,6 +145,10 @@ class ApiService {
     });
   }
 
+  async getJobFormData(jobId) {
+    return this.request(`/jobs/form-data/${jobId}`);
+  }
+
   // Application endpoints
   async createApplication(applicationData) {
     return this.request('/applications/', {
@@ -148,6 +159,10 @@ class ApiService {
 
   async getApplication(applicationId) {
     return this.request(`/applications/${applicationId}`);
+  }
+
+  async getApplicationWithDetails(applicationId) {
+    return this.request(`/applications/${applicationId}/details`);
   }
 
   async updateApplication(applicationId, updateData) {
@@ -176,9 +191,9 @@ class ApiService {
       formData.append('resume', resumeFile);
     }
 
+    // Do NOT set headers here!
     return this.request('/candidates/', {
       method: 'POST',
-      headers: {}, // Remove Content-Type to let browser set it for FormData
       body: formData,
     });
   }
