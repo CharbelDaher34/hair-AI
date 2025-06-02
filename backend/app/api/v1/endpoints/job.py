@@ -139,10 +139,11 @@ def get_form_data(
         raise HTTPException(status_code=403, detail="You are not authorized to access this job")
     
     form_keys = crud_form_key.get_form_keys(db=db, job_id=job_id)
-    
+    company = crud_company.get_company(db=db, employer_id=job.employer_id)
     return JobFormData(
         job=job,
-        form_keys=form_keys
+        form_keys=form_keys,
+        company=company
     )
 
 @router.get("/public/form-data/{job_id}", response_model=JobFormData)

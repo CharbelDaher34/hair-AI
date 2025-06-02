@@ -177,6 +177,7 @@ class CandidateBase(TimeBase):
     phone: Optional[str] = Field(unique=True)
     resume_url: Optional[str] = None
     parsed_resume: Optional[Dict] = Field(default=None, sa_column=Column(JSON))
+    employer_id: Optional[int] = Field(default=None, foreign_key="company.id")
 
 
 class Candidate(CandidateBase, table=True):
