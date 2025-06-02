@@ -71,6 +71,13 @@ from .crud_recruiter_company_link import (
     get_recruiter_company_links_by_target_company,
     update_recruiter_company_link,
 )
+from .crud_interview import (
+    create_interview,
+    delete_interview,
+    get_interview,
+    get_interviews,
+    update_interview,
+)
 
 __all__ = [
     "create_application",
@@ -128,4 +135,9 @@ __all__ = [
     "get_recruiter_company_links_by_recruiter",
     "get_recruiter_company_links_by_target_company",
     "update_recruiter_company_link",
+    "create_interview",
+    "delete_interview",
+    "get_interview",
+    "get_interviews",
+    "update_interview",
 ]
