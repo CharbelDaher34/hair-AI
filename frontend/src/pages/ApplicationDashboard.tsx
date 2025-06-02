@@ -6,11 +6,34 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Eye, Edit, Trash2, Plus, Search, MoreHorizontal, Filter, Loader2 } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Eye, Edit, Trash2, Plus, Search, MoreHorizontal, Filter, Loader2, Calendar, Clock } from "lucide-react";
 import { Link } from "react-router-dom";
 import apiService from "@/services/api";
 import { Application, ApplicationDashboardResponse } from "@/types";
 import { toast } from "sonner";
+
+interface Interview {
+  id: number;
+  application_id: number;
+  date: string;
+  type: string;
+  status: string;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+  application?: {
+    id: number;
+    candidate: {
+      id: number;
+      full_name: string;
+    };
+    job: {
+      id: number;
+      title: string;
+    };
+  };
+}
 
 const ApplicationDashboard = () => {
   const [search_term, set_search_term] = useState("");
@@ -21,6 +44,12 @@ const ApplicationDashboard = () => {
   const [total, set_total] = useState(0);
   const [skip, set_skip] = useState(0);
   const [limit] = useState(10);
+  
+  // Interview modal state
+  const [selected_application, set_selected_application] = useState<Application | null>(null);
+  const [interviews, set_interviews] = useState<Interview[]>([]);
+  const [interviews_loading, set_interviews_loading] = useState(false);
+  const [interviews_dialog_open, set_interviews_dialog_open] = useState(false);
 
   const fetch_applications = async () => {
     try {
@@ -33,6 +62,21 @@ const ApplicationDashboard = () => {
       toast.error("Failed to load applications");
     } finally {
       set_loading(false);
+    }
+  };
+
+  const fetch_interviews_for_application = async (application: Application) => {
+    try {
+      set_interviews_loading(true);
+      set_selected_application(application);
+      const interviews_data = await apiService.getInterviewsByApplication(application.id);
+      set_interviews(interviews_data);
+      set_interviews_dialog_open(true);
+    } catch (error) {
+      console.error("Failed to fetch interviews:", error);
+      toast.error("Failed to load interviews for this application");
+    } finally {
+      set_interviews_loading(false);
     }
   };
 
@@ -89,8 +133,27 @@ const ApplicationDashboard = () => {
     }
   };
 
+  const get_interview_status_variant = (status: string): "default" | "secondary" | "destructive" => {
+    switch (status.toLowerCase()) {
+      case "done":
+        return "default";
+      case "canceled":
+        return "destructive";
+      default:
+        return "secondary";
+    }
+  };
+
   const format_date = (date_string: string) => {
     return new Date(date_string).toLocaleDateString();
+  };
+
+  const format_date_time = (date_string: string) => {
+    const date = new Date(date_string);
+    return {
+      date: date.toLocaleDateString(),
+      time: date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    };
   };
 
   if (loading) {
@@ -212,6 +275,13 @@ const ApplicationDashboard = () => {
                                 View
                               </Link>
                             </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={() => fetch_interviews_for_application(application)}
+                              disabled={interviews_loading}
+                            >
+                              <Calendar className="mr-2 h-4 w-4" />
+                              Interviews
+                            </DropdownMenuItem>
                             <DropdownMenuItem asChild>
                               <Link to={`/applications/${application.id}/edit`}>
                                 <Edit className="mr-2 h-4 w-4" />
@@ -260,6 +330,101 @@ const ApplicationDashboard = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Interviews Dialog */}
+      <Dialog open={interviews_dialog_open} onOpenChange={set_interviews_dialog_open}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5" />
+              Interviews for {selected_application?.candidate?.full_name}
+            </DialogTitle>
+            <DialogDescription>
+              {selected_application?.job?.title} - Application #{selected_application?.id}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {interviews_loading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin" />
+                <span className="ml-2">Loading interviews...</span>
+              </div>
+            ) : interviews.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground mb-4">No interviews scheduled for this application</p>
+                <Button asChild>
+                  <Link to={`/interviews/create?application_id=${selected_application?.id}`}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Schedule Interview
+                  </Link>
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-medium">Scheduled Interviews ({interviews.length})</h4>
+                  <Button asChild size="sm">
+                    <Link to={`/interviews/create?application_id=${selected_application?.id}`}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Interview
+                    </Link>
+                  </Button>
+                </div>
+                
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date & Time</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Notes</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {interviews.map((interview) => {
+                      const dateTime = format_date_time(interview.date);
+                      return (
+                        <TableRow key={interview.id}>
+                          <TableCell>
+                            <div>
+                              <div className="font-medium">{dateTime.date}</div>
+                              <div className="text-sm text-muted-foreground">{dateTime.time}</div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{interview.type}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={get_interview_status_variant(interview.status)}>
+                              {interview.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="max-w-[200px] truncate text-sm text-muted-foreground">
+                              {interview.notes || "No notes"}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Button asChild variant="ghost" size="sm">
+                                <Link to={`/interviews/${interview.id}/edit`}>
+                                  <Edit className="h-4 w-4" />
+                                </Link>
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

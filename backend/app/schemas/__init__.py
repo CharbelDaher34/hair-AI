@@ -7,6 +7,7 @@ from .job import JobCreate, JobUpdate, JobRead
 from .job_form_key_constraint import JobFormKeyConstraintCreate, JobFormKeyConstraintUpdate, JobFormKeyConstraintRead
 from .match import MatchCreate, MatchUpdate, MatchRead
 from .recruiter_company_link import RecruiterCompanyLinkCreate, RecruiterCompanyLinkUpdate, RecruiterCompanyLinkRead
+from .interview import InterviewBase, InterviewCreate, InterviewUpdate, InterviewRead, InterviewReadWithApplication
 
 __all__ = [
     "ApplicationCreate",
@@ -21,6 +22,7 @@ __all__ = [
     "CompanyRead",
     "HRCreate",
     "HRUpdate",
+    "HRRead",
     "JobCreate",
     "JobUpdate",
     "JobRead",
@@ -33,4 +35,9 @@ __all__ = [
     "RecruiterCompanyLinkCreate",
     "RecruiterCompanyLinkUpdate",
     "RecruiterCompanyLinkRead",
+    "InterviewBase",
+    "InterviewCreate",
+    "InterviewUpdate",
+    "InterviewRead",
+    "InterviewReadWithApplication",
 ]

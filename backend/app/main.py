@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 import uvicorn
 import os
 from fastapi.middleware.cors import CORSMiddleware
-from api.v1.endpoints import company, hr, recruiter_company_link, form_key, job, job_form_key_constraint, application, match, candidate, auth
+from api.v1.endpoints import company, hr, recruiter_company_link, form_key, job, job_form_key_constraint, application, match, candidate, auth, interview
 # from api.v1.endpoints import auth as auth_router
 
 # Get debug mode from environment variable, default to True
@@ -97,6 +97,7 @@ app.include_router(job.router, prefix="/api/v1/jobs", tags=["jobs"])
 app.include_router(job_form_key_constraint.router, prefix="/api/v1/job_form_key_constraints", tags=["job_form_key_constraints"])
 app.include_router(application.router, prefix="/api/v1/applications", tags=["applications"])
 app.include_router(match.router, prefix="/api/v1/matches", tags=["matches"])
+app.include_router(interview.router, prefix="/api/v1/interviews", tags=["interviews"])
 app.include_router(candidate.router, prefix="/api/v1/candidates", tags=["candidates"])
 
 @app.get("/", summary="Root endpoint for API health and info")

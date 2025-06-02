@@ -354,6 +354,39 @@ class ApiService {
   async getCurrentUser() {
     return this.request('/hrs/');
   }
+
+  // Interview endpoints
+  async createInterview(interviewData) {
+    return this.request('/interviews/', {
+      method: 'POST',
+      body: JSON.stringify(interviewData),
+    });
+  }
+
+  async getInterview(interviewId) {
+    return this.request(`/interviews/${interviewId}`);
+  }
+
+  async updateInterview(interviewId, updateData) {
+    return this.request(`/interviews/${interviewId}`, {
+      method: 'PUT',
+      body: JSON.stringify(updateData),
+    });
+  }
+
+  async deleteInterview(interviewId) {
+    return this.request(`/interviews/${interviewId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getAllInterviews(skip = 0, limit = 100) {
+    return this.request(`/interviews/?skip=${skip}&limit=${limit}`);
+  }
+
+  async getInterviewsByApplication(applicationId) {
+    return this.request(`/interviews/by-application/${applicationId}`);
+  }
 }
 
 // Create and export a singleton instance

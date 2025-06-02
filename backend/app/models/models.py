@@ -200,11 +200,22 @@ class Application(ApplicationBase, table=True):
     matches: List["Match"] = Relationship(back_populates="application")
     interviews: List["Interview"] = Relationship(back_populates="application")
 
+
+class InterviewType(str,Enum):
+    PHONE = "phone"
+    ONLINE = "online"
+    IN_PERSON = "in_person"
+
+class InterviewStatus(str,Enum):
+    SCHEDULED = "scheduled"
+    DONE = "done"
+    CANCELED = "canceled"
+
 class InterviewBase(TimeBase):
     application_id: int = Field(foreign_key="application.id")
     date: datetime
-    type: str  # e.g. phone, zoom, in-person
-    status: str  # scheduled, done, canceled
+    type: InterviewType = Field(default=InterviewType.PHONE, sa_column=Column(SQLAlchemyEnum(InterviewType, name="interviewtype_enum", create_type=True)))
+    status: InterviewStatus = Field(default=InterviewStatus.SCHEDULED, sa_column=Column(SQLAlchemyEnum(InterviewStatus, name="interviewstatus_enum", create_type=True)))
     notes: Optional[str] = None
 
 
