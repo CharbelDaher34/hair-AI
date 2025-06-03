@@ -168,10 +168,12 @@ const FormKeysManagement = () => {
 
   if (isLoading) {
     return (
-      <div className="flex-1 space-y-8 p-8">
+      <div className="flex-1 space-y-8 p-8 bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
         <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin" />
-          <span className="ml-2">Loading form keys...</span>
+          <div className="text-center space-y-4">
+            <Loader2 className="h-12 w-12 animate-spin text-blue-600 mx-auto" />
+            <span className="text-lg font-medium text-gray-700">Loading form keys...</span>
+          </div>
         </div>
       </div>
     );
@@ -179,31 +181,35 @@ const FormKeysManagement = () => {
 
   if (error) {
     return (
-      <div className="flex-1 space-y-8 p-8">
+      <div className="flex-1 space-y-8 p-8 bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
         <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <p className="text-destructive mb-4">Error: {error}</p>
-            <Button onClick={fetchFormKeys}>
+          <Card className="w-full max-w-md shadow-xl border-0">
+            <CardContent className="text-center p-8 space-y-4">
+              <p className="text-red-600 font-semibold text-lg mb-4">Error: {error}</p>
+              <Button onClick={fetchFormKeys} className="button shadow-lg hover:shadow-xl transition-all duration-300">
               Retry
             </Button>
-          </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex-1 space-y-8 p-8">
+    <div className="flex-1 space-y-8 p-8 bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Form Keys Management</h1>
-          <p className="text-muted-foreground">
-            Manage custom form fields for job applications
+        <div className="space-y-2">
+          <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            Form Keys Management
+          </h1>
+          <p className="text-lg text-gray-600">
+            Create and manage custom form fields for job applications
           </p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button onClick={() => setEditingKey(null)}>
+            <Button onClick={() => resetForm()} className="button shadow-lg hover:shadow-xl transition-all duration-300">
               <Plus className="mr-2 h-4 w-4" />
               Add Form Key
             </Button>

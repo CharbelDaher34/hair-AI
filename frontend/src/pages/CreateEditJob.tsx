@@ -346,10 +346,14 @@ const CreateEditJob = () => {
 
   if (is_loading) {
     return (
-      <div className="flex-1 space-y-8 p-8">
+      <div className="flex-1 space-y-8 p-8 bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
         <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin" />
-          <span className="ml-2">Loading...</span>
+          <div className="text-center space-y-4">
+            <Loader2 className="h-12 w-12 animate-spin text-blue-600 mx-auto" />
+            <span className="text-lg font-medium text-gray-700">
+              {is_editing ? "Loading job data..." : "Loading form..."}
+            </span>
+          </div>
         </div>
       </div>
     );
@@ -357,111 +361,162 @@ const CreateEditJob = () => {
 
   if (error) {
     return (
-      <div className="flex-1 space-y-8 p-8">
+      <div className="flex-1 space-y-8 p-8 bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
         <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <p className="text-destructive mb-4">Error: {error}</p>
-            <Button onClick={() => window.location.reload()}>
+          <Card className="w-full max-w-md shadow-xl border-0">
+            <CardContent className="text-center p-8 space-y-4">
+              <p className="text-red-600 font-semibold text-lg mb-4">Error: {error}</p>
+              <Button onClick={() => window.location.reload()} className="button shadow-lg hover:shadow-xl transition-all duration-300">
               Retry
             </Button>
-          </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex-1 space-y-8 p-8">
+    <div className="flex-1 space-y-8 p-8 bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">
+        <div className="space-y-2">
+          <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
             {is_editing ? "Edit Job" : "Create New Job"}
           </h1>
-          <p className="text-muted-foreground">
-            {is_editing ? "Update job posting details" : "Set up a new job posting with custom requirements"}
+          <p className="text-lg text-gray-600">
+            {is_editing ? "Update job details and requirements" : "Fill in the details to create a new job posting"}
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => navigate("/jobs")} disabled={is_submitting}>
-            Cancel
+        {is_editing && (
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              onClick={generate_form_url}
+              className="shadow-md hover:shadow-lg transition-all duration-300"
+            >
+              <ExternalLink className="mr-2 h-4 w-4" />
+              Generate URL
+            </Button>
+            {generated_url && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  navigator.clipboard.writeText(generated_url);
+                  toast({
+                    title: "URL Copied!",
+                    description: "The application URL has been copied to your clipboard.",
+                  });
+                }}
+                className="shadow-md hover:shadow-lg transition-all duration-300"
+              >
+                <Copy className="mr-2 h-4 w-4" />
+                Copy URL
           </Button>
-          <Button onClick={handle_save} disabled={is_submitting}>
-            {is_submitting ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                {is_editing ? "Updating..." : "Creating..."}
-              </>
-            ) : (
-              is_editing ? "Update Job" : "Save Job"
             )}
-          </Button>
         </div>
+        )}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Job Information</CardTitle>
-              <CardDescription>Basic details about the position</CardDescription>
+      <div className="grid gap-8 lg:grid-cols-3">
+        <div className="lg:col-span-2 space-y-6">
+          {/* Basic Information */}
+          <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-xl font-bold text-gray-800">Basic Information</CardTitle>
+              <CardDescription className="text-base text-gray-600">
+                Essential details about the job position
+              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <Label htmlFor="title">Job Title</Label>
+                  <Label htmlFor="title" className="text-sm font-semibold text-gray-700">Job Title *</Label>
                 <Input
                   id="title"
                   value={job_data.title}
-                  onChange={(e) => set_job_data({...job_data, title: e.target.value})}
+                    onChange={(e) => set_job_data({ ...job_data, title: e.target.value })}
                   placeholder="e.g., Senior Frontend Developer"
+                    required
+                    className="h-12 shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="location" className="text-sm font-semibold text-gray-700">Location *</Label>
+                  <Input
+                    id="location"
+                    value={job_data.location}
+                    onChange={(e) => set_job_data({ ...job_data, location: e.target.value })}
+                    placeholder="e.g., San Francisco, CA"
+                    required
+                    className="h-12 shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500"
                 />
+                </div>
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="description">Description</Label>
+                <Label htmlFor="description" className="text-sm font-semibold text-gray-700">Job Description *</Label>
                 <Textarea
                   id="description"
                   value={job_data.description}
-                  onChange={(e) => set_job_data({...job_data, description: e.target.value})}
-                  placeholder="Brief description of the role and company"
-                  rows={3}
+                  onChange={(e) => set_job_data({ ...job_data, description: e.target.value })}
+                  placeholder="Describe the role, responsibilities, and what you're looking for..."
+                  rows={4}
+                  required
+                  className="shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500 resize-none"
                 />
               </div>
 
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <Label htmlFor="location">Location</Label>
+                  <Label htmlFor="salary_min" className="text-sm font-semibold text-gray-700">Minimum Salary</Label>
                 <Input
-                  id="location"
-                  value={job_data.location}
-                  onChange={(e) => set_job_data({...job_data, location: e.target.value})}
-                  placeholder="e.g., New York, NY"
+                    id="salary_min"
+                    type="number"
+                    value={job_data.salary_min}
+                    onChange={(e) => set_job_data({ ...job_data, salary_min: e.target.value })}
+                    placeholder="50000"
+                    className="h-12 shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500"
                 />
               </div>
-
               <div className="space-y-2">
-                <Label htmlFor="salary_min">Salary Min</Label>
+                  <Label htmlFor="salary_max" className="text-sm font-semibold text-gray-700">Maximum Salary</Label>
                 <Input
-                  id="salary_min"
-                  value={job_data.salary_min}
-                  onChange={(e) => set_job_data({...job_data, salary_min: e.target.value})}
-                  placeholder="e.g., 50000"
+                    id="salary_max"
+                    type="number"
+                    value={job_data.salary_max}
+                    onChange={(e) => set_job_data({ ...job_data, salary_max: e.target.value })}
+                    placeholder="80000"
+                    className="h-12 shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500"
                 />
+                </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="salary_max">Salary Max</Label>
+                <Label htmlFor="job_category" className="text-sm font-semibold text-gray-700">Job Category</Label>
                 <Input
-                  id="salary_max"
-                  value={job_data.salary_max}
-                  onChange={(e) => set_job_data({...job_data, salary_max: e.target.value})}
-                  placeholder="e.g., 100000"
+                  id="job_category"
+                  value={job_data.job_category}
+                  onChange={(e) => set_job_data({ ...job_data, job_category: e.target.value })}
+                  placeholder="e.g., Engineering, Marketing, Sales"
+                  className="h-12 shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500"
                 />
               </div>
+            </CardContent>
+          </Card>
 
+          <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-xl font-bold text-gray-800">Job Details</CardTitle>
+              <CardDescription className="text-base text-gray-600">
+                Additional information about the job position
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
               <div className="space-y-2">
-                <Label htmlFor="experience_level">Experience Level</Label>
+                <Label htmlFor="experience_level" className="text-sm font-semibold text-gray-700">Experience Level</Label>
                 <Select
                   value={job_data.experience_level}
-                  onValueChange={(value) => set_job_data({...job_data, experience_level: value})}
+                  onValueChange={(value) => set_job_data({ ...job_data, experience_level: value })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select experience level" />
@@ -477,10 +532,10 @@ const CreateEditJob = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="seniority_level">Seniority Level</Label>
+                <Label htmlFor="seniority_level" className="text-sm font-semibold text-gray-700">Seniority Level</Label>
                 <Select
                   value={job_data.seniority_level}
-                  onValueChange={(value) => set_job_data({...job_data, seniority_level: value})}
+                  onValueChange={(value) => set_job_data({ ...job_data, seniority_level: value })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select seniority level" />
@@ -496,10 +551,10 @@ const CreateEditJob = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="job_type">Job Type</Label>
+                <Label htmlFor="job_type" className="text-sm font-semibold text-gray-700">Job Type</Label>
                 <Select
                   value={job_data.job_type}
-                  onValueChange={(value) => set_job_data({...job_data, job_type: value})}
+                  onValueChange={(value) => set_job_data({ ...job_data, job_type: value })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select job type" />
@@ -515,20 +570,10 @@ const CreateEditJob = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="job_category">Job Category</Label>
-                <Input
-                  id="job_category"
-                  value={job_data.job_category}
-                  onChange={(e) => set_job_data({...job_data, job_category: e.target.value})}
-                  placeholder="e.g., Technology"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="status">Status</Label>
+                <Label htmlFor="status" className="text-sm font-semibold text-gray-700">Status</Label>
                 <Select
                   value={job_data.status}
-                  onValueChange={(value) => set_job_data({...job_data, status: value})}
+                  onValueChange={(value) => set_job_data({ ...job_data, status: value })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select job status" />
@@ -544,10 +589,10 @@ const CreateEditJob = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="recruited_to_id">Recruited To</Label>
+                <Label htmlFor="recruited_to_id" className="text-sm font-semibold text-gray-700">Recruited To</Label>
                 <Select
                   value={job_data.recruited_to_id?.toString() || "none"}
-                  onValueChange={(value) => set_job_data({...job_data, recruited_to_id: value === "none" ? null : parseInt(value)})}
+                  onValueChange={(value) => set_job_data({ ...job_data, recruited_to_id: value === "none" ? null : parseInt(value) })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select a company (optional)" />
@@ -572,41 +617,68 @@ const CreateEditJob = () => {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Application Form URL</CardTitle>
-              <CardDescription>Generate a public URL for external applications</CardDescription>
+          <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-xl font-bold text-gray-800">Additional Details</CardTitle>
+              <CardDescription className="text-base text-gray-600">
+                Optional additional information about the position
+              </CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="flex items-center space-x-2">
-                <Input
-                  value={generated_url || "Click generate to create URL"}
-                  readOnly
-                  className="flex-1"
+            <CardContent className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="overview" className="text-sm font-semibold text-gray-700">Overview</Label>
+                <Textarea
+                  id="overview"
+                  value={job_data.overview}
+                  onChange={(e) => set_job_data({ ...job_data, overview: e.target.value })}
+                  placeholder="Brief overview of the role and company"
+                  rows={3}
                 />
-                <Button variant="outline" onClick={generate_form_url}>
-                  <Copy className="mr-2 h-4 w-4" />
-                  Generate
-                </Button>
-                {generated_url && (
-                  <Button variant="outline" size="sm" onClick={() => window.open(generated_url, '_blank')}>
-                    <ExternalLink className="h-4 w-4" />
-                  </Button>
-                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="requirements" className="text-sm font-semibold text-gray-700">Requirements</Label>
+                <Textarea
+                  id="requirements"
+                  value={job_data.requirements}
+                  onChange={(e) => set_job_data({ ...job_data, requirements: e.target.value })}
+                  placeholder="List the key requirements for this position"
+                  rows={4}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="objectives" className="text-sm font-semibold text-gray-700">Objectives</Label>
+                <Textarea
+                  id="objectives"
+                  value={job_data.objectives}
+                  onChange={(e) => set_job_data({ ...job_data, objectives: e.target.value })}
+                  placeholder="What will the successful candidate achieve?"
+                  rows={4}
+                />
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="auto_generate"
+                  checked={job_data.auto_generate}
+                  onCheckedChange={(checked) => set_job_data({ ...job_data, auto_generate: checked })}
+                />
+                <Label htmlFor="auto_generate" className="text-sm font-semibold text-gray-700">Auto-generate job description</Label>
               </div>
             </CardContent>
           </Card>
         </div>
 
         <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Form Keys & Constraints</CardTitle>
-              <CardDescription>
+          <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-xl font-bold text-gray-800">Form Keys & Constraints</CardTitle>
+              <CardDescription className="text-base text-gray-600">
                 Attach custom form fields and set requirements
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-6">
               {form_keys.length === 0 ? (
                 <div className="text-center py-8">
                   <p className="text-muted-foreground mb-4">No form keys available</p>
@@ -730,56 +802,24 @@ const CreateEditJob = () => {
               )}
             </CardContent>
           </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Additional Details</CardTitle>
-              <CardDescription>Optional additional information about the position</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="overview">Overview</Label>
-                <Textarea
-                  id="overview"
-                  value={job_data.overview}
-                  onChange={(e) => set_job_data({...job_data, overview: e.target.value})}
-                  placeholder="Brief overview of the role and company"
-                  rows={3}
-                />
+              </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="requirements">Requirements</Label>
-                <Textarea
-                  id="requirements"
-                  value={job_data.requirements}
-                  onChange={(e) => set_job_data({...job_data, requirements: e.target.value})}
-                  placeholder="List the key requirements for this position"
-                  rows={4}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="objectives">Objectives</Label>
-                <Textarea
-                  id="objectives"
-                  value={job_data.objectives}
-                  onChange={(e) => set_job_data({...job_data, objectives: e.target.value})}
-                  placeholder="What will the successful candidate achieve?"
-                  rows={4}
-                />
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="auto_generate"
-                  checked={job_data.auto_generate}
-                  onCheckedChange={(checked) => set_job_data({...job_data, auto_generate: checked})}
-                />
-                <Label htmlFor="auto_generate">Auto-generate job description</Label>
-              </div>
-            </CardContent>
-          </Card>
+      <div className="flex items-center justify-between mt-8">
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => navigate("/jobs")} disabled={is_submitting}>
+            Cancel
+          </Button>
+          <Button onClick={handle_save} disabled={is_submitting}>
+            {is_submitting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                {is_editing ? "Updating..." : "Creating..."}
+              </>
+            ) : (
+              is_editing ? "Update Job" : "Save Job"
+            )}
+          </Button>
         </div>
       </div>
     </div>

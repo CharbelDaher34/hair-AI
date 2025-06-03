@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { FileText, Mail, Phone, User, Calendar, Star, ExternalLink, X, Loader2 } from "lucide-react";
+import { FileText, Mail, Phone, User, Calendar, Star, ExternalLink, X, Loader2, XCircle } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
 import apiService from "@/services/api";
 
@@ -68,8 +68,38 @@ const ViewApplication = () => {
     };
   }, [resume_pdf_url]);
 
-  if (loading) return <div>Loading...</div>;
-  if (!application_data) return <div>Application not found.</div>;
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50 p-8">
+        <div className="text-center space-y-4">
+          <Loader2 className="h-12 w-12 animate-spin text-blue-600 mx-auto" />
+          <p className="text-lg font-medium text-gray-700">Loading application details...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  if (!application_data) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50 p-8">
+        <Card className="w-full max-w-md shadow-2xl border-0">
+          <CardContent className="text-center p-10 space-y-5">
+            <XCircle className="h-16 w-16 text-red-500 mx-auto" />
+            <h2 className="text-2xl font-bold text-gray-800">Application Not Found</h2>
+            <p className="text-gray-600">
+              The application you are looking for does not exist or could not be loaded.
+            </p>
+            <Button 
+              onClick={() => navigate("/applications")} 
+              className="button shadow-lg hover:shadow-xl transition-all duration-300 w-full"
+            >
+              Back to Applications
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   // Helper to safely get parsed_resume
   let parsed_resume = undefined;
@@ -83,69 +113,73 @@ const ViewApplication = () => {
   }
 
   return (
-    <div className="flex-1 space-y-8 p-8">
+    <div className="flex-1 space-y-8 p-8 bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Application Details</h1>
-          <p className="text-muted-foreground">
-            {application_data.candidate?.name} • {application_data.job?.title}
+        <div className="space-y-2">
+          <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            Application Details
+          </h1>
+          <p className="text-lg text-gray-600">
+            {application_data.candidate?.full_name} for {application_data.job?.title}
           </p>
         </div>
-        <Button variant="outline" onClick={() => navigate("/applications")}>Back to Applications</Button>
+        <Button variant="outline" onClick={() => navigate("/applications")} className="button-outline shadow-md hover:shadow-lg transition-all duration-300">
+          Back to Applications
+        </Button>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-8 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <User className="h-5 w-5" />
+          <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center gap-3 text-xl font-bold text-gray-800">
+                <User className="h-6 w-6 text-blue-600" />
                 Candidate Information
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <Label>Full Name</Label>
-                  <div className="flex items-center gap-2 mt-1">
-                    <User className="h-4 w-4 text-muted-foreground" />
-                    <span>{application_data.candidate?.name}</span>
+            <CardContent className="space-y-6 pt-4">
+              <div className="grid gap-6 md:grid-cols-2">
+                <div className="space-y-1">
+                  <Label className="text-sm font-semibold text-gray-700">Full Name</Label>
+                  <div className="flex items-center gap-2 mt-1 p-3 bg-slate-100 rounded-md">
+                    <User className="h-4 w-4 text-blue-600" />
+                    <span className="text-gray-800 font-medium">{application_data.candidate?.full_name || "N/A"}</span>
                   </div>
                 </div>
-                <div>
-                  <Label>Email</Label>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Mail className="h-4 w-4 text-muted-foreground" />
-                    <span>{application_data.candidate?.email}</span>
+                <div className="space-y-1">
+                  <Label className="text-sm font-semibold text-gray-700">Email</Label>
+                  <div className="flex items-center gap-2 mt-1 p-3 bg-slate-100 rounded-md">
+                    <Mail className="h-4 w-4 text-blue-600" />
+                    <span className="text-gray-800 font-medium">{application_data.candidate?.email || "N/A"}</span>
                   </div>
                 </div>
-                <div>
-                  <Label>Phone</Label>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Phone className="h-4 w-4 text-muted-foreground" />
-                    <span>{application_data.candidate?.phone}</span>
+                <div className="space-y-1">
+                  <Label className="text-sm font-semibold text-gray-700">Phone</Label>
+                  <div className="flex items-center gap-2 mt-1 p-3 bg-slate-100 rounded-md">
+                    <Phone className="h-4 w-4 text-blue-600" />
+                    <span className="text-gray-800 font-medium">{application_data.candidate?.phone || "N/A"}</span>
                   </div>
                 </div>
-                <div>
-                  <Label>Resume</Label>
+                <div className="space-y-1">
+                  <Label className="text-sm font-semibold text-gray-700">Resume</Label>
                   <div className="flex items-center gap-2 mt-1">
-                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    <FileText className="h-5 w-5 text-blue-600" />
                     {application_data.candidate?.id && (
                       <Button 
                         variant="link"
-                        className="p-0 h-auto text-primary hover:underline flex items-center gap-1"
+                        className="p-0 h-auto text-blue-600 hover:text-blue-700 hover:underline flex items-center gap-1 text-base font-medium"
                         onClick={handle_view_resume}
                         disabled={pdf_loading}
                       >
                         {pdf_loading ? (
                           <>
-                            <Loader2 className="h-3 w-3 animate-spin" />
+                            <Loader2 className="h-4 w-4 animate-spin" />
                             Loading...
                           </>
                         ) : (
                           <>
                             View Resume
-                            <ExternalLink className="h-3 w-3" />
+                            <ExternalLink className="h-4 w-4 ml-1" />
                           </>
                         )}
                       </Button>
@@ -155,14 +189,14 @@ const ViewApplication = () => {
                          href={application_data.candidate?.resume_url} 
                          target="_blank" 
                          rel="noopener noreferrer"
-                         className="text-primary hover:underline flex items-center gap-1"
+                         className="text-blue-600 hover:text-blue-700 hover:underline flex items-center gap-1 text-base font-medium"
                        >
                          View Resume (URL)
-                         <ExternalLink className="h-3 w-3" /> 
+                         <ExternalLink className="h-4 w-4 ml-1" /> 
                        </a>
                     )}
-                    {!application_data.candidate?.id && !application_data.candidate?.resume_url && (
-                        <span>No resume available</span>
+                    {!(application_data.candidate?.id || application_data.candidate?.resume_url) && (
+                        <span className="text-gray-600 italic">No resume available</span>
                     )}
                   </div>
                 </div>
@@ -170,20 +204,19 @@ const ViewApplication = () => {
 
               {/* PDF Viewer Section */}
               {resume_pdf_url && (
-                <div className="mt-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <Label>Resume Preview</Label>
+                <div className="mt-6 pt-6 border-t border-gray-200">
+                  <div className="flex items-center justify-between mb-3">
+                    <Label className="text-lg font-semibold text-gray-800">Resume Preview</Label>
                     <Button 
                       variant="outline" 
-                      size="sm" 
+                      size="icon"
                       onClick={handle_close_pdf}
-                      className="flex items-center gap-1"
+                      className="button-outline rounded-full shadow-md hover:shadow-lg transition-all duration-300"
                     >
-                      <X className="h-4 w-4" />
-                      Close
+                      <X className="h-5 w-5" />
                     </Button>
                   </div>
-                  <div className="border rounded-lg overflow-hidden bg-gray-100">
+                  <div className="border border-gray-300 rounded-lg overflow-hidden bg-gray-50 shadow-inner">
                     <object
                       data={resume_pdf_url}
                       type="application/pdf"
@@ -298,110 +331,134 @@ const ViewApplication = () => {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Form Responses</CardTitle>
-              <CardDescription>Answers to custom application questions</CardDescription>
+          <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center gap-3 text-xl font-bold text-gray-800">
+                <FileText className="h-6 w-6 text-blue-600" />
+                Application Form Data
+              </CardTitle>
+              <CardDescription className="text-base text-gray-600">
+                Information provided by the candidate in the application form.
+              </CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {application_data.form_responses &&
+            <CardContent className="space-y-4 pt-4">
+              {application_data.form_responses && Object.keys(application_data.form_responses).length > 0 ? (
                   Object.entries(application_data.form_responses).map(([key, value]) => (
-                    <div key={key}>
-                      <Label className="capitalize">
-                        {key.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())}
-                      </Label>
-                      <div className="mt-1 p-2 bg-muted rounded-md">{String(value)}</div>
+                  <div key={key} className="space-y-1 pb-3 mb-3 border-b border-slate-200 last:border-b-0 last:pb-0 last:mb-0">
+                    <Label className="text-sm font-semibold text-gray-700">{key.split('_').join(' ').replace(/\b\w/g, l => l.toUpperCase())}</Label>
+                    <p className="text-gray-800 bg-slate-100 p-3 rounded-md whitespace-pre-wrap">{String(value)}</p>
+                  </div>
+                ))
+              ) : (
+                <p className="text-gray-600 italic">No additional form data submitted.</p>
+              )}
+            </CardContent>
+          </Card>
+
+          {parsed_resume && (
+            <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-3 text-xl font-bold text-gray-800">
+                  <Star className="h-6 w-6 text-yellow-500" />
+                  Parsed Resume Highlights
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4 pt-4">
+                {parsed_resume.skills && parsed_resume.skills.length > 0 && (
+                  <div className="space-y-2">
+                    <Label className="text-sm font-semibold text-gray-700">Skills</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {parsed_resume.skills.map((skill: string, index: number) => (
+                        <Badge key={index} variant="secondary" className="bg-blue-100 text-blue-700 border-blue-200 text-sm px-3 py-1">
+                          {skill}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {parsed_resume.experience && parsed_resume.experience.length > 0 && (
+                  <div className="space-y-3">
+                    <Label className="text-sm font-semibold text-gray-700">Work Experience</Label>
+                    {parsed_resume.experience.map((exp: any, index: number) => (
+                      <div key={index} className="p-3 bg-slate-100 rounded-md border border-slate-200">
+                        <h4 className="font-semibold text-gray-800">{exp.title} at {exp.company}</h4>
+                        <p className="text-sm text-gray-600">{exp.dates}</p>
+                        {exp.description && <p className="text-sm text-gray-700 mt-1 whitespace-pre-line">{exp.description}</p>}
                     </div>
                   ))}
+                  </div>
+                )}
+                 {(!parsed_resume.skills || parsed_resume.skills.length === 0) && 
+                  (!parsed_resume.experience || parsed_resume.experience.length === 0) && (
+                    <p className="text-gray-600 italic">No highlights extracted from resume.</p>
+                 )
+                }
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        <div className="space-y-6">
+          <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center gap-3 text-xl font-bold text-gray-800">
+                <Calendar className="h-6 w-6 text-blue-600" />
+                Job Information
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 pt-4">
+              <div className="space-y-1">
+                <Label className="text-sm font-semibold text-gray-700">Job Title</Label>
+                <p className="text-gray-800 font-medium">{application_data.job?.title || "N/A"}</p>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-sm font-semibold text-gray-700">Status</Label>
+                <Badge variant={application_data.status === 'active' ? 'default' : 'secondary'} className="font-medium">
+                    {application_data.status ? application_data.status.charAt(0).toUpperCase() + application_data.status.slice(1) : "N/A"}
+                </Badge>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-sm font-semibold text-gray-700">Applied On</Label>
+                <p className="text-gray-800 font-medium">
+                  {application_data.created_at ? new Date(application_data.created_at).toLocaleDateString() : "N/A"}
+                </p>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5" />
-                Interview History
+          {application_data.matches && application_data.matches.length > 0 && (
+            <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-3 text-xl font-bold text-gray-800">
+                  <Star className="h-6 w-6 text-yellow-500" />
+                  Match Details
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              {application_data.interviews?.length > 0 ? (
+              <CardContent className="pt-4">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Date & Time</TableHead>
-                      <TableHead>Interviewer</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Result</TableHead>
+                      <TableHead className="font-semibold text-gray-700">Score</TableHead>
+                      <TableHead className="font-semibold text-gray-700">Status</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {application_data.interviews.map((interview: any) => (
-                      <TableRow key={interview.id}>
+                    {application_data.matches.map((match: any) => (
+                      <TableRow key={match.id} className="hover:bg-slate-50">
                         <TableCell>
-                          {new Date(interview.date).toLocaleDateString()} at {interview.time}
+                          <Badge variant="outline" className="font-bold text-lg text-green-600 border-green-300 bg-green-50">
+                            {(match.score * 100).toFixed(1)}%
+                          </Badge>
                         </TableCell>
-                        <TableCell>{interview.interviewer}</TableCell>
-                        <TableCell>{interview.type}</TableCell>
                         <TableCell>
-                          <Badge variant={interview.result === "Pending" ? "secondary" : "default"}>
-                            {interview.result}
+                          <Badge variant={match.status === 'completed' ? 'default' : 'secondary'} className="font-medium">
+                            {match.status}
                           </Badge>
                         </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
-              ) : (
-                <p className="text-muted-foreground">No interviews scheduled yet.</p>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Application Status</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label>Current Status</Label>
-                <div className="mt-1">
-                  <Badge variant="outline" className="capitalize">
-                    {application_data.status}
-                  </Badge>
-                </div>
-              </div>
-              <div>
-                <Label>Submitted</Label>
-                <div className="mt-1 text-muted-foreground">
-                  {application_data.submission_date && new Date(application_data.submission_date).toLocaleDateString()}
-                </div>
-              </div>
-              <div>
-                <Label>Job Position</Label>
-                <div className="mt-1 font-medium">{application_data.job?.title}</div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {application_data.match_score && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Star className="h-5 w-5" />
-                  Match Score
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-primary">
-                    {application_data.match_score}%
-                  </div>
-                  <p className="text-muted-foreground">Compatibility with job requirements</p>
-                </div>
               </CardContent>
             </Card>
           )}

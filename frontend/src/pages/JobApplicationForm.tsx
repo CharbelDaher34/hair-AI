@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
-import { Building2, MapPin, DollarSign, Clock, Briefcase, Upload, Send } from "lucide-react";
+import { Building2, MapPin, DollarSign, Clock, Briefcase, Upload, Send, Loader2, XCircle, User, FileTextIcon } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 
 interface JobData {
@@ -203,98 +203,69 @@ const JobApplicationForm = () => {
   };
 
   const render_form_field = (form_key: FormKey) => {
-    const value = form_responses[form_key.id] || "";
+    const common_props = {
+      id: `form_key_${form_key.id}`,
+      value: form_responses[form_key.id] || '',
+      onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | string) => {
+        const value = typeof e === 'string' ? e : e.target.value;
+        handle_form_response_change(form_key.id, value);
+      },
+      className: "h-12 text-base bg-white shadow-sm focus:ring-purple-500 focus:border-purple-500",
+      required: form_key.required,
+    };
+    const select_common_props = {
+      id: `form_key_${form_key.id}`,
+      value: form_responses[form_key.id] || '',
+      onValueChange: (value: string) => handle_form_response_change(form_key.id, value),
+      required: form_key.required,
+    };
 
+    return (
+      <div key={form_key.id} className="space-y-2">
+        <Label htmlFor={common_props.id} className="text-base font-semibold text-gray-700">
+          {form_key.name} {form_key.required && <span className="text-red-500">*</span>}
+        </Label>
+        {(() => {
     switch (form_key.field_type) {
       case "text":
       case "email":
-        return (
-          <Input
-            type={form_key.field_type}
-            value={value}
-            onChange={(e) => handle_form_response_change(form_key.id, e.target.value)}
-            placeholder={`Enter ${form_key.name.toLowerCase()}`}
-            required={form_key.required}
-          />
-        );
-
       case "number":
-        return (
-          <Input
-            type="number"
-            value={value}
-            onChange={(e) => handle_form_response_change(form_key.id, e.target.value)}
-            placeholder={`Enter ${form_key.name.toLowerCase()}`}
-            required={form_key.required}
-          />
-        );
-
+            case "date":
+              return <Input type={form_key.field_type} {...common_props} placeholder={`Your ${form_key.name.toLowerCase()}`} />;
       case "textarea":
-        return (
-          <Textarea
-            value={value}
-            onChange={(e) => handle_form_response_change(form_key.id, e.target.value)}
-            placeholder={`Enter ${form_key.name.toLowerCase()}`}
-            rows={4}
-            required={form_key.required}
-          />
-        );
-
+              return <Textarea {...common_props} placeholder={`Tell us about your ${form_key.name.toLowerCase()}...`} rows={5} className="text-base bg-white shadow-sm focus:ring-purple-500 focus:border-purple-500 resize-none" />;
       case "select":
         return (
-          <Select
-            value={value}
-            onValueChange={(val) => handle_form_response_change(form_key.id, val)}
-            required={form_key.required}
-          >
-            <SelectTrigger>
+                <Select {...select_common_props}>
+                  <SelectTrigger className="h-12 text-base bg-white shadow-sm focus:ring-purple-500 focus:border-purple-500">
               <SelectValue placeholder={`Select ${form_key.name.toLowerCase()}`} />
             </SelectTrigger>
             <SelectContent>
-              {form_key.enum_values?.map((option) => (
-                <SelectItem key={option} value={option}>
-                  {option}
-                </SelectItem>
+                    {form_key.enum_values?.map(option => (
+                      <SelectItem key={option} value={option}>{option}</SelectItem>
               ))}
             </SelectContent>
           </Select>
         );
-
       case "checkbox":
         return (
-          <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-2 pt-2">
             <Checkbox
-              id={`checkbox-${form_key.id}`}
-              checked={value === true}
-              onCheckedChange={(checked) => handle_form_response_change(form_key.id, checked)}
-              required={form_key.required}
+                    id={common_props.id} 
+                    checked={Boolean(form_responses[form_key.id])} 
+                    onCheckedChange={checked => handle_form_response_change(form_key.id, checked)} 
             />
-            <Label htmlFor={`checkbox-${form_key.id}`}>
-              {form_key.name}
+                  <Label htmlFor={common_props.id} className="text-base font-normal text-gray-700 cursor-pointer">
+                    I agree to the terms and conditions related to {form_key.name.toLowerCase()}
             </Label>
           </div>
         );
-
-      case "date":
-        return (
-          <Input
-            type="date"
-            value={value}
-            onChange={(e) => handle_form_response_change(form_key.id, e.target.value)}
-            required={form_key.required}
-          />
-        );
-
       default:
-        return (
-          <Input
-            value={value}
-            onChange={(e) => handle_form_response_change(form_key.id, e.target.value)}
-            placeholder={`Enter ${form_key.name.toLowerCase()}`}
-            required={form_key.required}
-          />
+              return <Input type="text" {...common_props} placeholder={`Your ${form_key.name.toLowerCase()}`} />;
+          }
+        })()}
+      </div>
         );
-    }
   };
 
   const format_salary = (min?: number, max?: number) => {
@@ -314,185 +285,206 @@ const JobApplicationForm = () => {
 
   if (is_loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p>Loading job information...</p>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50 p-8">
+        <div className="text-center space-y-4">
+          <Loader2 className="h-12 w-12 animate-spin text-blue-600 mx-auto" />
+          <p className="text-lg font-medium text-gray-700">Loading application form...</p>
         </div>
       </div>
     );
   }
 
-  if (!job_data) {
+  if (!job_data?.job) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <Card className="w-full max-w-md">
-          <CardContent className="text-center py-8">
-            <h2 className="text-xl font-semibold mb-2">Job Not Found</h2>
-            <p className="text-muted-foreground">
-              The job you're looking for doesn't exist or has been removed.
-            </p>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50 p-8">
+        <Card className="w-full max-w-lg shadow-2xl border-0 text-center">
+          <CardHeader>
+            <XCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
+            <CardTitle className="text-3xl font-bold text-gray-800">Job Not Found</CardTitle>
+            <CardDescription className="text-lg text-gray-600 mt-2">
+              The job you are trying to apply for could not be found or is no longer available.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button 
+              onClick={() => window.history.back()} 
+              className="button shadow-lg hover:shadow-xl transition-all duration-300 w-full mt-4"
+            >
+              Go Back
+            </Button>
           </CardContent>
         </Card>
       </div>
     );
   }
 
+  const { job, form_keys } = job_data;
+
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4">
-        {/* Job Information */}
-        <Card className="mb-8">
-          <CardHeader>
-            <div className="flex items-start justify-between">
+    <div className="min-h-screen bg-gradient-to-br from-slate-100 to-blue-100 py-12 px-4 sm:px-6 lg:px-8">
+      <header className="mb-12 text-center">
+        <h1 className="text-5xl font-extrabold tracking-tight bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent sm:text-6xl">
+          Apply for {job.title}
+        </h1>
+        <p className="mt-4 text-xl text-gray-600 max-w-3xl mx-auto">
+          We are excited to see your application! Please fill out the form below to be considered for this role.
+        </p>
+      </header>
+
+      <div className="max-w-4xl mx-auto space-y-10">
+        <Card className="card shadow-2xl border-0 overflow-hidden">
+          <CardHeader className="bg-gradient-to-r from-blue-500 to-purple-500 p-6">
+            <CardTitle className="text-2xl font-bold text-white flex items-center gap-3">
+              <Briefcase className="h-7 w-7" />
+              Job Details
+            </CardTitle>
+            <CardDescription className="text-blue-100 text-base mt-1">
+              Review the key information about this position.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-8 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 text-base">
+            <div className="flex items-center gap-3">
+              <MapPin className="h-5 w-5 text-blue-600" />
               <div>
-                <CardTitle className="text-2xl mb-2">{job_data.job.title}</CardTitle>
-                <div className="flex items-center gap-4 text-muted-foreground mb-4">
-                  <div className="flex items-center gap-1">
-                    <Building2 className="h-4 w-4" />
-                    <span>{job_data.company.name}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <MapPin className="h-4 w-4" />
-                    <span>{job_data.job.location}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <DollarSign className="h-4 w-4" />
-                    <span>{format_salary(job_data.job.salary_min, job_data.job.salary_max)}</span>
+                <Label className="text-sm font-semibold text-gray-500">Location</Label>
+                <p className="font-medium text-gray-800">{job.location}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-4 text-sm">
-                  <div className="flex items-center gap-1">
-                    <Briefcase className="h-4 w-4" />
-                    <span>{format_experience_level(job_data.job.job_type)}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Clock className="h-4 w-4" />
-                    <span>{format_experience_level(job_data.job.experience_level)}</span>
+            <div className="flex items-center gap-3">
+              <DollarSign className="h-5 w-5 text-blue-600" />
+              <div>
+                <Label className="text-sm font-semibold text-gray-500">Salary</Label>
+                <p className="font-medium text-gray-800">{format_salary(job.salary_min, job.salary_max)}</p>
                   </div>
                 </div>
+            <div className="flex items-center gap-3">
+              <Clock className="h-5 w-5 text-blue-600" />
+              <div>
+                <Label className="text-sm font-semibold text-gray-500">Job Type</Label>
+                <p className="font-medium text-gray-800">{job.job_type.replace("_", " ").replace(/\b\w/g, l => l.toUpperCase())}</p>
               </div>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <Building2 className="h-5 w-5 text-blue-600" />
               <div>
-                <h3 className="font-semibold mb-2">Job Description</h3>
-                <p className="text-muted-foreground whitespace-pre-wrap">
-                  {job_data.job.description}
-                </p>
+                <Label className="text-sm font-semibold text-gray-500">Experience</Label>
+                <p className="font-medium text-gray-800">{format_experience_level(job.experience_level)}</p>
               </div>
+            </div>
+            <div className="md:col-span-2 pt-2">
+              <Label className="text-sm font-semibold text-gray-500 block mb-1">Description</Label>
+              <p className="text-gray-700 leading-relaxed text-sm">
+                {job.description}
+              </p>
             </div>
           </CardContent>
         </Card>
 
-        {/* Application Form */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Apply for this Position</CardTitle>
-            <CardDescription>
-              Fill out the form below to submit your application
+        <form onSubmit={(e) => { e.preventDefault(); submit_application(); }} className="space-y-10">
+          <Card className="card shadow-2xl border-0 overflow-hidden">
+            <CardHeader className="bg-gradient-to-r from-blue-500 to-purple-500 p-6">
+              <CardTitle className="text-2xl font-bold text-white flex items-center gap-3">
+                <User className="h-7 w-7" />
+                Your Information
+              </CardTitle>
+              <CardDescription className="text-blue-100 text-base mt-1">
+                Tell us about yourself.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Candidate Information */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold">Personal Information</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <CardContent className="p-8 space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <Label htmlFor="full_name">Full Name *</Label>
+                  <Label htmlFor="full_name" className="text-base font-semibold text-gray-700">Full Name *</Label>
                   <Input
                     id="full_name"
                     value={candidate_data.full_name}
-                    onChange={(e) => handle_candidate_change("full_name", e.target.value)}
-                    placeholder="Enter your full name"
+                    onChange={(e) => handle_candidate_change('full_name', e.target.value)} 
+                    placeholder="Your full name"
                     required
+                    className="h-12 text-base bg-white shadow-sm focus:ring-purple-500 focus:border-purple-500"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email *</Label>
+                  <Label htmlFor="email" className="text-base font-semibold text-gray-700">Email Address *</Label>
                   <Input
                     id="email"
                     type="email"
                     value={candidate_data.email}
-                    onChange={(e) => handle_candidate_change("email", e.target.value)}
-                    placeholder="Enter your email"
+                    onChange={(e) => handle_candidate_change('email', e.target.value)} 
+                    placeholder="your.email@example.com"
                     required
+                    className="h-12 text-base bg-white shadow-sm focus:ring-purple-500 focus:border-purple-500"
                   />
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number</Label>
+                <Label htmlFor="phone" className="text-base font-semibold text-gray-700">Phone Number</Label>
                 <Input
                   id="phone"
                   type="tel"
                   value={candidate_data.phone}
-                  onChange={(e) => handle_candidate_change("phone", e.target.value)}
-                  placeholder="Enter your phone number"
+                  onChange={(e) => handle_candidate_change('phone', e.target.value)} 
+                  placeholder="+1 234 567 8900 (Optional)" 
+                  className="h-12 text-base bg-white shadow-sm focus:ring-purple-500 focus:border-purple-500"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="resume">Resume *</Label>
-                <div className="flex items-center gap-4">
-                  <Input
-                    id="resume"
-                    type="file"
-                    accept=".pdf,.doc,.docx"
-                    onChange={handle_resume_change}
-                    required
-                  />
-                  <div className="text-sm text-muted-foreground">
-                    PDF, DOC, or DOCX (max 5MB)
-                  </div>
-                </div>
-                {resume_file && (
-                  <div className="flex items-center gap-2 text-sm text-green-600">
-                    <Upload className="h-4 w-4" />
-                    <span>{resume_file.name}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Dynamic Form Fields */}
-            {job_data.form_keys.length > 0 && (
-              <>
-                <Separator />
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Additional Information</h3>
-                  {job_data.form_keys.map((form_key) => (
-                    <div key={form_key.id} className="space-y-2">
-                      <Label htmlFor={`form-${form_key.id}`}>
-                        {form_key.name}
-                        {form_key.required && <span className="text-red-500 ml-1">*</span>}
-                      </Label>
-                      {render_form_field(form_key)}
+                <Label htmlFor="resume" className="text-base font-semibold text-gray-700">Upload Resume *</Label>
+                <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md bg-white hover:border-purple-400 transition-colors duration-200">
+                  <div className="space-y-1 text-center">
+                    <Upload className="mx-auto h-12 w-12 text-gray-400" />
+                    <div className="flex text-sm text-gray-600">
+                      <label
+                        htmlFor="resume-upload"
+                        className="relative cursor-pointer rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500"
+                      >
+                        <span>Upload a file</span>
+                        <input id="resume-upload" name="resume-upload" type="file" className="sr-only" onChange={handle_resume_change} accept=".pdf,.doc,.docx" required />
+                      </label>
+                      <p className="pl-1">or drag and drop</p>
                     </div>
-                  ))}
+                    {resume_file ? (
+                       <p className="text-sm text-green-600 font-semibold">{resume_file.name} selected</p>
+                    ) : (
+                       <p className="text-xs text-gray-500">PDF, DOC, DOCX up to 5MB</p>
+                    )}
+                  </div>
                 </div>
-              </>
+              </div>
+            </CardContent>
+          </Card>
+
+          {form_keys && form_keys.length > 0 && (
+            <Card className="card shadow-2xl border-0 overflow-hidden">
+              <CardHeader className="bg-gradient-to-r from-blue-500 to-purple-500 p-6">
+                <CardTitle className="text-2xl font-bold text-white flex items-center gap-3">
+                  <FileTextIcon className="h-7 w-7" />
+                  Additional Information
+                </CardTitle>
+                <CardDescription className="text-blue-100 text-base mt-1">
+                  Please provide responses to the following questions.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-8 space-y-8">
+                {form_keys.map((form_key) => render_form_field(form_key))}
+              </CardContent>
+            </Card>
             )}
 
-            {/* Submit Button */}
-            <div className="pt-6">
+          <div className="pt-5">
               <Button
-                onClick={submit_application}
-                disabled={is_submitting}
-                className="w-full"
-                size="lg"
+              type="submit" 
+              disabled={is_submitting || is_loading}
+              className="w-full button text-lg py-3 shadow-xl hover:shadow-2xl transition-all duration-300 flex items-center justify-center gap-2"
               >
                 {is_submitting ? (
-                  "Submitting Application..."
+                <><Loader2 className="h-5 w-5 animate-spin" /> Submitting Application...</>
                 ) : (
-                  <>
-                    <Send className="h-4 w-4 mr-2" />
-                    Submit Application
-                  </>
+                <><Send className="h-5 w-5" /> Submit Application</>
                 )}
               </Button>
             </div>
-          </CardContent>
-        </Card>
+        </form>
       </div>
     </div>
   );

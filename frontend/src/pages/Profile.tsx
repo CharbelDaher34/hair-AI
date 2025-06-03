@@ -303,44 +303,46 @@ const Profile = () => {
 
   if (is_loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p>Loading profile...</p>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-blue-600 mx-auto"></div>
+          <p className="text-lg font-medium text-gray-700">Loading profile...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold">Profile Settings</h1>
-          <p className="text-muted-foreground">Manage your company and personal information</p>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 py-8">
+      <div className="max-w-6xl mx-auto px-4">
+        <div className="mb-8 space-y-2">
+          <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            Profile Settings
+          </h1>
+          <p className="text-lg text-gray-600">Manage your company and personal information</p>
         </div>
 
-        <Tabs defaultValue="company" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="company" className="flex items-center gap-2">
+        <Tabs defaultValue="company" className="space-y-8">
+          <TabsList className="grid w-full grid-cols-4 bg-white shadow-lg rounded-xl p-2 border-0">
+            <TabsTrigger value="company" className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-500 data-[state=active]:text-white rounded-lg transition-all duration-300">
               <Building2 className="h-4 w-4" />
               Company
             </TabsTrigger>
-            <TabsTrigger value="personal" className="flex items-center gap-2">
+            <TabsTrigger value="personal" className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-500 data-[state=active]:text-white rounded-lg transition-all duration-300">
               <User className="h-4 w-4" />
               Personal
             </TabsTrigger>
-            <TabsTrigger value="recruitable">Recruitable</TabsTrigger>
-            <TabsTrigger value="security">Security</TabsTrigger>
+            <TabsTrigger value="recruitable" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-500 data-[state=active]:text-white rounded-lg transition-all duration-300">Recruitable</TabsTrigger>
+            <TabsTrigger value="security" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-500 data-[state=active]:text-white rounded-lg transition-all duration-300">Security</TabsTrigger>
           </TabsList>
 
           <TabsContent value="company">
-            <Card>
-              <CardHeader>
+            <Card className="card shadow-xl hover:shadow-2xl transition-all duration-300 border-0">
+              <CardHeader className="pb-6">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Company Information</CardTitle>
-                    <CardDescription>
+                  <div className="space-y-1">
+                    <CardTitle className="text-2xl font-bold text-gray-800">Company Information</CardTitle>
+                    <CardDescription className="text-base text-gray-600">
                       Update your company details and branding
                     </CardDescription>
                   </div>
@@ -349,6 +351,7 @@ const Profile = () => {
                       variant="outline"
                       size="sm"
                       onClick={() => set_is_editing_company(true)}
+                      className="shadow-md hover:shadow-lg transition-all duration-300"
                     >
                       <Edit3 className="h-4 w-4 mr-2" />
                       Edit
@@ -356,38 +359,40 @@ const Profile = () => {
                   )}
                 </div>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <Label htmlFor="company_name">Company Name</Label>
+                    <Label htmlFor="company_name" className="text-sm font-semibold text-gray-700">Company Name</Label>
                     <Input
                       id="company_name"
                       value={company_form.name || ""}
                       onChange={(e) => handle_company_form_change("name", e.target.value)}
                       disabled={!is_editing_company}
+                      className="h-12 shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="company_domain">Domain</Label>
+                    <Label htmlFor="company_domain" className="text-sm font-semibold text-gray-700">Domain</Label>
                     <Input
                       id="company_domain"
                       value={company_form.domain || ""}
                       onChange={(e) => handle_company_form_change("domain", e.target.value)}
                       disabled={!is_editing_company}
                       placeholder="yourcompany.com"
+                      className="h-12 shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500"
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <Label htmlFor="industry">Industry</Label>
+                    <Label htmlFor="industry" className="text-sm font-semibold text-gray-700">Industry</Label>
                     <Select
                       value={company_form.industry || ""}
                       onValueChange={(value) => handle_company_form_change("industry", value)}
                       disabled={!is_editing_company}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="h-12 shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500">
                         <SelectValue placeholder="Select industry" />
                       </SelectTrigger>
                       <SelectContent>
@@ -402,7 +407,7 @@ const Profile = () => {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="website">Website</Label>
+                    <Label htmlFor="website" className="text-sm font-semibold text-gray-700">Website</Label>
                     <Input
                       id="website"
                       type="url"
@@ -410,12 +415,13 @@ const Profile = () => {
                       onChange={(e) => handle_company_form_change("website", e.target.value)}
                       disabled={!is_editing_company}
                       placeholder="https://yourcompany.com"
+                      className="h-12 shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
+                  <Label htmlFor="description" className="text-sm font-semibold text-gray-700">Description</Label>
                   <Textarea
                     id="description"
                     value={company_form.description || ""}
@@ -423,11 +429,12 @@ const Profile = () => {
                     disabled={!is_editing_company}
                     rows={3}
                     placeholder="Brief description of your company"
+                    className="shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500 resize-none"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="bio">Company Bio</Label>
+                  <Label htmlFor="bio" className="text-sm font-semibold text-gray-700">Company Bio</Label>
                   <Textarea
                     id="bio"
                     value={company_form.bio || ""}
@@ -435,14 +442,16 @@ const Profile = () => {
                     disabled={!is_editing_company}
                     rows={4}
                     placeholder="Tell us about your company culture and values"
+                    className="shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500 resize-none"
                   />
                 </div>
 
                 {is_editing_company && (
-                  <div className="flex gap-2 pt-4">
+                  <div className="flex gap-3 pt-6 border-t border-gray-200">
                     <Button
                       onClick={save_company_changes}
                       disabled={is_saving}
+                      className="button shadow-lg hover:shadow-xl transition-all duration-300"
                     >
                       <Save className="h-4 w-4 mr-2" />
                       {is_saving ? "Saving..." : "Save Changes"}
@@ -451,6 +460,7 @@ const Profile = () => {
                       variant="outline"
                       onClick={cancel_company_edit}
                       disabled={is_saving}
+                      className="shadow-md hover:shadow-lg transition-all duration-300"
                     >
                       Cancel
                     </Button>
@@ -461,12 +471,12 @@ const Profile = () => {
           </TabsContent>
 
           <TabsContent value="personal">
-            <Card>
-              <CardHeader>
+            <Card className="card shadow-xl hover:shadow-2xl transition-all duration-300 border-0">
+              <CardHeader className="pb-6">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Personal Information</CardTitle>
-                    <CardDescription>
+                  <div className="space-y-1">
+                    <CardTitle className="text-2xl font-bold text-gray-800">Personal Information</CardTitle>
+                    <CardDescription className="text-base text-gray-600">
                       Update your personal details
                     </CardDescription>
                   </div>
@@ -475,6 +485,7 @@ const Profile = () => {
                       variant="outline"
                       size="sm"
                       onClick={() => set_is_editing_personal(true)}
+                      className="shadow-md hover:shadow-lg transition-all duration-300"
                     >
                       <Edit3 className="h-4 w-4 mr-2" />
                       Edit
@@ -482,31 +493,33 @@ const Profile = () => {
                   )}
                 </div>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <Label htmlFor="full_name">Full Name</Label>
+                    <Label htmlFor="full_name" className="text-sm font-semibold text-gray-700">Full Name</Label>
                     <Input
                       id="full_name"
                       value={personal_form.full_name || ""}
                       onChange={(e) => handle_personal_form_change("full_name", e.target.value)}
                       disabled={!is_editing_personal}
+                      className="h-12 shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
+                    <Label htmlFor="email" className="text-sm font-semibold text-gray-700">Email</Label>
                     <Input
                       id="email"
                       type="email"
                       value={personal_form.email || ""}
                       onChange={(e) => handle_personal_form_change("email", e.target.value)}
                       disabled={!is_editing_personal}
+                      className="h-12 shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="role">Role</Label>
+                  <Label htmlFor="role" className="text-sm font-semibold text-gray-700">Role</Label>
                   <Input
                     id="role"
                     value={personal_form.role || ""}
@@ -516,10 +529,11 @@ const Profile = () => {
                 </div>
 
                 {is_editing_personal && (
-                  <div className="flex gap-2 pt-4">
+                  <div className="flex gap-3 pt-6 border-t border-gray-200">
                     <Button
                       onClick={save_personal_changes}
                       disabled={is_saving}
+                      className="button shadow-lg hover:shadow-xl transition-all duration-300"
                     >
                       <Save className="h-4 w-4 mr-2" />
                       {is_saving ? "Saving..." : "Save Changes"}
@@ -528,6 +542,7 @@ const Profile = () => {
                       variant="outline"
                       onClick={cancel_personal_edit}
                       disabled={is_saving}
+                      className="shadow-md hover:shadow-lg transition-all duration-300"
                     >
                       Cancel
                     </Button>
@@ -538,18 +553,18 @@ const Profile = () => {
           </TabsContent>
 
           <TabsContent value="recruitable">
-            <Card>
-              <CardHeader>
+            <Card className="card shadow-xl hover:shadow-2xl transition-all duration-300 border-0">
+              <CardHeader className="pb-6">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Recruitable Companies</CardTitle>
-                    <CardDescription>
+                  <div className="space-y-1">
+                    <CardTitle className="text-2xl font-bold text-gray-800">Recruitable Companies</CardTitle>
+                    <CardDescription className="text-base text-gray-600">
                       Manage companies that your organization can recruit for
                     </CardDescription>
                   </div>
                   <Dialog open={is_add_company_open} onOpenChange={set_is_add_company_open}>
                     <DialogTrigger asChild>
-                      <Button>
+                      <Button className="shadow-md hover:shadow-lg transition-all duration-300">
                         <Plus className="h-4 w-4 mr-2" />
                         Add Company
                       </Button>
@@ -710,16 +725,16 @@ const Profile = () => {
           </TabsContent>
 
           <TabsContent value="security">
-            <Card>
-              <CardHeader>
-                <CardTitle>Security Settings</CardTitle>
-                <CardDescription>
+            <Card className="card shadow-xl hover:shadow-2xl transition-all duration-300 border-0">
+              <CardHeader className="pb-6">
+                <CardTitle className="text-2xl font-bold text-gray-800">Security Settings</CardTitle>
+                <CardDescription className="text-base text-gray-600">
                   Change your password and manage security preferences
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="current_password">Current Password</Label>
+                  <Label htmlFor="current_password" className="text-sm font-semibold text-gray-700">Current Password</Label>
                   <div className="relative">
                     <Input
                       id="current_password"
@@ -747,7 +762,7 @@ const Profile = () => {
                 <Separator />
 
                 <div className="space-y-2">
-                  <Label htmlFor="new_password">New Password</Label>
+                  <Label htmlFor="new_password" className="text-sm font-semibold text-gray-700">New Password</Label>
                   <div className="relative">
                     <Input
                       id="new_password"
@@ -773,7 +788,7 @@ const Profile = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="confirm_password">Confirm New Password</Label>
+                  <Label htmlFor="confirm_password" className="text-sm font-semibold text-gray-700">Confirm New Password</Label>
                   <div className="relative">
                     <Input
                       id="confirm_password"
@@ -801,7 +816,7 @@ const Profile = () => {
                 <Button
                   onClick={change_password}
                   disabled={is_saving}
-                  className="mt-4"
+                  className="mt-4 button shadow-lg hover:shadow-xl transition-all duration-300"
                 >
                   {is_saving ? "Changing Password..." : "Change Password"}
                 </Button>
