@@ -1,6 +1,6 @@
 from sqlmodel import create_engine, SQLModel
 from sqlalchemy import inspect
-from models.models import * # Import all models to ensure they are registered with SQLModel
+from models.models import target_metadata  # Import metadata to ensure all models are registered
 import os
 from dotenv import load_dotenv
 
@@ -11,8 +11,8 @@ print(DATABASE_URL)
 engine = create_engine(DATABASE_URL, echo=False)
 
 def create_db_and_tables():
-    SQLModel.metadata.drop_all(engine)
-    SQLModel.metadata.create_all(engine)
+    target_metadata.drop_all(engine)
+    target_metadata.create_all(engine)
 
 def check_db_tables():
     """
@@ -21,7 +21,7 @@ def check_db_tables():
     """
     inspector = inspect(engine)
     existing_tables = set(inspector.get_table_names())
-    expected_tables = set(SQLModel.metadata.tables.keys())
+    expected_tables = set(target_metadata.tables.keys())
     missing_tables = list(expected_tables - existing_tables)
     all_exist = len(missing_tables) == 0
     return all_exist, missing_tables

@@ -1,4 +1,7 @@
 from typing import List, Optional
+from crud import crud_candidate
+from schemas.candidate import CandidateRead
+from crud import crud_match
 from crud import crud_company
 from schemas.form_key import FormKeyRead
 from fastapi import APIRouter, Depends, HTTPException, status, Request
@@ -7,7 +10,8 @@ from pydantic import BaseModel
 
 from core.database import get_session
 from crud import crud_job, crud_form_key
-from schemas import JobCreate, JobUpdate, JobRead, CompanyRead
+from schemas import JobCreate, JobUpdate, JobRead, CompanyRead, MatchRead
+from schemas.job import JobAnalytics
 from core.security import TokenData
 
 router = APIRouter()
@@ -168,3 +172,84 @@ def get_public_form_data(
         form_keys=form_keys,
         company=company
     )
+
+@router.get("/analytics/{job_id}", response_model=JobAnalytics)
+def get_job_analytics(
+    *,
+    db: Session = Depends(get_session),
+    job_id: int,
+    request: Request
+) -> JobAnalytics:
+    """Get comprehensive analytics for a specific job"""
+    current_user: Optional[TokenData] = request.state.user
+    if not current_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials"
+        )
+    
+    # Get the job first to check permissions
+    job = crud_job.get_job(db=db, job_id=job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    # Check if user has access to this job
+    if job.employer_id != current_user.employer_id and job.recruited_to_id != current_user.employer_id:
+        raise HTTPException(status_code=403, detail="You are not authorized to access this job")
+    
+    try:
+        return crud_job.get_job_analytics(db=db, job_id=job_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating analytics: {str(e)}")
+
+class MatchCandidateResponse(MatchRead, CandidateRead):
+    pass
+
+class MatchResponseWithDetails(BaseModel):
+    matches: List[MatchCandidateResponse]
+    job: JobRead
+
+@router.get("/matches/{job_id}", response_model=MatchResponseWithDetails)
+def get_job_matches(
+    *,
+    db: Session = Depends(get_session),
+    job_id: int,
+    request: Request
+) -> MatchResponseWithDetails:
+    """Get all matches for a specific job"""
+    current_user: Optional[TokenData] = request.state.user
+    if not current_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials"
+        )
+    
+    # Get the job first to check permissions
+    job = crud_job.get_job(db=db, job_id=job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    # Check if user has access to this job
+    if job.employer_id != current_user.employer_id and job.recruited_to_id != current_user.employer_id:
+        raise HTTPException(status_code=403, detail="You are not authorized to access this job")
+    
+    try:
+        match_candidate_pairs = crud_job.get_job_matches(db=db, job_id=job_id)
+        
+        matches_with_candidates = []
+        for match, candidate in match_candidate_pairs:
+            # Combine match and candidate data into a single object
+            combined_data = {
+                **match.model_dump(),
+                **candidate.model_dump()
+            }
+            matches_with_candidates.append(MatchCandidateResponse(**combined_data))
+        
+        return MatchResponseWithDetails(
+            matches=matches_with_candidates,
+            job=job
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error retrieving matches: {str(e)}")

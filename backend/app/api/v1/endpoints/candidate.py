@@ -16,30 +16,10 @@ from core.config import RESUME_STORAGE_DIR
 from crud import crud_candidate
 from schemas import CandidateCreate, CandidateUpdate, CandidateRead
 from utils.file_utils import save_resume_file, get_resume_file_path, delete_resume_file
-from pydantic import BaseModel
-# Import the LLM AI resume parser and Candidate model
-# from ai.app.services.llm.llm_agent import LLM
-# from ai.app.services.llm.entities_models.candidate_pydantic import Candidate as AICandidate
-from schemas.candidate_pydantic import Candidate as resume_data
-# Import ResumeParserClient
+from models.candidate_pydantic import CandidateResume
 from services.resume_upload import ResumeParserClient
 
 router = APIRouter()
-
-
-class post_candidate_payload(BaseModel):
-    candidate_in: CandidateCreate
-    resume: UploadFile = File(...)
-
-
-candidateExample = CandidateCreate(
-    full_name="John Doe",
-    email="john@example.com", 
-    phone="123456789",
-    resume_url="",
-    parsed_resume={}
-).model_dump_json()
-
 
 def parse_resume_background(candidate_id: int, resume_file_path: str, max_retries: int = 3):
     """
@@ -65,7 +45,7 @@ def parse_resume_background(candidate_id: int, resume_file_path: str, max_retrie
             
             # Use ResumeParserClient to parse the resume
             system_prompt = "Extract structured information from resumes. Focus on contact details, skills, and work experience."
-            schema = resume_data.model_json_schema()
+            schema = CandidateResume.model_json_schema()
             
             print(f"[Background] Creating parser client for candidate {candidate_id}")
             parser_client = ResumeParserClient(system_prompt, schema, [absolute_resume_file_path])

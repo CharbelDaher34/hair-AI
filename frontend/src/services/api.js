@@ -393,6 +393,14 @@ class ApiService {
     return this.request(`/jobs/by-status/${status}?skip=${skip}&limit=${limit}`);
   }
 
+  async getJobAnalytics(jobId) {
+    return this.request(`/jobs/analytics/${jobId}`);
+  }
+
+  async getJobMatches(jobId) {
+    return this.request(`/jobs/matches/${jobId}`);
+  }
+
   async changePassword(passwordData) {
     return this.request('/auth/change-password', {
       method: 'POST',

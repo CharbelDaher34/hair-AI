@@ -23,7 +23,7 @@ from core.database import engine
 from crud import crud_candidate
 from models.models import Candidate
 from utils.file_utils import get_resume_file_path
-from schemas.candidate_pydantic import Candidate as resume_data
+from models.candidate_pydantic import CandidateResume
 from services.resume_upload import ResumeParserClient
 
 
@@ -54,7 +54,7 @@ def parse_resume_for_candidate(candidate_id: int, resume_file_path: str, max_ret
             
             # Use ResumeParserClient to parse the resume
             system_prompt = "Extract structured information from resumes. Focus on contact details, skills, and work experience."
-            schema = resume_data.model_json_schema()
+            schema = CandidateResume.model_json_schema()
             
             print(f"[Batch] Creating parser client for candidate {candidate_id}")
             parser_client = ResumeParserClient(system_prompt, schema, [absolute_resume_file_path])

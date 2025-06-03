@@ -4,7 +4,7 @@ from sqlmodel import SQLModel, Field, Relationship, Column, Text
 from sqlalchemy import Boolean, JSON, Enum as SQLAlchemyEnum, UniqueConstraint
 from datetime import datetime
 from pydantic import validator
-
+from models.candidate_pydantic import CandidateResume
 
 class TimeBase(SQLModel):
     created_at: Optional[datetime] = Field(default_factory=datetime.utcnow)
@@ -142,7 +142,6 @@ class JobBase(TimeBase):
     employer_id: int = Field(foreign_key="company.id")
     recruited_to_id: Optional[int] = Field(default=None, foreign_key="company.id")
     created_by_hr_id: int = Field(foreign_key="hr.id")
-    job_data: Dict = Field(sa_column=Column(JSON))
     status: Status = Field(default=Status.DRAFT,sa_column=Column(SQLAlchemyEnum(Status, name="status_enum", create_type=True)))
     title: str
     description: str
@@ -176,7 +175,7 @@ class CandidateBase(TimeBase):
     email: str = Field(unique=True)
     phone: Optional[str] = Field(unique=True)
     resume_url: Optional[str] = None
-    parsed_resume: Optional[Dict] = Field(default=None, sa_column=Column(JSON))
+    parsed_resume: Optional[CandidateResume] = Field(default=None, sa_column=Column(JSON))
     employer_id: Optional[int] = Field(default=None, foreign_key="company.id")
 
 
@@ -214,8 +213,10 @@ class InterviewStatus(str,Enum):
 class InterviewBase(TimeBase):
     application_id: int = Field(foreign_key="application.id")
     date: datetime
-    type: InterviewType = Field(default=InterviewType.PHONE, sa_column=Column(SQLAlchemyEnum(InterviewType, name="interviewtype_enum", create_type=True)))
-    status: InterviewStatus = Field(default=InterviewStatus.SCHEDULED, sa_column=Column(SQLAlchemyEnum(InterviewStatus, name="interviewstatus_enum", create_type=True)))
+    type:str
+    # type: InterviewType = Field(default=InterviewType.PHONE, sa_column=Column(SQLAlchemyEnum(InterviewType, name="interviewtype_enum", create_type=True)))
+    status:str
+    # status: InterviewStatus = Field(default=InterviewStatus.SCHEDULED, sa_column=Column(SQLAlchemyEnum(InterviewStatus, name="interviewstatus_enum", create_type=True)))
     notes: Optional[str] = None
 
 
@@ -227,7 +228,28 @@ class Interview(InterviewBase, table=True):
 
 class MatchBase(TimeBase):
     application_id: int = Field(foreign_key="application.id")
-    match_result: Dict = Field(default=None, sa_column=Column(JSON))
+    
+    # Main match result fields
+    score: Optional[float] = Field(default=None)
+    embedding_similarity: Optional[float] = Field(default=None)
+    
+    # Skill analysis fields
+    match_percentage: Optional[float] = Field(default=None)
+    matching_skills: Optional[List[str]] = Field(default=None, sa_column=Column(JSON))
+    missing_skills: Optional[List[str]] = Field(default=None, sa_column=Column(JSON))
+    extra_skills: Optional[List[str]] = Field(default=None, sa_column=Column(JSON))
+    
+    # Summary fields (from skill_analysis.summary)
+    total_required_skills: Optional[int] = Field(default=None)
+    matching_skills_count: Optional[int] = Field(default=None)
+    missing_skills_count: Optional[int] = Field(default=None)
+    extra_skills_count: Optional[int] = Field(default=None)
+    
+    # Weights used in matching
+    skill_weight: Optional[float] = Field(default=None)
+    embedding_weight: Optional[float] = Field(default=None)
+    
+    # Match status
     status: str = Field(default="pending")
 
 class Match(MatchBase, table=True):
