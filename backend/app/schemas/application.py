@@ -1,10 +1,9 @@
-from typing import Optional, Dict
-from sqlmodel import SQLModel
+from typing import Optional
 from models.models import ApplicationBase, Application
 from utils.pydantic_utils import make_optional
-from .candidate import CandidateRead
-from .job import JobRead
-from datetime import datetime
+from schemas.candidate import CandidateRead
+from schemas.job import JobRead
+
 
 class ApplicationCreate(ApplicationBase):
     pass
