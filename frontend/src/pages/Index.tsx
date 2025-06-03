@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -20,56 +19,63 @@ const Index = () => {
   ];
 
   return (
-    <div className="flex-1 space-y-8 p-8">
+    <div className="flex-1 space-y-8 p-8 bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground">
+        <div className="space-y-2">
+          <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            Dashboard
+          </h1>
+          <p className="text-lg text-gray-600">
             Welcome back! Here's what's happening with your recruitment.
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button asChild>
+        <div className="flex gap-3">
+          <Button asChild className="button shadow-lg hover:shadow-xl transition-all duration-300">
             <Link to="/jobs/create">Create Job</Link>
           </Button>
-          <Button variant="outline" asChild>
+          <Button variant="outline" asChild className="shadow-md hover:shadow-lg transition-all duration-300">
             <Link to="/profile">Profile</Link>
           </Button>
         </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat) => (
-          <Card key={stat.title}>
+        {stats.map((stat, index) => (
+          <Card key={stat.title} className="card hover:scale-105 transition-all duration-300 border-0 shadow-lg hover:shadow-xl" style={{animationDelay: `${index * 100}ms`}}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
-              <stat.icon className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-semibold text-gray-700">{stat.title}</CardTitle>
+              <div className="p-2 bg-gradient-to-br from-blue-100 to-purple-100 rounded-lg">
+                <stat.icon className="h-5 w-5 text-blue-600" />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stat.value}</div>
-              <p className="text-xs text-muted-foreground">{stat.change}</p>
+              <div className="text-3xl font-bold text-gray-800 mb-1">{stat.value}</div>
+              <p className="text-sm text-green-600 font-medium">{stat.change}</p>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Jobs</CardTitle>
-            <CardDescription>Your latest job postings</CardDescription>
+      <div className="grid gap-8 md:grid-cols-2">
+        <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-xl font-bold text-gray-800">Recent Jobs</CardTitle>
+            <CardDescription className="text-base text-gray-600">Your latest job postings</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               {recentJobs.map((job, index) => (
-                <div key={index} className="flex items-center justify-between">
+                <div key={index} className="flex items-center justify-between p-4 bg-gradient-to-r from-gray-50 to-blue-50 rounded-lg hover:from-blue-50 hover:to-purple-50 transition-all duration-300">
                   <div>
-                    <p className="font-medium">{job.title}</p>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="font-semibold text-gray-800">{job.title}</p>
+                    <p className="text-sm text-gray-600">
                       {job.applications} applications
                     </p>
                   </div>
-                  <Badge variant={job.status === "Active" ? "default" : "secondary"}>
+                  <Badge 
+                    variant={job.status === "Active" ? "default" : "secondary"}
+                    className={job.status === "Active" ? "bg-green-100 text-green-800 hover:bg-green-200" : ""}
+                  >
                     {job.status}
                   </Badge>
                 </div>
@@ -78,33 +84,33 @@ const Index = () => {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
-            <CardDescription>Common tasks to get you started</CardDescription>
+        <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-xl font-bold text-gray-800">Quick Actions</CardTitle>
+            <CardDescription className="text-base text-gray-600">Common tasks to get you started</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <Button asChild className="w-full justify-start">
+          <CardContent className="space-y-4">
+            <Button asChild className="w-full justify-start button h-12 text-base font-semibold shadow-md hover:shadow-lg transition-all duration-300">
               <Link to="/jobs/create">
-                <FileText className="mr-2 h-4 w-4" />
+                <FileText className="mr-3 h-5 w-5" />
                 Create New Job
               </Link>
             </Button>
-            <Button variant="outline" asChild className="w-full justify-start">
+            <Button variant="outline" asChild className="w-full justify-start h-12 text-base font-semibold shadow-sm hover:shadow-md transition-all duration-300 hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50">
               <Link to="/applications">
-                <Users className="mr-2 h-4 w-4" />
+                <Users className="mr-3 h-5 w-5" />
                 Review Applications
               </Link>
             </Button>
-            <Button variant="outline" asChild className="w-full justify-start">
+            <Button variant="outline" asChild className="w-full justify-start h-12 text-base font-semibold shadow-sm hover:shadow-md transition-all duration-300 hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50">
               <Link to="/interviews/create">
-                <Calendar className="mr-2 h-4 w-4" />
+                <Calendar className="mr-3 h-5 w-5" />
                 Schedule Interview
               </Link>
             </Button>
-            <Button variant="outline" asChild className="w-full justify-start">
+            <Button variant="outline" asChild className="w-full justify-start h-12 text-base font-semibold shadow-sm hover:shadow-md transition-all duration-300 hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50">
               <Link to="/analytics">
-                <TrendingUp className="mr-2 h-4 w-4" />
+                <TrendingUp className="mr-3 h-5 w-5" />
                 View Analytics
               </Link>
             </Button>

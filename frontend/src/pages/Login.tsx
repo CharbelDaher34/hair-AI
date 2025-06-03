@@ -45,14 +45,14 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <Building2 className="h-8 w-8 text-primary" />
-            <span className="font-bold text-2xl">HR Platform</span>
+    <div className="min-h-screen flex flex-col items-center justify-center px-4 py-8">
+      <Card className="w-full max-w-md shadow-2xl">
+        <CardHeader className="text-center space-y-2 pt-8">
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <Building2 className="h-10 w-10 text-primary" />
+            <span className="font-bold text-3xl text-gray-800">HR Platform</span>
           </div>
-          <CardTitle className="text-2xl">Welcome back</CardTitle>
+          <CardTitle className="text-3xl font-bold">Welcome Back</CardTitle>
           <CardDescription>
             Sign in to your account to continue
           </CardDescription>
@@ -73,7 +73,7 @@ const Login = () => {
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
-              <div className="relative">
+              <div className="relative flex items-center">
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
@@ -82,12 +82,13 @@ const Login = () => {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   autoComplete="current-password"
+                  className="pr-10"
                 />
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  className="absolute right-0 top-1/2 transform -translate-y-1/2 h-full px-3 py-2 hover:bg-transparent text-gray-500 hover:text-gray-700"
                   onClick={() => setShowPassword(!showPassword)}
                 >
                   {showPassword ? (
@@ -100,19 +101,19 @@ const Login = () => {
             </div>
             <Button
               type="submit"
-              className="w-full"
+              className="w-full button mt-6 py-3 text-base font-semibold"
               disabled={isLoading}
             >
-              {isLoading ? "Signing in..." : "Sign in"}
+              {isLoading ? "Signing in..." : "Sign In"}
             </Button>
           </form>
-          <div className="mt-6 text-center text-sm">
-            <span className="text-muted-foreground">Don't have an account? </span>
+          <div className="mt-8 text-center text-sm">
+            <span className="text-gray-600">Don't have an account? </span>
             <Link
               to="/signup"
-              className="text-primary hover:underline font-medium"
+              className="text-primary hover:underline font-semibold"
             >
-              Sign up
+              Sign Up Now
             </Link>
           </div>
         </CardContent>

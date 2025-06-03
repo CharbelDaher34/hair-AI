@@ -170,10 +170,12 @@ const JobAnalytics = () => {
 
   if (isLoading) {
     return (
-      <div className="flex-1 space-y-8 p-8">
+      <div className="flex-1 space-y-8 p-8 bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
         <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin" />
-          <span className="ml-2">Loading analytics...</span>
+          <div className="text-center space-y-4">
+            <Loader2 className="h-12 w-12 animate-spin text-blue-600 mx-auto" />
+            <span className="text-lg font-medium text-gray-700">Loading analytics...</span>
+          </div>
         </div>
       </div>
     );
@@ -181,14 +183,16 @@ const JobAnalytics = () => {
 
   if (error) {
     return (
-      <div className="flex-1 space-y-8 p-8">
+      <div className="flex-1 space-y-8 p-8 bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
         <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <p className="text-destructive mb-4">Error loading analytics: {error}</p>
-            <Button onClick={() => window.location.reload()}>
+          <Card className="w-full max-w-md shadow-xl border-0">
+            <CardContent className="text-center p-8 space-y-4">
+              <p className="text-red-600 font-semibold text-lg mb-4">Error loading analytics: {error}</p>
+              <Button onClick={() => window.location.reload()} className="button shadow-lg hover:shadow-xl transition-all duration-300">
               Retry
             </Button>
-          </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     );
@@ -196,9 +200,16 @@ const JobAnalytics = () => {
 
   if (!analytics) {
     return (
-      <div className="flex-1 space-y-8 p-8">
+      <div className="flex-1 space-y-8 p-8 bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
         <div className="flex items-center justify-center h-64">
-          <p className="text-muted-foreground">No analytics data available</p>
+          <Card className="w-full max-w-md shadow-xl border-0">
+            <CardContent className="text-center p-8 space-y-4">
+              <p className="text-lg text-gray-600">No analytics data available for this job.</p>
+              <Button asChild className="button shadow-lg hover:shadow-xl transition-all duration-300">
+                <Link to={`/jobs`}>Back to Jobs</Link>
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </div>
     );
@@ -236,23 +247,24 @@ const JobAnalytics = () => {
   };
 
   return (
-    <div className="flex-1 space-y-8 p-8">
+    <div className="flex-1 space-y-8 p-8 bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Job Analytics</h1>
-          <p className="text-muted-foreground">{analytics.job_title}</p>
-          <Badge variant={getStatusVariant(analytics.job_status)} className="mt-2">
+        <div className="space-y-2">
+          <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            Job Analytics: {analytics.job_title}
+          </h1>
+          <Badge variant={getStatusVariant(analytics.job_status)} className="font-medium px-3 py-1 text-base">
             {analytics.job_status.charAt(0).toUpperCase() + analytics.job_status.slice(1)}
           </Badge>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" asChild>
+        <div className="flex gap-3">
+          <Button variant="outline" asChild className="shadow-md hover:shadow-lg transition-all duration-300">
             <Link to={`/jobs/${id}`}>
               <Eye className="mr-2 h-4 w-4" />
               View Job
             </Link>
           </Button>
-          <Button asChild>
+          <Button asChild className="button shadow-lg hover:shadow-xl transition-all duration-300">
             <Link to={`/jobs/${id}/matches`}>
               <Users className="mr-2 h-4 w-4" />
               View All Matches
@@ -263,89 +275,58 @@ const JobAnalytics = () => {
 
       {/* Key Metrics */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
+        {[ 
+          { title: "Total Applications", value: analytics.total_applications, icon: Users, note: `${analytics.applications_last_7_days} in last 7 days` },
+          { title: "Total Matches", value: analytics.total_matches, icon: Target, note: `${analytics.application_to_match_rate}% conversion` },
+          { title: "Interviews", value: analytics.total_interviews, icon: Calendar, note: `${analytics.application_to_interview_rate}% from applications` },
+          { title: "Avg Match Score", value: analytics.average_match_score ? `${(analytics.average_match_score * 100).toFixed(1)}%` : 'N/A', icon: TrendingUp, note: `Top: ${analytics.top_match_score ? `${(analytics.top_match_score * 100).toFixed(1)}%` : 'N/A'}` }
+        ].map((stat, index) => (
+          <Card key={stat.title} className="card hover:scale-105 transition-all duration-300 border-0 shadow-lg hover:shadow-xl" style={{animationDelay: `${index * 100}ms`}}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Applications</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-semibold text-gray-700">{stat.title}</CardTitle>
+              <div className="p-2 bg-gradient-to-br from-blue-100 to-purple-100 rounded-lg">
+                <stat.icon className="h-5 w-5 text-blue-600" />
+              </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{analytics.total_applications}</div>
-            <p className="text-xs text-muted-foreground">
-              {analytics.applications_last_7_days} in last 7 days
-            </p>
+              <div className="text-3xl font-bold text-gray-800 mb-1">{stat.value}</div>
+              <p className="text-xs text-gray-600">{stat.note}</p>
           </CardContent>
         </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Matches</CardTitle>
-            <Target className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{analytics.total_matches}</div>
-            <p className="text-xs text-muted-foreground">
-              {analytics.application_to_match_rate}% conversion rate
-            </p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Interviews</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{analytics.total_interviews}</div>
-            <p className="text-xs text-muted-foreground">
-              {analytics.application_to_interview_rate}% from applications
-            </p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg Match Score</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {analytics.average_match_score ? `${(analytics.average_match_score * 100).toFixed(1)}%` : 'N/A'}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Top: {analytics.top_match_score ? `${(analytics.top_match_score * 100).toFixed(1)}%` : 'N/A'}
-            </p>
-          </CardContent>
-        </Card>
+        ))}
       </div>
 
       {/* Candidate Matches Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Candidate Matches</CardTitle>
-          <CardDescription>
+      <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
+        <CardHeader className="pb-6">
+          <CardTitle className="text-2xl font-bold text-gray-800">Candidate Matches</CardTitle>
+          <CardDescription className="text-base text-gray-600">
             Detailed view of all candidate matches with scores and skills
           </CardDescription>
         </CardHeader>
         <CardContent>
           {isLoadingMatches ? (
-            <div className="flex items-center justify-center h-32">
-              <Loader2 className="h-6 w-6 animate-spin" />
-              <span className="ml-2">Loading matches...</span>
+            <div className="flex items-center justify-center h-40">
+              <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+              <span className="ml-3 text-lg font-medium text-gray-700">Loading matches...</span>
             </div>
           ) : matches.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-muted-foreground">No matches found for this job</p>
+            <div className="text-center py-12 space-y-4">
+              <div className="w-16 h-16 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center mx-auto">
+                <Users className="h-8 w-8 text-blue-600" />
+              </div>
+              <p className="text-lg text-gray-600 mb-4">No matches found for this job yet.</p>
             </div>
           ) : (
-            <div className="rounded-md border">
+            <div className="overflow-hidden rounded-lg border border-gray-200 shadow-sm">
               <Table>
-                <TableHeader>
+                <TableHeader className="bg-gradient-to-r from-gray-50 to-blue-50">
                   <TableRow>
                     <TableHead>
                       <Button
                         variant="ghost"
                         onClick={() => handleSort('full_name')}
-                        className="h-auto p-0 font-semibold"
+                        className="h-auto p-2 font-semibold text-gray-700 hover:bg-gray-200 transition-colors duration-200"
                       >
                         Candidate {getSortIcon('full_name')}
                       </Button>
@@ -354,7 +335,7 @@ const JobAnalytics = () => {
                       <Button
                         variant="ghost"
                         onClick={() => handleSort('score')}
-                        className="h-auto p-0 font-semibold"
+                        className="h-auto p-2 font-semibold text-gray-700 hover:bg-gray-200 transition-colors duration-200"
                       >
                         Overall Score {getSortIcon('score')}
                       </Button>
@@ -363,7 +344,7 @@ const JobAnalytics = () => {
                       <Button
                         variant="ghost"
                         onClick={() => handleSort('match_percentage')}
-                        className="h-auto p-0 font-semibold"
+                        className="h-auto p-2 font-semibold text-gray-700 hover:bg-gray-200 transition-colors duration-200"
                       >
                         Skill Match {getSortIcon('match_percentage')}
                       </Button>
@@ -372,7 +353,7 @@ const JobAnalytics = () => {
                       <Button
                         variant="ghost"
                         onClick={() => handleSort('embedding_similarity')}
-                        className="h-auto p-0 font-semibold"
+                        className="h-auto p-2 font-semibold text-gray-700 hover:bg-gray-200 transition-colors duration-200"
                       >
                         Similarity {getSortIcon('embedding_similarity')}
                       </Button>
@@ -381,26 +362,26 @@ const JobAnalytics = () => {
                       <Button
                         variant="ghost"
                         onClick={() => handleSort('matching_skills_count')}
-                        className="h-auto p-0 font-semibold"
+                        className="h-auto p-2 font-semibold text-gray-700 hover:bg-gray-200 transition-colors duration-200"
                       >
                         Skills Match {getSortIcon('matching_skills_count')}
                       </Button>
                     </TableHead>
-                    <TableHead>Matching Skills</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Matching Skills</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {sortedMatches.map((match) => (
-                    <TableRow key={match.id}>
+                    <TableRow key={match.id} className="hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50 transition-all duration-200">
                       <TableCell>
-                        <div>
-                          <div className="font-medium">{match.full_name}</div>
-                          <div className="text-sm text-muted-foreground">{match.email}</div>
+                        <div className="space-y-1">
+                          <div className="font-semibold text-gray-800">{match.full_name}</div>
+                          <div className="text-sm text-gray-600">{match.email}</div>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className={`font-semibold ${getScoreColor(match.score)}`}>
+                        <div className={`font-bold text-lg ${getScoreColor(match.score)}`}>
                           {(match.score * 100).toFixed(1)}%
                         </div>
                       </TableCell>
@@ -410,31 +391,31 @@ const JobAnalytics = () => {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="font-medium">
+                        <div className="font-medium text-gray-700">
                           {(match.embedding_similarity * 100).toFixed(1)}%
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="font-medium">
+                        <div className="font-medium text-gray-700">
                           {match.matching_skills_count}/{match.total_required_skills}
                         </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1 max-w-xs">
                           {match.matching_skills?.slice(0, 3).map((skill, index) => (
-                            <Badge key={index} variant="secondary" className="text-xs">
+                            <Badge key={index} variant="secondary" className="text-xs bg-blue-100 text-blue-700">
                               {skill}
                             </Badge>
                           ))}
                           {match.matching_skills?.length > 3 && (
-                            <Badge variant="outline" className="text-xs">
+                            <Badge variant="outline" className="text-xs border-blue-200 text-blue-600">
                               +{match.matching_skills.length - 3} more
                             </Badge>
                           )}
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={getStatusVariant(match.status)}>
+                        <Badge variant={getStatusVariant(match.status)} className="font-medium">
                           {match.status}
                         </Badge>
                       </TableCell>
@@ -447,22 +428,29 @@ const JobAnalytics = () => {
         </CardContent>
       </Card>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-8 lg:grid-cols-2">
         {/* Interview Types */}
         {interviewTypeData.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Interview Types</CardTitle>
-              <CardDescription>Distribution of interview types</CardDescription>
+          <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-xl font-bold text-gray-800">Interview Types</CardTitle>
+              <CardDescription className="text-base text-gray-600">Distribution of interview types</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={interviewTypeData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="type" />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="count" fill="hsl(var(--primary))" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis dataKey="type" stroke="#64748b" />
+                  <YAxis stroke="#64748b" />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'white', 
+                      border: '1px solid #e2e8f0', 
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                    }} 
+                  />
+                  <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
@@ -471,10 +459,10 @@ const JobAnalytics = () => {
 
         {/* Match Status */}
         {matchStatusData.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Match Status</CardTitle>
-              <CardDescription>Current status of all matches</CardDescription>
+          <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-xl font-bold text-gray-800">Match Status</CardTitle>
+              <CardDescription className="text-base text-gray-600">Current status of all matches</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
@@ -493,7 +481,14 @@ const JobAnalytics = () => {
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'white', 
+                      border: '1px solid #e2e8f0', 
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                    }} 
+                  />
                 </PieChart>
               </ResponsiveContainer>
             </CardContent>
@@ -502,10 +497,10 @@ const JobAnalytics = () => {
 
         {/* Interview Status */}
         {interviewStatusData.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Interview Status</CardTitle>
-              <CardDescription>Current status of all interviews</CardDescription>
+          <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-xl font-bold text-gray-800">Interview Status</CardTitle>
+              <CardDescription className="text-base text-gray-600">Current status of all interviews</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
@@ -524,7 +519,14 @@ const JobAnalytics = () => {
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'white', 
+                      border: '1px solid #e2e8f0', 
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                    }} 
+                  />
                 </PieChart>
               </ResponsiveContainer>
             </CardContent>
@@ -532,26 +534,26 @@ const JobAnalytics = () => {
         )}
 
         {/* Candidate Insights */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Candidate Insights</CardTitle>
-            <CardDescription>Overview of candidate pool</CardDescription>
+        <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-xl font-bold text-gray-800">Candidate Insights</CardTitle>
+            <CardDescription className="text-base text-gray-600">Overview of candidate pool</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Unique Candidates</span>
-                <Badge variant="outline">{analytics.unique_candidates}</Badge>
+              <div className="flex items-center justify-between p-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg">
+                <span className="text-sm font-medium text-gray-700">Unique Candidates</span>
+                <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-200">{analytics.unique_candidates}</Badge>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">With Parsed Resumes</span>
-                <Badge variant="outline">
+              <div className="flex items-center justify-between p-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg">
+                <span className="text-sm font-medium text-gray-700">With Parsed Resumes</span>
+                <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-200">
                   {analytics.candidates_with_parsed_resumes}/{analytics.unique_candidates}
                 </Badge>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Applications (30 days)</span>
-                <Badge variant="outline">{analytics.applications_last_30_days}</Badge>
+              <div className="flex items-center justify-between p-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg">
+                <span className="text-sm font-medium text-gray-700">Applications (30 days)</span>
+                <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-200">{analytics.applications_last_30_days}</Badge>
               </div>
             </div>
           </CardContent>
@@ -560,17 +562,17 @@ const JobAnalytics = () => {
 
       {/* Top Skills */}
       {analytics.top_skills_from_candidates && analytics.top_skills_from_candidates.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Top Skills from Candidates</CardTitle>
-            <CardDescription>
+        <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-xl font-bold text-gray-800">Top Skills from Candidates</CardTitle>
+            <CardDescription className="text-base text-gray-600">
               Most common skills found in candidate resumes
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-3">
               {analytics.top_skills_from_candidates.map((skill, index) => (
-                <Badge key={index} variant="secondary" className="text-sm">
+                <Badge key={index} className="text-sm px-3 py-1 bg-gradient-to-r from-blue-100 to-purple-100 text-blue-700 border-blue-200">
                   {skill}
                 </Badge>
               ))}
@@ -580,32 +582,32 @@ const JobAnalytics = () => {
       )}
 
       {/* Conversion Metrics */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Conversion Metrics</CardTitle>
-          <CardDescription>
+      <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
+        <CardHeader className="pb-6">
+          <CardTitle className="text-2xl font-bold text-gray-800">Conversion Metrics</CardTitle>
+          <CardDescription className="text-base text-gray-600">
             Recruitment funnel performance
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-primary">
+          <div className="grid gap-6 md:grid-cols-3">
+            <div className="text-center p-6 bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg border border-blue-200">
+              <div className="text-4xl font-bold text-blue-600 mb-2">
                 {analytics.application_to_match_rate}%
               </div>
-              <p className="text-sm text-muted-foreground">Application → Match</p>
+              <p className="text-sm text-gray-700 font-medium">Application → Match</p>
             </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-primary">
+            <div className="text-center p-6 bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg border border-blue-200">
+              <div className="text-4xl font-bold text-purple-600 mb-2">
                 {analytics.application_to_interview_rate}%
               </div>
-              <p className="text-sm text-muted-foreground">Application → Interview</p>
+              <p className="text-sm text-gray-700 font-medium">Application → Interview</p>
             </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-primary">
+            <div className="text-center p-6 bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg border border-blue-200">
+              <div className="text-4xl font-bold text-indigo-600 mb-2">
                 {analytics.match_to_interview_rate}%
               </div>
-              <p className="text-sm text-muted-foreground">Match → Interview</p>
+              <p className="text-sm text-gray-700 font-medium">Match → Interview</p>
             </div>
           </div>
         </CardContent>

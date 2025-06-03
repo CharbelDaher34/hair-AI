@@ -9,6 +9,7 @@ import { Upload } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
 import apiService from "@/services/api";
+import { Loader2 } from "lucide-react";
 
 const AddApplication = () => {
   const navigate = useNavigate();
@@ -29,6 +30,14 @@ const AddApplication = () => {
   const [selected_job, setSelectedJob] = useState<any>(null);
   const [form_responses, setFormResponses] = useState<Record<string, string>>( {} );
   const [is_submitting, setIsSubmitting] = useState(false);
+
+  // --- Derived state for button enable/disable ---
+  const is_candidate_selected = !show_new_candidate_form && !!selected_candidate_id;
+  const is_job_selected = !!selected_job_id;
+  const is_form_valid = form_keys.every(
+    (key) => !key.required || !!form_responses[key.id]
+  );
+  const can_create_application = is_candidate_selected && is_job_selected && is_form_valid;
 
   // Fetch candidates and jobs on mount
   useEffect(() => {
@@ -104,22 +113,19 @@ const AddApplication = () => {
     }
   };
 
-  // Submit application
-  const handleSubmit = async () => {
-    if (!selected_candidate_id && !show_new_candidate_form) {
-      toast({ title: "Error", description: "Please select or create a candidate.", variant: "destructive" });
+  // --- Updated Submit Handler ---
+  const handle_submit_application = async () => {
+    if (!is_candidate_selected) {
+      toast({ title: "Error", description: "Please select a candidate.", variant: "destructive" });
       return;
     }
-    if (!selected_job_id) {
+    if (!is_job_selected) {
       toast({ title: "Error", description: "Please select a job.", variant: "destructive" });
       return;
     }
-    // Validate required form keys
-    const missing_required = form_keys.find(
-      (key) => key.required && !form_responses[key.id]
-    );
-    if (missing_required) {
-      toast({ title: "Error", description: `Please fill in the required field: ${missing_required.name}`, variant: "destructive" });
+    if (!is_form_valid) {
+      const missing_key = form_keys.find((key) => key.required && !form_responses[key.id]);
+      toast({ title: "Error", description: `Please fill in the required field: ${missing_key?.name || ''}`, variant: "destructive" });
       return;
     }
     setIsSubmitting(true);
@@ -140,31 +146,109 @@ const AddApplication = () => {
     }
   };
 
+  // Add this function before the return statement
+  const render_form_field = (form_key: any) => {
+    const common_props = {
+      id: `form_key_${form_key.id}`,
+      value: form_responses[form_key.id] || '',
+      onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | string) => {
+        const value = typeof e === 'string' ? e : e.target.value;
+        handleFormResponseChange(form_key.id.toString(), value);
+      },
+      className: "h-12 bg-white shadow-sm",
+      required: form_key.required,
+    };
+    const select_common_props = {
+      id: `form_key_${form_key.id}`,
+      value: form_responses[form_key.id] || '',
+      onValueChange: (value: string) => handleFormResponseChange(form_key.id.toString(), value),
+      required: form_key.required,
+    };
+    return (
+      <div key={form_key.id} className="space-y-2">
+        <Label htmlFor={common_props.id} className="text-sm font-semibold text-gray-700">
+          {form_key.name} {form_key.required && <span className="text-red-500">*</span>}
+        </Label>
+        {(() => {
+          switch (form_key.field_type) {
+            case "text":
+            case "email":
+            case "number":
+            case "date":
+              return <Input type={form_key.field_type} {...common_props} placeholder={`Your ${form_key.name.toLowerCase()}`} />;
+            case "textarea":
+              return <Textarea {...common_props} placeholder={`Tell us about your ${form_key.name.toLowerCase()}...`} rows={4} className="bg-white shadow-sm resize-none" />;
+            case "select":
+              return (
+                <Select {...select_common_props}>
+                  <SelectTrigger className="h-12 bg-white shadow-sm">
+                    <SelectValue placeholder={`Select ${form_key.name}`} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {form_key.enum_values?.map((option: string) => (
+                      <SelectItem key={option} value={option}>{option}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              );
+            case "checkbox":
+              return (
+                <div className="flex items-center space-x-2 pt-2">
+                  <input
+                    type="checkbox"
+                    id={common_props.id}
+                    checked={Boolean(form_responses[form_key.id])}
+                    onChange={e => handleFormResponseChange(form_key.id.toString(), e.target.checked)}
+                    className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <Label htmlFor={common_props.id} className="text-base font-normal text-gray-700 cursor-pointer">
+                    {form_key.name}
+                  </Label>
+                </div>
+              );
+            default:
+              return <Input type="text" {...common_props} placeholder={`Your ${form_key.name.toLowerCase()}`} />;
+          }
+        })()}
+      </div>
+    );
+  };
+
   return (
-    <div className="flex-1 space-y-8 p-8">
+    <div className="flex-1 space-y-8 p-8 bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Add New Application</h1>
-          <p className="text-muted-foreground">Manually create an application for a candidate</p>
+        <div className="space-y-2">
+          <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            Add New Application
+          </h1>
+          <p className="text-lg text-gray-600">Manually create an application for a candidate</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => navigate("/applications")}>Cancel</Button>
-          <Button onClick={handleSubmit} disabled={is_submitting}>{is_submitting ? "Submitting..." : "Create Application"}</Button>
+        <div className="flex gap-3">
+          <Button variant="outline" onClick={() => navigate("/applications")} className="shadow-md hover:shadow-lg transition-all duration-300">
+            Cancel
+          </Button>
+          <Button onClick={handle_submit_application} disabled={!can_create_application || is_submitting} className="button shadow-lg hover:shadow-xl transition-all duration-300">
+            {is_submitting ? (
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...</>
+            ) : (
+              "Create Application"
+            )}
+          </Button>
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Candidate</CardTitle>
-              <CardDescription>Select or create a candidate</CardDescription>
+      <div className="grid gap-8 lg:grid-cols-3">
+        <div className="lg:col-span-2 space-y-6">
+          <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-xl font-bold text-gray-800">Candidate Information</CardTitle>
+              <CardDescription className="text-base text-gray-600">Select an existing candidate or add a new one</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-6 pt-4">
               <div className="space-y-2">
-                <Label htmlFor="candidateId">Candidate *</Label>
-                <Select value={selected_candidate_id} onValueChange={handleCandidateChange}>
-                  <SelectTrigger>
+                <Label htmlFor="candidateId" className="text-sm font-semibold text-gray-700">Candidate *</Label>
+                <Select value={show_new_candidate_form ? "new" : selected_candidate_id} onValueChange={handleCandidateChange}>
+                  <SelectTrigger className="h-12 shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500">
                     <SelectValue placeholder="Select a candidate or add new" />
                   </SelectTrigger>
                   <SelectContent>
@@ -176,50 +260,51 @@ const AddApplication = () => {
                 </Select>
               </div>
               {show_new_candidate_form && (
-                <div className="space-y-4 border rounded-lg p-4 bg-muted">
+                <div className="space-y-4 border border-blue-200 rounded-lg p-6 bg-gradient-to-r from-blue-50 to-purple-50 shadow-sm">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-3">New Candidate Details</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <Label htmlFor="full_name">Full Name *</Label>
-                    <Input id="full_name" value={new_candidate_data.full_name} onChange={e => setNewCandidateData({ ...new_candidate_data, full_name: e.target.value })} placeholder="Enter full name" />
+                      <Label htmlFor="full_name" className="text-sm font-semibold text-gray-700">Full Name *</Label>
+                      <Input id="full_name" value={new_candidate_data.full_name} onChange={e => setNewCandidateData({ ...new_candidate_data, full_name: e.target.value })} placeholder="Enter full name" className="h-12 bg-white shadow-sm" />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="email">Email *</Label>
-                    <Input id="email" type="email" value={new_candidate_data.email} onChange={e => setNewCandidateData({ ...new_candidate_data, email: e.target.value })} placeholder="candidate@email.com" />
+                      <Label htmlFor="email" className="text-sm font-semibold text-gray-700">Email *</Label>
+                      <Input id="email" type="email" value={new_candidate_data.email} onChange={e => setNewCandidateData({ ...new_candidate_data, email: e.target.value })} placeholder="candidate@example.com" className="h-12 bg-white shadow-sm" />
+                    </div>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="phone">Phone</Label>
-                    <Input id="phone" type="tel" value={new_candidate_data.phone} onChange={e => setNewCandidateData({ ...new_candidate_data, phone: e.target.value })} placeholder="+1 234 567 8900" />
+                    <Label htmlFor="phone" className="text-sm font-semibold text-gray-700">Phone</Label>
+                    <Input id="phone" type="tel" value={new_candidate_data.phone} onChange={e => setNewCandidateData({ ...new_candidate_data, phone: e.target.value })} placeholder="+1 234 567 8900" className="h-12 bg-white shadow-sm" />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="resume">Resume (Optional)</Label>
+                    <Label htmlFor="resume" className="text-sm font-semibold text-gray-700">Resume (Optional)</Label>
                     <div className="flex items-center gap-4">
                       <input id="resume" type="file" accept=".pdf,.doc,.docx" onChange={handleFileUpload} className="hidden" />
-                      <Button variant="outline" onClick={() => document.getElementById("resume")?.click()} className="w-full">
-                        <Upload className="mr-2 h-4 w-4" />
+                      <Button variant="outline" onClick={() => document.getElementById("resume")?.click()} className="w-full h-12 bg-white shadow-sm hover:bg-slate-50">
+                        <Upload className="mr-2 h-4 w-4 text-blue-600" />
                         {new_candidate_data.resume_file ? new_candidate_data.resume_file.name : "Upload Resume"}
                       </Button>
                     </div>
-                    <p className="text-xs text-muted-foreground">Accepted formats: PDF, DOC, DOCX (Max 10MB)</p>
                   </div>
-                  <div className="flex gap-2">
-                    <Button type="button" onClick={handleCreateCandidate}>Create Candidate</Button>
-                    <Button type="button" variant="outline" onClick={() => setShowNewCandidateForm(false)}>Cancel</Button>
-                  </div>
+                  <Button onClick={handleCreateCandidate} className="button-outline w-full shadow-md hover:shadow-lg transition-all duration-300">
+                    Save New Candidate
+                  </Button>
                 </div>
               )}
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Job Selection</CardTitle>
-              <CardDescription>Select the position this candidate is applying for</CardDescription>
+          <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-xl font-bold text-gray-800">Job Selection</CardTitle>
+              <CardDescription className="text-base text-gray-600">Choose the job for this application</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4 pt-4">
               <div className="space-y-2">
-                <Label htmlFor="jobId">Job Position *</Label>
+                <Label htmlFor="jobId" className="text-sm font-semibold text-gray-700">Job *</Label>
                 <Select value={selected_job_id} onValueChange={setSelectedJobId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a job position" />
+                  <SelectTrigger className="h-12 shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500">
+                    <SelectValue placeholder="Select a job" />
                   </SelectTrigger>
                   <SelectContent>
                     {jobs.map((job) => (
@@ -229,8 +314,10 @@ const AddApplication = () => {
                 </Select>
               </div>
               {selected_job && (
-                <div className="mt-4 p-3 bg-muted rounded-lg">
-                  <p className="text-sm"><strong>Selected:</strong> {selected_job.title}</p>
+                <div className="p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg space-y-1 border border-blue-100 shadow-sm">
+                  <h4 className="font-semibold text-gray-800">{selected_job.title}</h4>
+                  <p className="text-sm text-gray-600">Location: {selected_job.location}</p>
+                  <p className="text-sm text-gray-600">Type: {selected_job.job_type.replace("_", " ").toUpperCase()}</p>
                 </div>
               )}
             </CardContent>
@@ -238,39 +325,19 @@ const AddApplication = () => {
         </div>
 
         <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Form Responses</CardTitle>
-              <CardDescription>Fill in the custom form fields for this application</CardDescription>
+          <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-xl font-bold text-gray-800">Application Form</CardTitle>
+              <CardDescription className="text-base text-gray-600">Complete any additional fields for this job</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {form_keys.length === 0 && <div className="text-muted-foreground">Select a job to see form fields.</div>}
-              {form_keys.map((form_key) => (
-                <div key={form_key.id} className="space-y-2">
-                  <Label htmlFor={`formKey-${form_key.id}`}>{form_key.name}{form_key.required && <span className="text-destructive ml-1">*</span>}</Label>
-                  {form_key.field_type === "textarea" ? (
-                    <Textarea id={`formKey-${form_key.id}`} value={form_responses[form_key.id] || ""} onChange={e => handleFormResponseChange(form_key.id, e.target.value)} placeholder={`Enter ${form_key.name.toLowerCase()}`} rows={3} />
-                  ) : form_key.field_type === "date" ? (
-                    <Input id={`formKey-${form_key.id}`} type="date" value={form_responses[form_key.id] || ""} onChange={e => handleFormResponseChange(form_key.id, e.target.value)} />
-                  ) : (
-                    <Input id={`formKey-${form_key.id}`} type={form_key.field_type || "text"} value={form_responses[form_key.id] || ""} onChange={e => handleFormResponseChange(form_key.id, e.target.value)} placeholder={`Enter ${form_key.name.toLowerCase()}`} />
-                  )}
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Application Preview</CardTitle>
-              <CardDescription>Review the application details before creating</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div><strong>Candidate:</strong> {selected_candidate_id ? (candidates.find(c => c.id.toString() === selected_candidate_id)?.full_name) : show_new_candidate_form ? new_candidate_data.full_name : "Not specified"}</div>
-              <div><strong>Email:</strong> {selected_candidate_id ? (candidates.find(c => c.id.toString() === selected_candidate_id)?.email) : show_new_candidate_form ? new_candidate_data.email : "Not specified"}</div>
-              <div><strong>Job:</strong> {selected_job?.title || "Not selected"}</div>
-              <div><strong>Resume:</strong> {show_new_candidate_form ? (new_candidate_data.resume_file?.name || "Not uploaded") : selected_candidate_id ? (candidates.find(c => c.id.toString() === selected_candidate_id)?.resume_file_name || "Not uploaded") : "Not uploaded"}</div>
-              <div><strong>Form Responses:</strong> {Object.keys(form_responses).length} fields completed</div>
+            <CardContent className="space-y-6 pt-4">
+              {form_keys.length === 0 && selected_job_id && (
+                <p className="text-gray-600 italic">No custom form fields for this job.</p>
+              )}
+              {!selected_job_id && (
+                <p className="text-gray-600 italic">Select a job to see its application form fields.</p>
+              )}
+              {form_keys.map(render_form_field)}
             </CardContent>
           </Card>
         </div>

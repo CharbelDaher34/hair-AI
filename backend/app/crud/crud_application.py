@@ -22,16 +22,18 @@ def get_applications_by_candidate(db: Session, candidate_id: int, skip: int = 0,
 
 
 def get_random_applications_by_employer(db: Session, employer_id: int, skip: int = 0, limit: int = 100) -> List[Application]:
-    """Get random applications for jobs belonging to an employer with pagination"""
+    """Get applications for jobs belonging to an employer with pagination, ordered by most recent"""
     statement = (
         select(Application)
         .join(Job, Application.job_id == Job.id)
         .where(Job.employer_id == employer_id)
-        .order_by(func.random())
+        .order_by(Application.id.desc())
         .offset(skip)
         .limit(limit)
     )
-    return db.exec(statement).all()
+    result = db.exec(statement).all()
+    print(f"[get_random_applications_by_employer] skip={skip}, limit={limit}, returned_ids={[app.id for app in result]}")
+    return result
 
 
 def get_application_with_details(db: Session, application_id: int) -> Optional[Application]:
@@ -81,3 +83,14 @@ def delete_application(db: Session, *, application_id: int) -> Optional[Applicat
         db.delete(db_application)
         db.commit()
     return db_application
+
+
+def get_applications_count_by_employer(db: Session, employer_id: int) -> int:
+    job_ids_subquery = select(Job.id).where(Job.employer_id == employer_id)
+    statement = select(func.count(Application.id)).where(Application.job_id.in_(job_ids_subquery))
+    result = db.exec(statement)
+    total = result.one()
+    print(f"Total applications: {total}")
+    if isinstance(total, tuple):
+        total = total[0]
+    return total

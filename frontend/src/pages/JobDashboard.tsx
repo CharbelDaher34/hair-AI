@@ -96,10 +96,12 @@ const JobDashboard = () => {
 
   if (isLoading) {
     return (
-      <div className="flex-1 space-y-8 p-8">
+      <div className="flex-1 space-y-8 p-8 bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
         <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin" />
-          <span className="ml-2">Loading jobs...</span>
+          <div className="text-center space-y-4">
+            <Loader2 className="h-12 w-12 animate-spin text-blue-600 mx-auto" />
+            <span className="text-lg font-medium text-gray-700">Loading jobs...</span>
+          </div>
         </div>
       </div>
     );
@@ -107,36 +109,40 @@ const JobDashboard = () => {
 
   if (error) {
     return (
-      <div className="flex-1 space-y-8 p-8">
+      <div className="flex-1 space-y-8 p-8 bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
         <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <p className="text-destructive mb-4">Error loading jobs: {error}</p>
-            <Button onClick={() => window.location.reload()}>
+          <Card className="w-full max-w-md shadow-xl border-0">
+            <CardContent className="text-center p-8 space-y-4">
+              <p className="text-red-600 font-semibold text-lg mb-4">Error loading jobs: {error}</p>
+              <Button onClick={() => window.location.reload()} className="button shadow-lg hover:shadow-xl transition-all duration-300">
               Retry
             </Button>
-          </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex-1 space-y-8 p-8">
+    <div className="flex-1 space-y-8 p-8 bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Job Management</h1>
-          <p className="text-muted-foreground">
+        <div className="space-y-2">
+          <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            Job Management
+          </h1>
+          <p className="text-lg text-gray-600">
             Manage your job postings and track applications
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" asChild>
+        <div className="flex gap-3">
+          <Button variant="outline" asChild className="shadow-md hover:shadow-lg transition-all duration-300">
             <Link to="/form-keys">
               <Settings className="mr-2 h-4 w-4" />
               Manage Form Keys
             </Link>
           </Button>
-          <Button asChild>
+          <Button asChild className="button shadow-lg hover:shadow-xl transition-all duration-300">
             <Link to="/jobs/create">
               <Plus className="mr-2 h-4 w-4" />
               Create Job
@@ -145,29 +151,36 @@ const JobDashboard = () => {
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>All Jobs ({jobs.length})</CardTitle>
-          <CardDescription>
+      <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
+        <CardHeader className="pb-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-2xl font-bold text-gray-800">All Jobs ({jobs.length})</CardTitle>
+              <CardDescription className="text-base text-gray-600 mt-1">
             Overview of all your job postings
           </CardDescription>
-          <div className="flex items-center space-x-2">
+            </div>
+          </div>
+          <div className="flex items-center space-x-2 pt-4">
             <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
               <Input
                 placeholder="Search jobs..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-8"
+                className="pl-10 h-12 shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500"
               />
             </div>
           </div>
         </CardHeader>
         <CardContent>
           {jobs.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-muted-foreground mb-4">No jobs found</p>
-              <Button asChild>
+            <div className="text-center py-12 space-y-4">
+              <div className="w-16 h-16 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center mx-auto">
+                <Plus className="h-8 w-8 text-blue-600" />
+              </div>
+              <p className="text-lg text-gray-600 mb-4">No jobs found</p>
+              <Button asChild className="button shadow-lg hover:shadow-xl transition-all duration-300">
                 <Link to="/jobs/create">
                   <Plus className="mr-2 h-4 w-4" />
                   Create Your First Job
@@ -175,28 +188,32 @@ const JobDashboard = () => {
               </Button>
             </div>
           ) : (
+            <div className="overflow-hidden rounded-lg border border-gray-200 shadow-sm">
             <Table>
-              <TableHeader>
+                <TableHeader className="bg-gradient-to-r from-gray-50 to-blue-50">
                 <TableRow>
-                  <TableHead>Job Title</TableHead>
-                  <TableHead>Created Date</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Applications</TableHead>
-                  <TableHead>Actions</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Job Title</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Created Date</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Status</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Applications</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredJobs.map((job) => (
-                  console.log(job),
-                  <TableRow key={job.id}>
-                    <TableCell className="font-medium">{getJobTitle(job)}</TableCell>
-                    <TableCell>{formatDate(job.created_at)}</TableCell>
+                  {filteredJobs.map((job, index) => (
+                    <TableRow key={job.id} className="hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50 transition-all duration-200">
+                      <TableCell className="font-semibold text-gray-800">{getJobTitle(job)}</TableCell>
+                      <TableCell className="text-gray-600">{formatDate(job.created_at)}</TableCell>
                     <TableCell>
-                      <Badge variant={getStatusColor(job.status) as any}>
+                        <Badge variant={getStatusColor(job.status) as any} className="font-medium">
                         {job.status ? job.status.charAt(0).toUpperCase() + job.status.slice(1) : 'Unknown'}
                       </Badge>
                     </TableCell>
-                    <TableCell>{getApplicationCount(job)}</TableCell>
+                      <TableCell>
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          {getApplicationCount(job)}
+                        </span>
+                      </TableCell>
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -234,6 +251,7 @@ const JobDashboard = () => {
                 ))}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>

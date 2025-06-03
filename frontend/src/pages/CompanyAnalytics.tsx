@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -47,11 +46,13 @@ const CompanyAnalytics = () => {
   ];
 
   return (
-    <div className="flex-1 space-y-8 p-8">
+    <div className="flex-1 space-y-8 p-8 bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Company Analytics</h1>
-          <p className="text-muted-foreground">
+        <div className="space-y-2">
+          <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            Company Analytics
+          </h1>
+          <p className="text-lg text-gray-600">
             Overview of your recruitment performance and insights
           </p>
         </div>
@@ -59,43 +60,53 @@ const CompanyAnalytics = () => {
 
       {/* Key Metrics */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat) => (
-          <Card key={stat.title}>
+        {stats.map((stat, index) => (
+          <Card key={stat.title} className="card hover:scale-105 transition-all duration-300 border-0 shadow-lg hover:shadow-xl" style={{animationDelay: `${index * 100}ms`}}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
-              <stat.icon className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-semibold text-gray-700">{stat.title}</CardTitle>
+              <div className="p-2 bg-gradient-to-br from-blue-100 to-purple-100 rounded-lg">
+                <stat.icon className="h-5 w-5 text-blue-600" />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stat.value}</div>
-              <div className="flex items-center space-x-2 text-xs text-muted-foreground">
+              <div className="text-3xl font-bold text-gray-800 mb-1">{stat.value}</div>
+              <div className="flex items-center space-x-2 text-xs">
                 <TrendingUp className="h-3 w-3 text-green-500" />
-                <span className="text-green-500">{stat.change}</span>
-                <span>from last month</span>
+                <span className="text-green-600 font-medium">{stat.change}</span>
+                <span className="text-gray-600">from last month</span>
               </div>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-8 lg:grid-cols-2">
         {/* Applications Over Time */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Applications Over Time</CardTitle>
-            <CardDescription>Monthly application volume trends</CardDescription>
+        <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-xl font-bold text-gray-800">Applications Over Time</CardTitle>
+            <CardDescription className="text-base text-gray-600">Monthly application volume trends</CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={applicationsOverTime}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
-                <Tooltip />
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <XAxis dataKey="month" stroke="#64748b" />
+                <YAxis stroke="#64748b" />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: 'white', 
+                    border: '1px solid #e2e8f0', 
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                  }} 
+                />
                 <Line 
                   type="monotone" 
                   dataKey="applications" 
-                  stroke="hsl(var(--primary))" 
-                  strokeWidth={2}
+                  stroke="#3b82f6" 
+                  strokeWidth={3}
+                  dot={{ fill: '#3b82f6', strokeWidth: 2, r: 4 }}
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -103,43 +114,50 @@ const CompanyAnalytics = () => {
         </Card>
 
         {/* Job Performance */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Top Performing Jobs</CardTitle>
-            <CardDescription>Jobs with highest application to hire ratio</CardDescription>
+        <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-xl font-bold text-gray-800">Top Performing Jobs</CardTitle>
+            <CardDescription className="text-base text-gray-600">Jobs with highest application to hire ratio</CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={jobPerformance}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="job" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="applications" fill="hsl(var(--primary))" name="Applications" />
-                <Bar dataKey="hired" fill="hsl(var(--secondary))" name="Hired" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <XAxis dataKey="job" stroke="#64748b" />
+                <YAxis stroke="#64748b" />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: 'white', 
+                    border: '1px solid #e2e8f0', 
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                  }} 
+                />
+                <Bar dataKey="applications" fill="#3b82f6" name="Applications" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="hired" fill="#8b5cf6" name="Hired" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
 
         {/* Form Completion Rates */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Form Completion Rates</CardTitle>
-            <CardDescription>How candidates progress through application forms</CardDescription>
+        <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-xl font-bold text-gray-800">Form Completion Rates</CardTitle>
+            <CardDescription className="text-base text-gray-600">How candidates progress through application forms</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
+            <div className="space-y-6">
               {completionRates.map((stage, index) => (
-                <div key={stage.stage}>
+                <div key={stage.stage} className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
-                    <span>{stage.stage}</span>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-muted-foreground">{stage.count}</span>
-                      <Badge variant="outline">{stage.value}%</Badge>
+                    <span className="font-medium text-gray-700">{stage.stage}</span>
+                    <div className="flex items-center space-x-3">
+                      <span className="text-gray-600 font-medium">{stage.count} candidates</span>
+                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">{stage.value}%</Badge>
                     </div>
                   </div>
-                  <Progress value={stage.value} className="mt-1" />
+                  <Progress value={stage.value} className="h-3" />
                 </div>
               ))}
             </div>
@@ -147,10 +165,10 @@ const CompanyAnalytics = () => {
         </Card>
 
         {/* Candidate Drop-off Points */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Candidate Drop-off Points</CardTitle>
-            <CardDescription>Where candidates abandon their applications</CardDescription>
+        <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-xl font-bold text-gray-800">Candidate Drop-off Points</CardTitle>
+            <CardDescription className="text-base text-gray-600">Where candidates abandon their applications</CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
@@ -169,7 +187,14 @@ const CompanyAnalytics = () => {
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: 'white', 
+                    border: '1px solid #e2e8f0', 
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                  }} 
+                />
               </PieChart>
             </ResponsiveContainer>
           </CardContent>
@@ -177,35 +202,44 @@ const CompanyAnalytics = () => {
       </div>
 
       {/* Recent Performance Summary */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Performance Summary</CardTitle>
-          <CardDescription>Key insights from your recruitment data</CardDescription>
+      <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
+        <CardHeader className="pb-6">
+          <CardTitle className="text-2xl font-bold text-gray-800">Performance Summary</CardTitle>
+          <CardDescription className="text-base text-gray-600">Key insights from your recruitment data</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="space-y-2">
-              <h4 className="font-semibold text-green-600">Strong Performance</h4>
-              <ul className="text-sm text-muted-foreground space-y-1">
+          <div className="grid gap-6 md:grid-cols-3">
+            <div className="space-y-3 p-4 bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg border border-green-200">
+              <h4 className="font-bold text-green-700 flex items-center gap-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                Strong Performance
+              </h4>
+              <ul className="text-sm text-gray-700 space-y-2">
                 <li>• Frontend Developer roles show highest conversion</li>
                 <li>• 23% increase in applications this month</li>
                 <li>• Interview-to-hire ratio improved by 12%</li>
               </ul>
             </div>
-            <div className="space-y-2">
-              <h4 className="font-semibold text-orange-600">Areas for Improvement</h4>
-              <ul className="text-sm text-muted-foreground space-y-1">
+            <div className="space-y-3 p-4 bg-gradient-to-br from-orange-50 to-amber-50 rounded-lg border border-orange-200">
+              <h4 className="font-bold text-orange-700 flex items-center gap-2">
+                <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                Areas for Improvement
+              </h4>
+              <ul className="text-sm text-gray-700 space-y-2">
                 <li>• 35% drop-off at experience section</li>
                 <li>• Portfolio upload causing abandonment</li>
                 <li>• Consider simplifying application form</li>
               </ul>
             </div>
-            <div className="space-y-2">
-              <h4 className="font-semibold text-blue-600">Recommendations</h4>
-              <ul className="text-sm text-muted-foreground space-y-1">
+            <div className="space-y-3 p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+              <h4 className="font-bold text-blue-700 flex items-center gap-2">
+                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                Recommendations
+              </h4>
+              <ul className="text-sm text-gray-700 space-y-2">
+                <li>• Add progress indicators to forms</li>
                 <li>• Make portfolio upload optional initially</li>
-                <li>• Add progress indicator to forms</li>
-                <li>• Implement auto-save functionality</li>
+                <li>• A/B test shorter application forms</li>
               </ul>
             </div>
           </div>

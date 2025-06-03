@@ -131,20 +131,20 @@ const SignUp = () => {
   };
 
   const render_step_1 = () => (
-    <Card className="w-full max-w-md">
-      <CardHeader className="text-center">
-        <div className="flex items-center justify-center gap-2 mb-4">
-          <Building2 className="h-8 w-8 text-primary" />
-          <span className="font-bold text-2xl">HR Platform</span>
+    <Card className="w-full max-w-md shadow-2xl">
+      <CardHeader className="text-center space-y-2 pt-8">
+        <div className="flex items-center justify-center gap-3 mb-4">
+          <Building2 className="h-10 w-10 text-primary" />
+          <span className="font-bold text-3xl text-gray-800">HR Platform</span>
         </div>
-        <CardTitle className="text-2xl">Company Information</CardTitle>
-        <CardDescription>
+        <CardTitle className="text-3xl font-bold">Company Information</CardTitle>
+        <CardDescription className="text-base">
           Let's start by setting up your company
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-6 pb-8">
         <div className="space-y-2">
-          <Label htmlFor="company_name">Company Name *</Label>
+          <Label htmlFor="company_name" className="text-sm font-semibold">Company Name *</Label>
           <Input
             id="company_name"
             type="text"
@@ -153,10 +153,11 @@ const SignUp = () => {
             onChange={(e) => handle_company_data_change("name", e.target.value)}
             required
             disabled={is_loading}
+            className="h-12"
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="company_domain">Company Domain</Label>
+          <Label htmlFor="company_domain" className="text-sm font-semibold">Company Domain</Label>
           <Input
             id="company_domain"
             type="text"
@@ -164,16 +165,17 @@ const SignUp = () => {
             value={company_data.domain}
             onChange={(e) => handle_company_data_change("domain", e.target.value)}
             disabled={is_loading}
+            className="h-12"
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="industry">Industry</Label>
+          <Label htmlFor="industry" className="text-sm font-semibold">Industry</Label>
           <Select
             value={company_data.industry}
             onValueChange={(value) => handle_company_data_change("industry", value)}
             disabled={is_loading}
           >
-            <SelectTrigger>
+            <SelectTrigger className="h-12">
               <SelectValue placeholder="Select your industry" />
             </SelectTrigger>
             <SelectContent>
@@ -188,7 +190,7 @@ const SignUp = () => {
           </Select>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="website">Website</Label>
+          <Label htmlFor="website" className="text-sm font-semibold">Website</Label>
           <Input
             id="website"
             type="url"
@@ -196,38 +198,58 @@ const SignUp = () => {
             value={company_data.website}
             onChange={(e) => handle_company_data_change("website", e.target.value)}
             disabled={is_loading}
+            className="h-12"
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="description">Company Description</Label>
+          <Label htmlFor="description" className="text-sm font-semibold">Description</Label>
           <Textarea
             id="description"
-            placeholder="Brief description of your company"
+            placeholder="Tell us about your company..."
             value={company_data.description}
             onChange={(e) => handle_company_data_change("description", e.target.value)}
             disabled={is_loading}
-            rows={3}
+            className="min-h-[100px] resize-none"
           />
         </div>
+        <div className="space-y-2">
+          <Label htmlFor="bio" className="text-sm font-semibold">Company Bio</Label>
+          <Textarea
+            id="bio"
+            placeholder="A brief bio about your company culture and values..."
+            value={company_data.bio}
+            onChange={(e) => handle_company_data_change("bio", e.target.value)}
+            disabled={is_loading}
+            className="min-h-[100px] resize-none"
+          />
+        </div>
+        <Button
+          onClick={handle_step_1_submit}
+          className="w-full button mt-8 py-3 text-base font-semibold"
+          disabled={is_loading}
+        >
+          {is_loading ? "Creating Company..." : "Continue"}
+          <ArrowRight className="ml-2 h-4 w-4" />
+        </Button>
       </CardContent>
     </Card>
   );
 
   const render_step_2 = () => (
-    <Card className="w-full max-w-md">
-      <CardHeader className="text-center">
-        <div className="flex items-center justify-center gap-2 mb-4">
-          <Building2 className="h-8 w-8 text-primary" />
-          <span className="font-bold text-2xl">HR Platform</span>
+    <Card className="w-full max-w-md shadow-2xl">
+      <CardHeader className="text-center space-y-2 pt-8">
+        <div className="flex items-center justify-center gap-3 mb-4">
+          <Building2 className="h-10 w-10 text-primary" />
+          <span className="font-bold text-3xl text-gray-800">HR Platform</span>
         </div>
-        <CardTitle className="text-2xl">Your Account</CardTitle>
-        <CardDescription>
-          Create your HR manager account
+        <CardTitle className="text-3xl font-bold">Create Your Account</CardTitle>
+        <CardDescription className="text-base">
+          Set up your HR manager account
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-6 pb-8">
         <div className="space-y-2">
-          <Label htmlFor="full_name">Full Name *</Label>
+          <Label htmlFor="full_name" className="text-sm font-semibold">Full Name *</Label>
           <Input
             id="full_name"
             type="text"
@@ -236,37 +258,40 @@ const SignUp = () => {
             onChange={(e) => handle_hr_data_change("full_name", e.target.value)}
             required
             disabled={is_loading}
+            className="h-12"
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="email">Email *</Label>
+          <Label htmlFor="email" className="text-sm font-semibold">Email Address *</Label>
           <Input
             id="email"
             type="email"
-            placeholder="Enter your email"
+            placeholder="Enter your email address"
             value={hr_data.email}
             onChange={(e) => handle_hr_data_change("email", e.target.value)}
             required
             disabled={is_loading}
+            className="h-12"
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="password">Password *</Label>
-          <div className="relative">
+          <Label htmlFor="password" className="text-sm font-semibold">Password *</Label>
+          <div className="relative flex items-center">
             <Input
               id="password"
               type={show_password ? "text" : "password"}
-              placeholder="Create a password"
+              placeholder="Create a strong password"
               value={hr_data.password}
               onChange={(e) => handle_hr_data_change("password", e.target.value)}
               required
               disabled={is_loading}
+              className="h-12 pr-12"
             />
             <Button
               type="button"
               variant="ghost"
               size="icon"
-              className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+              className="absolute right-0 top-1/2 transform -translate-y-1/2 h-full px-3 py-2 hover:bg-transparent text-gray-500 hover:text-gray-700"
               onClick={() => set_show_password(!show_password)}
               disabled={is_loading}
             >
@@ -279,8 +304,8 @@ const SignUp = () => {
           </div>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="confirm_password">Confirm Password *</Label>
-          <div className="relative">
+          <Label htmlFor="confirm_password" className="text-sm font-semibold">Confirm Password *</Label>
+          <div className="relative flex items-center">
             <Input
               id="confirm_password"
               type={show_confirm_password ? "text" : "password"}
@@ -289,12 +314,13 @@ const SignUp = () => {
               onChange={(e) => handle_hr_data_change("confirm_password", e.target.value)}
               required
               disabled={is_loading}
+              className="h-12 pr-12"
             />
             <Button
               type="button"
               variant="ghost"
               size="icon"
-              className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+              className="absolute right-0 top-1/2 transform -translate-y-1/2 h-full px-3 py-2 hover:bg-transparent text-gray-500 hover:text-gray-700"
               onClick={() => set_show_confirm_password(!show_confirm_password)}
               disabled={is_loading}
             >
@@ -306,86 +332,59 @@ const SignUp = () => {
             </Button>
           </div>
         </div>
+        <div className="flex gap-3 mt-8">
+          <Button
+            variant="outline"
+            onClick={handle_back}
+            className="flex-1 py-3 text-base font-semibold"
+            disabled={is_loading}
+          >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back
+            </Button>
+          <Button
+            onClick={handle_step_2_submit}
+            className="flex-1 button py-3 text-base font-semibold"
+            disabled={is_loading}
+          >
+            {is_loading ? "Creating Account..." : "Create Account"}
+            <Check className="ml-2 h-4 w-4" />
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );
 
+  const render_progress_indicator = () => (
+    <div className="flex items-center justify-center mb-8">
+      <div className="flex items-center space-x-4">
+        <div className={`flex items-center justify-center w-10 h-10 rounded-full border-2 ${
+          current_step >= 1 ? 'bg-primary border-primary text-white' : 'border-gray-300 text-gray-300'
+        }`}>
+          {current_step > 1 ? <Check className="h-5 w-5" /> : '1'}
+        </div>
+        <div className={`h-1 w-16 ${current_step > 1 ? 'bg-primary' : 'bg-gray-300'}`} />
+        <div className={`flex items-center justify-center w-10 h-10 rounded-full border-2 ${
+          current_step >= 2 ? 'bg-primary border-primary text-white' : 'border-gray-300 text-gray-300'
+        }`}>
+          2
+        </div>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-8">
-      <div className="w-full max-w-md space-y-6">
-        {/* Progress indicator */}
-        <div className="flex items-center justify-center space-x-4">
-          <div className="flex items-center space-x-2">
-            <div
-              className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                current_step >= 1
-                  ? current_step === 1
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-green-500 text-white"
-                  : "bg-muted text-muted-foreground"
-              }`}
-            >
-              {current_step > 1 ? <Check className="h-4 w-4" /> : "1"}
-            </div>
-            <span className="text-sm font-medium">Company</span>
-          </div>
-          <div className={`w-16 h-0.5 ${current_step > 1 ? "bg-green-500" : "bg-muted"}`} />
-          <div className="flex items-center space-x-2">
-            <div
-              className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                current_step >= 2
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground"
-              }`}
-            >
-              2
-            </div>
-            <span className="text-sm font-medium">Account</span>
-          </div>
-        </div>
-
-        {/* Step content */}
-        {current_step === 1 && render_step_1()}
-        {current_step === 2 && render_step_2()}
-
-        {/* Navigation buttons */}
-        <div className="flex justify-between">
-          {current_step > 1 ? (
-            <Button variant="outline" onClick={handle_back} disabled={is_loading}>
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back
-            </Button>
-          ) : (
-            <div />
-          )}
-          
-          <Button
-            onClick={current_step === 1 ? handle_step_1_submit : handle_step_2_submit}
-            disabled={is_loading}
-          >
-            {is_loading ? (
-              "Processing..."
-            ) : current_step === 1 ? (
-              <>
-                Next
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </>
-            ) : (
-              "Create Account"
-            )}
-          </Button>
-        </div>
-
-        {/* Login link */}
-        <div className="text-center text-sm">
-          <span className="text-muted-foreground">Already have an account? </span>
-          <Link
-            to="/login"
-            className="text-primary hover:underline font-medium"
-          >
-            Sign in
-          </Link>
-        </div>
+    <div className="min-h-screen flex flex-col items-center justify-center px-4 py-8">
+      {render_progress_indicator()}
+      {current_step === 1 ? render_step_1() : render_step_2()}
+      <div className="mt-8 text-center text-sm">
+        <span className="text-gray-600">Already have an account? </span>
+        <Link
+          to="/login"
+          className="text-primary hover:underline font-semibold"
+        >
+          Sign In
+        </Link>
       </div>
     </div>
   );

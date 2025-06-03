@@ -124,10 +124,12 @@ const JobDetails = () => {
 
   if (is_loading) {
     return (
-      <div className="flex-1 space-y-8 p-8">
+      <div className="flex-1 space-y-8 p-8 bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
         <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin" />
-          <span className="ml-2">Loading job details...</span>
+          <div className="text-center space-y-4">
+            <Loader2 className="h-12 w-12 animate-spin text-blue-600 mx-auto" />
+            <span className="text-lg font-medium text-gray-700">Loading job details...</span>
+          </div>
         </div>
       </div>
     );
@@ -135,52 +137,59 @@ const JobDetails = () => {
 
   if (error || !job) {
     return (
-      <div className="flex-1 space-y-8 p-8">
+      <div className="flex-1 space-y-8 p-8 bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
         <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <p className="text-destructive mb-4">Error: {error || "Job not found"}</p>
-            <Button onClick={() => window.location.reload()}>
+          <Card className="w-full max-w-md shadow-xl border-0">
+            <CardContent className="text-center p-8 space-y-4">
+              <p className="text-red-600 font-semibold text-lg mb-4">Error: {error || "Job not found"}</p>
+              <Button onClick={() => window.location.reload()} className="button shadow-lg hover:shadow-xl transition-all duration-300">
               Retry
             </Button>
-          </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex-1 space-y-8 p-8">
+    <div className="flex-1 space-y-8 p-8 bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">{job.title}</h1>
-          <div className="flex items-center space-x-4 mt-2">
-            <Badge variant={job.status === "published" ? "default" : job.status === "draft" ? "secondary" : "destructive"}>
+        <div className="space-y-3">
+          <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            {job.title}
+          </h1>
+          <div className="flex items-center space-x-4">
+            <Badge 
+              variant={job.status === "published" ? "default" : job.status === "draft" ? "secondary" : "destructive"}
+              className="font-medium px-3 py-1"
+            >
               {format_enum_value(job.status)}
             </Badge>
-            <span className="text-muted-foreground">
-              Location: {job.location}
+            <span className="text-gray-600 font-medium">
+              📍 {job.location}
             </span>
             {job.created_at && (
-              <span className="text-muted-foreground">
-                Created: {new Date(job.created_at).toLocaleDateString()}
+              <span className="text-gray-600">
+                📅 Created: {new Date(job.created_at).toLocaleDateString()}
               </span>
             )}
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" asChild>
+        <div className="flex gap-3">
+          <Button variant="outline" asChild className="shadow-md hover:shadow-lg transition-all duration-300">
             <Link to={`/jobs/${id}/edit`}>
               <Edit className="mr-2 h-4 w-4" />
               Edit
             </Link>
           </Button>
-          <Button variant="outline" asChild>
+          <Button variant="outline" asChild className="shadow-md hover:shadow-lg transition-all duration-300">
             <Link to={`/jobs/${id}/analytics`}>
               <BarChart3 className="mr-2 h-4 w-4" />
               Analytics
             </Link>
           </Button>
-          <Button asChild>
+          <Button asChild className="button shadow-lg hover:shadow-xl transition-all duration-300">
             <Link to={`/jobs/${id}/matches`}>
               <Users className="mr-2 h-4 w-4" />
               View Matches
@@ -189,35 +198,35 @@ const JobDetails = () => {
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-8 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Job Description</CardTitle>
+          <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-xl font-bold text-gray-800">Job Description</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground leading-relaxed">{job.description}</p>
+              <p className="text-gray-700 leading-relaxed text-base">{job.description}</p>
             </CardContent>
           </Card>
 
           {job.job_data?.overview && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Overview</CardTitle>
+            <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-xl font-bold text-gray-800">Overview</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-muted-foreground leading-relaxed">{job.job_data.overview}</p>
+                <p className="text-gray-700 leading-relaxed text-base">{job.job_data.overview}</p>
               </CardContent>
             </Card>
           )}
 
           {job.job_data?.requirements && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Requirements</CardTitle>
+            <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-xl font-bold text-gray-800">Requirements</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="whitespace-pre-line text-muted-foreground">
+                <div className="whitespace-pre-line text-gray-700">
                   {job.job_data.requirements}
                 </div>
               </CardContent>
@@ -225,12 +234,12 @@ const JobDetails = () => {
           )}
 
           {job.job_data?.objectives && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Objectives</CardTitle>
+            <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-xl font-bold text-gray-800">Objectives</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="whitespace-pre-line text-muted-foreground">
+                <div className="whitespace-pre-line text-gray-700">
                   {job.job_data.objectives}
                 </div>
               </CardContent>
@@ -239,39 +248,39 @@ const JobDetails = () => {
         </div>
 
         <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Job Details</CardTitle>
+          <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-xl font-bold text-gray-800">Job Details</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex justify-between">
                 <span className="text-sm font-medium">Salary:</span>
-                <span className="text-sm text-muted-foreground">
+                <span className="text-sm text-gray-700">
                   {format_salary(job.salary_min, job.salary_max)}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-sm font-medium">Job Type:</span>
-                <span className="text-sm text-muted-foreground">
+                <span className="text-sm text-gray-700">
                   {format_enum_value(job.job_type)}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-sm font-medium">Experience Level:</span>
-                <span className="text-sm text-muted-foreground">
+                <span className="text-sm text-gray-700">
                   {format_enum_value(job.experience_level)}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-sm font-medium">Seniority Level:</span>
-                <span className="text-sm text-muted-foreground">
+                <span className="text-sm text-gray-700">
                   {format_enum_value(job.seniority_level)}
                 </span>
               </div>
               {job.job_category && (
                 <div className="flex justify-between">
                   <span className="text-sm font-medium">Category:</span>
-                  <span className="text-sm text-muted-foreground">
+                  <span className="text-sm text-gray-700">
                     {job.job_category}
                   </span>
                 </div>
@@ -279,9 +288,9 @@ const JobDetails = () => {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Application Form</CardTitle>
+          <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-xl font-bold text-gray-800">Application Form</CardTitle>
               <CardDescription>Public URL for candidates to apply</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -300,16 +309,16 @@ const JobDetails = () => {
                 )}
               </div>
               {generated_url && (
-                <p className="text-xs text-muted-foreground break-all">
+                <p className="text-xs text-gray-700 break-all">
                   {generated_url}
                 </p>
               )}
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Form Keys & Constraints</CardTitle>
+          <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-xl font-bold text-gray-800">Form Keys & Constraints</CardTitle>
               <CardDescription>Custom fields attached to this job</CardDescription>
             </CardHeader>
             <CardContent>
@@ -333,7 +342,7 @@ const JobDetails = () => {
                         </div>
                       </div>
                       {constraint.constraints && Object.keys(constraint.constraints).length > 0 && (
-                        <div className="mt-2 p-2 bg-muted rounded text-xs">
+                        <div className="mt-2 p-2 bg-gray-200 rounded text-xs">
                           <strong>Constraints:</strong>
                           <div className="mt-1">
                             {Object.entries(constraint.constraints).map(([key, value]) => (
@@ -349,14 +358,14 @@ const JobDetails = () => {
                   ))}
                 </div>
               ) : (
-                <p className="text-muted-foreground text-sm">No form keys attached</p>
+                <p className="text-gray-700 text-sm">No form keys attached</p>
               )}
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Quick Actions</CardTitle>
+          <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-xl font-bold text-gray-800">Quick Actions</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
               <Button variant="outline" className="w-full justify-start" asChild>

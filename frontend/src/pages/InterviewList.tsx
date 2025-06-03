@@ -141,12 +141,26 @@ const InterviewList = () => {
 
   const stats = getStatistics();
 
+  // Define stat items with explicit typing for clarity
+  interface StatItem {
+    title: string;
+    value: string | number;
+    note: string;
+    icon: React.FC<React.SVGProps<SVGSVGElement>>; // Type for Lucide icons
+  }
+
+  const statItems: StatItem[] = [
+    { title: "This Week", value: stats.thisWeek, note: "Interviews scheduled", icon: Calendar },
+    { title: "Completion Rate", value: `${stats.successRate}%`, note: "Interviews completed", icon: Calendar }, // Assuming Calendar for all, adjust if different icons are needed
+    { title: "Scheduled", value: stats.pending, note: "Awaiting interviews", icon: Calendar }
+  ];
+
   if (loading) {
     return (
-      <div className="flex-1 flex items-center justify-center p-8">
-        <div className="flex items-center gap-2">
-          <Loader2 className="h-6 w-6 animate-spin" />
-          <span>Loading interviews...</span>
+      <div className="flex-1 flex items-center justify-center p-8 bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
+        <div className="text-center space-y-4">
+          <Loader2 className="h-12 w-12 animate-spin text-blue-600 mx-auto" />
+          <span className="text-lg font-medium text-gray-700">Loading interviews...</span>
         </div>
       </div>
     );
@@ -154,25 +168,31 @@ const InterviewList = () => {
 
   if (error) {
     return (
-      <div className="flex-1 flex items-center justify-center p-8">
-        <div className="text-center">
-          <p className="text-destructive mb-4">{error}</p>
-          <Button onClick={fetchInterviews}>Try Again</Button>
-        </div>
+      <div className="flex-1 flex items-center justify-center p-8 bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
+        <Card className="w-full max-w-md shadow-xl border-0">
+          <CardContent className="text-center p-8 space-y-4">
+            <p className="text-red-600 font-semibold text-lg mb-4">{error}</p>
+            <Button onClick={fetchInterviews} className="button shadow-lg hover:shadow-xl transition-all duration-300">
+              Try Again
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="flex-1 space-y-8 p-8">
+    <div className="flex-1 space-y-8 p-8 bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Interview Tracking</h1>
-          <p className="text-muted-foreground">
+        <div className="space-y-2">
+          <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            Interview Tracking
+          </h1>
+          <p className="text-lg text-gray-600">
             Manage and track all candidate interviews
           </p>
         </div>
-        <Button asChild>
+        <Button asChild className="button shadow-lg hover:shadow-xl transition-all duration-300">
           <Link to="/interviews/create">
             <Plus className="mr-2 h-4 w-4" />
             Schedule Interview
@@ -180,27 +200,27 @@ const InterviewList = () => {
         </Button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
+      <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
+        <CardHeader className="pb-6">
+          <CardTitle className="flex items-center gap-3 text-2xl font-bold text-gray-800">
+            <Calendar className="h-6 w-6 text-blue-600" />
             All Interviews ({interviews.length})
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-base text-gray-600 mt-1">
             Overview of all scheduled and completed interviews
           </CardDescription>
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-4 pt-4">
             <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
               <Input
                 placeholder="Search interviews..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-8"
+                className="pl-10 h-12 shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500"
               />
             </div>
             <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-[200px]">
+              <SelectTrigger className="w-48 h-12 shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500">
                 <SelectValue placeholder="Filter by type" />
               </SelectTrigger>
               <SelectContent>
@@ -213,7 +233,7 @@ const InterviewList = () => {
               </SelectContent>
             </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[150px]">
+              <SelectTrigger className="w-48 h-12 shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500">
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
               <SelectContent>
@@ -227,10 +247,15 @@ const InterviewList = () => {
         </CardHeader>
         <CardContent>
           {filteredInterviews.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-muted-foreground">No interviews found</p>
+            <div className="text-center py-12 space-y-4">
+              <div className="w-16 h-16 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center mx-auto">
+                <Calendar className="h-8 w-8 text-blue-600" />
+              </div>
+              <p className="text-lg text-gray-600 mb-4">
+                {interviews.length === 0 ? "No interviews scheduled yet." : "No interviews match your filters."}
+              </p>
               {interviews.length === 0 && (
-                <Button asChild className="mt-4">
+                <Button asChild className="button shadow-lg hover:shadow-xl transition-all duration-300">
                   <Link to="/interviews/create">
                     <Plus className="mr-2 h-4 w-4" />
                     Schedule Your First Interview
@@ -239,48 +264,51 @@ const InterviewList = () => {
               )}
             </div>
           ) : (
+            <div className="overflow-hidden rounded-lg border border-gray-200 shadow-sm">
             <Table>
-              <TableHeader>
+                <TableHeader className="bg-gradient-to-r from-gray-50 to-blue-50">
                 <TableRow>
-                  <TableHead>Candidate</TableHead>
-                  <TableHead>Job</TableHead>
-                  <TableHead>Date & Time</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Notes</TableHead>
-                  <TableHead>Actions</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Candidate</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Job</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Date & Time</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Type</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Status</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Notes</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredInterviews.map((interview) => {
                   const dateTime = formatDateTime(interview.date);
                   return (
-                    <TableRow key={interview.id}>
+                      <TableRow key={interview.id} className="hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50 transition-all duration-200">
                       <TableCell>
-                        <div className="font-medium">
+                          <div className="font-semibold text-gray-800">
                           {interview.application?.candidate?.full_name || "Unknown"}
                         </div>
                       </TableCell>
-                      <TableCell>
+                        <TableCell className="font-medium text-gray-800">
                         {interview.application?.job?.title || "Unknown"}
                       </TableCell>
                       <TableCell>
-                        <div>
-                          <div className="font-medium">{dateTime.date}</div>
-                          <div className="text-sm text-muted-foreground">{dateTime.time}</div>
+                          <div className="space-y-1">
+                            <div className="font-semibold text-gray-800">{dateTime.date}</div>
+                            <div className="text-sm text-gray-600">{dateTime.time}</div>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline">{interview.type}</Badge>
+                          <Badge variant="outline" className="font-medium bg-blue-50 text-blue-700 border-blue-200">
+                            {interview.type}
+                          </Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={getStatusVariant(interview.status)}>
+                          <Badge variant={getStatusVariant(interview.status)} className="font-medium">
                           {interview.status}
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <div className="max-w-[200px] truncate text-sm text-muted-foreground">
-                          {interview.notes || "No notes"}
+                          <div className="max-w-[200px] truncate text-sm text-gray-600">
+                            {interview.notes || "-"}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -312,39 +340,27 @@ const InterviewList = () => {
                 })}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>
 
       {/* Interview Statistics */}
       <div className="grid gap-6 md:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle>This Week</CardTitle>
+        {statItems.map((stat, index) => (
+          <Card key={stat.title} className="card hover:scale-105 transition-all duration-300 border-0 shadow-lg hover:shadow-xl" style={{animationDelay: `${index * 100}ms`}}>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-semibold text-gray-700">{stat.title}</CardTitle>
+              <div className="p-2 bg-gradient-to-br from-blue-100 to-purple-100 rounded-lg">
+                <stat.icon className="h-5 w-5 text-blue-600" />
+              </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.thisWeek}</div>
-            <p className="text-muted-foreground text-sm">Interviews scheduled</p>
+              <div className="text-3xl font-bold text-gray-800 mb-1">{stat.value}</div>
+              <p className="text-xs text-gray-600">{stat.note}</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Completion Rate</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.successRate}%</div>
-            <p className="text-muted-foreground text-sm">Interviews completed</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Scheduled</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.pending}</div>
-            <p className="text-muted-foreground text-sm">Awaiting interviews</p>
-          </CardContent>
-        </Card>
+        ))}
       </div>
     </div>
   );

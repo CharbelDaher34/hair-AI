@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -101,70 +100,74 @@ const ChatBot = () => {
   };
 
   return (
-    <div className="flex-1 space-y-6 p-8">
+    <div className="flex-1 space-y-8 p-8 bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-            <Sparkles className="h-8 w-8 text-primary" />
+        <div className="space-y-2">
+          <h1 className="text-4xl font-bold tracking-tight flex items-center gap-3 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            <Sparkles className="h-10 w-10 text-blue-600" />
             AI Assistant
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-lg text-gray-600">
             Get insights and analytics from your HR data using natural language
           </p>
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-4">
+      <div className="grid gap-8 lg:grid-cols-4">
         <div className="lg:col-span-3">
-          <Card className="h-[600px] flex flex-col">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Bot className="h-5 w-5" />
+          <Card className="h-[650px] flex flex-col card shadow-xl hover:shadow-2xl transition-all duration-300 border-0">
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center gap-3 text-xl font-bold text-gray-800">
+                <div className="p-2 bg-gradient-to-br from-blue-100 to-purple-100 rounded-lg">
+                  <Bot className="h-6 w-6 text-blue-600" />
+                </div>
                 Chat Assistant
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-base text-gray-600">
                 Ask questions about your recruitment data and get AI-powered insights
               </CardDescription>
             </CardHeader>
             <CardContent className="flex-1 flex flex-col">
               <ScrollArea className="flex-1 pr-4">
-                <div className="space-y-4">
+                <div className="space-y-6">
                   {messages.map((message) => (
                     <div
                       key={message.id}
-                      className={`flex items-start space-x-3 ${
+                      className={`flex items-start space-x-4 ${
                         message.type === "user" ? "flex-row-reverse space-x-reverse" : ""
                       }`}
                     >
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center shadow-md ${
                         message.type === "user" 
-                          ? "bg-primary text-primary-foreground" 
-                          : "bg-muted"
+                          ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white" 
+                          : "bg-gradient-to-r from-gray-100 to-blue-100 text-gray-700"
                       }`}>
-                        {message.type === "user" ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
+                        {message.type === "user" ? <User className="w-5 h-5" /> : <Bot className="w-5 h-5" />}
                       </div>
-                      <div className={`max-w-[80%] p-3 rounded-lg ${
+                      <div className={`max-w-[80%] p-4 rounded-2xl shadow-md ${
                         message.type === "user"
-                          ? "bg-primary text-primary-foreground ml-auto"
-                          : "bg-muted"
+                          ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white ml-auto"
+                          : "bg-white border border-gray-200"
                       }`}>
-                        <div className="whitespace-pre-wrap">{message.content}</div>
-                        <div className="text-xs opacity-70 mt-1">
+                        <div className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</div>
+                        <div className={`text-xs mt-2 ${
+                          message.type === "user" ? "text-blue-100" : "text-gray-500"
+                        }`}>
                           {message.timestamp.toLocaleTimeString()}
                         </div>
                       </div>
                     </div>
                   ))}
                   {isTyping && (
-                    <div className="flex items-start space-x-3">
-                      <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
-                        <Bot className="w-4 h-4" />
+                    <div className="flex items-start space-x-4">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-r from-gray-100 to-blue-100 text-gray-700 flex items-center justify-center shadow-md">
+                        <Bot className="w-5 h-5" />
                       </div>
-                      <div className="bg-muted p-3 rounded-lg">
+                      <div className="bg-white border border-gray-200 p-4 rounded-2xl shadow-md">
                         <div className="flex space-x-1">
-                          <div className="w-2 h-2 bg-current rounded-full animate-bounce"></div>
-                          <div className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: "0.1s" }}></div>
-                          <div className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: "0.2s" }}></div>
+                          <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
+                          <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: "0.1s" }}></div>
+                          <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }}></div>
                         </div>
                       </div>
                     </div>
@@ -172,16 +175,20 @@ const ChatBot = () => {
                 </div>
               </ScrollArea>
               
-              <div className="flex items-center space-x-2 mt-4">
+              <div className="flex items-center space-x-3 mt-6 pt-4 border-t border-gray-200">
                 <Input
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyPress={handleKeyPress}
                   placeholder="Ask me about your HR data..."
-                  className="flex-1"
+                  className="flex-1 h-12 shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500"
                 />
-                <Button onClick={handleSendMessage} disabled={!input.trim() || isTyping}>
-                  <Send className="w-4 h-4" />
+                <Button 
+                  onClick={handleSendMessage} 
+                  disabled={!input.trim() || isTyping}
+                  className="button h-12 px-6 shadow-lg hover:shadow-xl transition-all duration-300"
+                >
+                  <Send className="w-5 h-5" />
                 </Button>
               </div>
             </CardContent>
@@ -189,17 +196,17 @@ const ChatBot = () => {
         </div>
 
         <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Quick Questions</CardTitle>
-              <CardDescription>Try these sample queries</CardDescription>
+          <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-lg font-bold text-gray-800">Quick Questions</CardTitle>
+              <CardDescription className="text-sm text-gray-600">Try these sample queries</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-2">
+            <CardContent className="space-y-3">
               {quickQuestions.map((question, index) => (
                 <Button
                   key={index}
                   variant="outline"
-                  className="w-full text-left h-auto p-3 justify-start whitespace-normal"
+                  className="w-full text-left justify-start h-auto p-3 text-sm font-medium shadow-sm hover:shadow-md transition-all duration-300 hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50"
                   onClick={() => handleQuickQuestion(question)}
                 >
                   {question}
@@ -208,44 +215,33 @@ const ChatBot = () => {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Data Coverage</CardTitle>
-              <CardDescription>What I can help you analyze</CardDescription>
+          <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-lg font-bold text-gray-800">Analytics Overview</CardTitle>
+              <CardDescription className="text-sm text-gray-600">Key metrics at a glance</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between p-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg">
               <div className="flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-green-500" />
-                <span className="text-sm">Application trends</span>
-                <Badge variant="secondary" className="ml-auto">Active</Badge>
+                  <TrendingUp className="h-5 w-5 text-blue-600" />
+                  <span className="text-sm font-medium text-gray-700">Applications</span>
+                </div>
+                <Badge className="bg-green-100 text-green-800 hover:bg-green-200">+23%</Badge>
               </div>
+              <div className="flex items-center justify-between p-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg">
               <div className="flex items-center gap-2">
-                <Users className="h-4 w-4 text-green-500" />
-                <span className="text-sm">Candidate analytics</span>
-                <Badge variant="secondary" className="ml-auto">Active</Badge>
+                  <Users className="h-5 w-5 text-blue-600" />
+                  <span className="text-sm font-medium text-gray-700">Active Jobs</span>
+                </div>
+                <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-200">12</Badge>
               </div>
+              <div className="flex items-center justify-between p-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg">
               <div className="flex items-center gap-2">
-                <FileText className="h-4 w-4 text-green-500" />
-                <span className="text-sm">Job performance</span>
-                <Badge variant="secondary" className="ml-auto">Active</Badge>
+                  <FileText className="h-5 w-5 text-blue-600" />
+                  <span className="text-sm font-medium text-gray-700">Conversion Rate</span>
               </div>
-              <div className="flex items-center gap-2">
-                <Bot className="h-4 w-4 text-yellow-500" />
-                <span className="text-sm">Predictive insights</span>
-                <Badge variant="outline" className="ml-auto">Coming Soon</Badge>
+                <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-200">16%</Badge>
               </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Tips</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm text-muted-foreground">
-              <p>• Ask specific questions about metrics, trends, or comparisons</p>
-              <p>• Request data for specific time periods or job positions</p>
-              <p>• Ask for recommendations to improve your processes</p>
-              <p>• Use natural language - no need for complex queries</p>
             </CardContent>
           </Card>
         </div>

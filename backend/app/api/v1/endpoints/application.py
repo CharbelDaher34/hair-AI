@@ -1,9 +1,10 @@
+from itertools import count
 from typing import List
 from pydantic import BaseModel
 from schemas.candidate import CandidateRead
 from schemas.job import JobRead
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlmodel import Session
+from sqlmodel import Session, select, func
 import traceback
 from core.database import get_session
 from crud import crud_application, crud_job
@@ -11,7 +12,7 @@ from schemas import ApplicationCreate, ApplicationUpdate, ApplicationRead, Appli
 
 # Import for matching
 from crud import crud_match
-from models.models import Candidate, Job
+from models.models import Candidate, Job, Application, Interview
 from services.matching import match_candidates_client
 
 router = APIRouter()
@@ -58,12 +59,14 @@ def get_employer_applications(
     if not employer_id:
         raise HTTPException(status_code=400, detail="User is not associated with an employer")
     
-    # Get random applications for this employer
+    # Get total count of applications for this employer
+    total= crud_application.get_applications_count_by_employer(db=db, employer_id=employer_id)
+    # Get random applications for this employer (paginated)
     applications = crud_application.get_random_applications_by_employer(
         db=db, 
         employer_id=employer_id, 
         skip=skip, 
-        limit=limit
+        limit=10
     )
     
     # Convert to ApplicationWithDetails format
@@ -71,12 +74,7 @@ def get_employer_applications(
     for app in applications:
         # Load relationships if not already loaded
         application = crud_application.get_application_with_details(db=db, application_id=app.id)
-            
         applications_with_details.append(application)
-    
-    # For now, we'll return the count of applications returned
-    # In a real scenario, you might want to get the total count separately
-    total = len(applications_with_details)
     
     return ApplicationDashboardResponse(
         applications=applications_with_details,
