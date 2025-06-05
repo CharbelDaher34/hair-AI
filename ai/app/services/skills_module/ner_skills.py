@@ -4,7 +4,8 @@ from spacy.matcher import PhraseMatcher
 from skillNer.general_params import SKILL_DB
 from typing import Dict, List, Set, Tuple
 import logging
-
+from typing import Optional
+from rapidfuzz import fuzz, process
 logger = logging.getLogger(__name__)
 
 class skill_ner:
@@ -61,28 +62,75 @@ class skill_ner:
         
         return sorted(skills)
 
+    
+    def match_skills(job_skills: list[str], candidate_skills: list[str], threshold: int = 85):
+        
+        job_skills_set = set([x.lower() for x in job_skills])
+        candidate_skills_set = set([x.lower() for x in candidate_skills])
+    
+        matched = set()
+        missing = set(job_skills_set)
+        matched_candidate_skills = set()
+    
+        # If no candidate skills, all job skills are missing
+        if not candidate_skills_set:
+            return {
+                "matching_skills": matched,
+                "missing_skills": missing,
+                "extra_skills": set(),
+            }
+    
+        for job_skill in job_skills_set:
+            result = process.extractOne(
+                job_skill,
+                candidate_skills_set,
+                scorer=fuzz.ratio,
+            )
+            if result is not None:
+                best_match, score, match_index = result
+                if score >= threshold:
+                    matched.add(job_skill)
+                    missing.discard(job_skill)
+                    matched_candidate_skills.add(best_match)
+    
+        extra = candidate_skills_set - matched_candidate_skills
+    
+        return {
+            "matching_skills": matched,
+            "missing_skills": missing,
+            "extra_skills": extra,
+        }
+    
     @classmethod
-    def analyze_skills(cls, job_text: str, candidate_text: str) -> Dict:
+    def analyze_skills(cls, job_text: str, candidate_text: str, candidate_skills: Optional[List[str]] = None) -> Dict:
         """
         Analyze skills between job description and candidate profile.
         Returns detailed analysis including matching, missing, and extra skills.
         """
-        job_skills = set(cls.extract_skills(job_text))
-        candidate_skills = set(cls.extract_skills(candidate_text))
+        job_skills = cls.extract_skills(job_text)
         
-        matching_skills = job_skills & candidate_skills
-        missing_skills = job_skills - candidate_skills
-        extra_skills = candidate_skills - job_skills
+        resume_skills=cls.extract_skills(candidate_text)
+        try:
+            candidate_skills = candidate_skills if candidate_skills else []
+            candidate_skills.extend(resume_skills)
+        except Exception as e:
+            print(f"Error: {e}")
+            candidate_skills = resume_skills
+        
+        match_skills = cls.match_skills(job_skills, candidate_skills)
+        # matching_skills = job_skills & candidate_skills
+        # missing_skills = job_skills - candidate_skills
+        # extra_skills = candidate_skills - job_skills
         
         return {
-            "matching_skills": sorted(matching_skills),
-            "missing_skills": sorted(missing_skills),
-            "extra_skills": sorted(extra_skills),
+            "matching_skills": list(match_skills["matching_skills"]),
+            "missing_skills": list(match_skills["missing_skills"]),
+            "extra_skills": list(match_skills["extra_skills"]),
             "total_job_skills": len(job_skills),
             "total_candidate_skills": len(candidate_skills),
-            "matching_skills_count": len(matching_skills),
-            "missing_skills_count": len(missing_skills),
-            "extra_skills_count": len(extra_skills)
+            "matching_skills_count": len(match_skills["matching_skills"]),
+            "missing_skills_count": len(match_skills["missing_skills"]),
+            "extra_skills_count": len(match_skills["extra_skills"])
         }
 
     @classmethod
@@ -116,12 +164,12 @@ class skill_ner:
         return resemblance_rate, analysis
 
     @classmethod
-    def get_skill_match_details(cls, job_text: str, candidate_text: str) -> Dict:
+    def get_skill_match_details(cls, job_text: str, candidate_text: str, candidate_skills: Optional[List[str]] = None) -> Dict:
         """
         Get detailed skill matching information between job and candidate.
         Includes skill categories and match percentages.
         """
-        analysis = cls.analyze_skills(job_text, candidate_text)
+        analysis = cls.analyze_skills(job_text, candidate_text, candidate_skills)
         
         # Calculate match percentages
         total_required = analysis["total_job_skills"]

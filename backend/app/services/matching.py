@@ -8,13 +8,15 @@ def match_candidates_client(
     candidates: List[str],
     skill_weight: Optional[float] = 0.4,
     embedding_weight: Optional[float] = 0.6,
-    matcher_url: str = MATCHER_URL
+    matcher_url: str = MATCHER_URL,
+    candidate_skills: Optional[List[str]] = None
 ):
     payload = {
         "job_description": job_description,
         "candidates": candidates,
         "skill_weight": skill_weight,
-        "embedding_weight": embedding_weight
+        "embedding_weight": embedding_weight,
+        "candidate_skills": candidate_skills
     }
     with httpx.Client() as client:
         response = client.post(matcher_url, json=payload,timeout=None)

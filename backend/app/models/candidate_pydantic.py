@@ -74,7 +74,7 @@ class CertificationItem(BaseModel):
 # Main model with flattened contact fields
 class CandidateResume(BaseModel):
     full_name: str = Field(..., description="Full name of the candidate.")
-    email: EmailStr = Field(..., description="Email of the candidate.")
+    email: Optional[EmailStr] = Field(None, description="Email of the candidate.")
     phone: Optional[str] = Field(None, description="Phone number of the candidate.")
     # created_at: datetime = Field(..., description="Datetime when this record was created.")
     # updated_at: datetime = Field(..., description="Datetime when this record was last updated.")
@@ -99,7 +99,7 @@ class CandidateResume(BaseModel):
     # web_addresses: List[HttpUrl] = Field(..., description="List of personal/professional websites.")
 
     # Candidate background
-    work_history: List[WorkHistoryItem] = Field(..., description="List of work experience entries.")
-    education: List[EducationItem] = Field(..., description="List of education history entries.")
-    skills: List[SkillItem] = Field(..., description="List of skills the candidate possesses.")
-    certifications: List[CertificationItem] = Field(..., description="List of certifications held by the candidate.")
+    work_history: Optional[List[WorkHistoryItem]] = Field(None, description="List of work experience entries.")
+    education: Optional[List[EducationItem]] = Field(None, description="List of education history entries.")
+    skills: Optional[List[SkillItem]] = Field(None, description="List of skills the candidate possesses.")
+    certifications: Optional[List[CertificationItem]] = Field(None, description="List of certifications held by the candidate.")

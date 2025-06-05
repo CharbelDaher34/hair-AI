@@ -2,10 +2,10 @@ import numpy as np
 from typing import List, Dict, Tuple
 import sys
 from pathlib import Path
-
+from typing import Optional
 # Add parent directory to path for imports
-project_root = Path(__file__).resolve().parent.parent.parent
-sys.path.insert(0, str(project_root))
+# project_root = Path(__file__).resolve().parent.parent.parent
+# sys.path.insert(0, str(project_root))
 
 from services.skills_module.ner_skills import skill_ner
 from sentence_transformers import SentenceTransformer
@@ -62,7 +62,8 @@ class Matcher:
         job_description: str,
         candidates: List[str],
         skill_weight: float = 0.4,
-        embedding_weight: float = 0.6
+        embedding_weight: float = 0.6,
+        candidate_skills: Optional[List[str]] = None
     ) -> List[Dict]:
         """
         Match candidates against a job description using both skill and embedding similarity.
@@ -83,11 +84,12 @@ class Matcher:
         
         for candidate in candidates:
             candidate_text = candidate
-            
+            print(f"candidate_skills: {candidate_skills}")
             # Get detailed skill analysis
             skill_analysis = self.skills_ner.get_skill_match_details(
                 job_description,
-                candidate_text
+                candidate_text,
+                candidate_skills
             )
             
             # Calculate embedding similarity

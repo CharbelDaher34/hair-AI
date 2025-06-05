@@ -43,6 +43,7 @@ def update_form_key(
 def delete_form_key(db: Session, *, form_key_id: int) -> Optional[FormKey]:
     db_form_key = db.get(FormKey, form_key_id)
     if db_form_key:
+        db.query(JobFormKeyConstraint).filter(JobFormKeyConstraint.form_key_id == form_key_id).delete()
         db.delete(db_form_key)
         db.commit()
     return db_form_key 
