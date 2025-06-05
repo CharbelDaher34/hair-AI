@@ -6,13 +6,14 @@ import base64
 import httpx
 import json
 from core.database import create_db_and_tables
+from models.candidate_pydantic import CandidateResume
 create_db_and_tables()
 # Import main directly since it's in the same directory
 # from main import app  # Direct import from same directory
 API_V1_PREFIX = "http://localhost:8017/api/v1"
 client = httpx.Client(base_url=API_V1_PREFIX)
 # client = TestClient(app)
-create_db_and_tables()
+# create_db_and_tables()
 
 
 def run_api_tests():
@@ -70,43 +71,64 @@ def run_api_tests():
         "recruited_to_id": None,
         "job_data": {}
     }
+    candidate_resume_data = {
+        "full_name": "Api Test Candidate",
+        "email": "candidate.api@example.com",
+        "phone": "1234567890",
+        "work_history": [
+            {
+                "job_title": "Software Engineer",
+                "employer": "ApiTestCo",
+                "location": "Remote",
+                "employment_type": "Full-time",
+                "start_date": "2021-01-01",
+                "end_date": None,
+                "summary": "Worked on API development."
+            }
+        ],
+        "education": [
+            {
+                "level": "Bachelor’s",
+                "degree_type": "Bachelor’s",
+                "subject": "Computer Science",
+                "start_date": "2017-09-01",
+                "end_date": "2021-06-01",
+                "institution": "Test University",
+                "gpa": 3.8,
+                "summary": "Graduated with honors."
+            }
+        ],
+        "skills": [
+            {"name": "Python", "category": "Programming Language", "level": "Expert"}
+        ],
+        "certifications": [
+            {"certification": "AWS Certified Developer", "certification_group": "Cloud", "issued_by": "Amazon", "issue_date": "2022-05-01"}
+        ]
+    }
     candidate_data = {
         "full_name": "Api Test Candidate",
         "email": "candidate.api@example.com",
         "phone": "1234567890",
         "resume_url": "https://example.com/resume1.pdf",
-        "parsed_resume": {"skills": ["python", "fastapi"], "summary": "Experienced developer."}
     }
     application_data_payload = {
         "form_responses": {"experience_api": "3 years", "status": "applied", "extra_field": "extra_value"}
         # candidate_id, job_id will be added dynamically
     }
     match_data_payload = {
-        "match_result": {
-            "results": [
-                {
-                    "candidate": "I am a python developer with 3 years of experience in FastAPI.",
-                    "score": 0.85,
-                    "skill_analysis": {
-                        "match_percentage": 50,
-                        "matching_skills": ["python"],
-                        "missing_skills": ["software engineer"],
-                        "extra_skills": [],
-                        "summary": {
-                            "total_required_skills": 2,
-                            "matching_skills_count": 1,
-                            "missing_skills_count": 1,
-                            "extra_skills_count": 0
-                        }
-                    },
-                    "embedding_similarity": 0.828,
-                    "weights": {
-                        "skill_weight": 0.4,
-                        "embedding_weight": 0.6
-                    }
-                }
-            ]
-        }
+        "score": 0.85,
+        "embedding_similarity": 0.828,
+        "match_percentage": 50,
+        "matching_skills": ["python"],
+        "missing_skills": ["software engineer"],
+        "extra_skills": [],
+        "total_required_skills": 2,
+        "matching_skills_count": 1,
+        "missing_skills_count": 1,
+        "extra_skills_count": 0,
+        "skill_weight": 0.4,
+        "embedding_weight": 0.6,
+        "status": "pending"
         # application_id will be added dynamically
     }
     company_data_target = {
@@ -313,64 +335,16 @@ def run_api_tests():
 
     # --- 8. Match ---
     try:
-        match_result = {"results": [
-            {
-                "candidate": "I am a python developer with 3 years of experience in FastAPI.",
-                "score": 0.697,
-                "skill_analysis": {
-                    "match_percentage": 50,
-                    "matching_skills": ["python"],
-                    "missing_skills": ["software engineer"],
-                    "extra_skills": [],
-                    "summary": {
-                        "total_required_skills": 2,
-                        "matching_skills_count": 1,
-                        "missing_skills_count": 1,
-                        "extra_skills_count": 0
-                    }
-                },
-                "embedding_similarity": 0.828,
-                "weights": {
-                    "skill_weight": 0.4,
-                    "embedding_weight": 0.6
-                }
-            }
-        ]}
+        
+        
         response = client.get(f"{API_V1_PREFIX}/matches/by-application/{application_id}")
         assert response.status_code == 200, response.text
         retrieved_matches = response.json()
         match_id = retrieved_matches[0]["id"]
         print(f"READ Matches: ID {match_id}")
     
-        # Update match_result, not top-level fields
-        match_update_data = {
-            "match_result": {
-                "results": [
-                    {
-                        "candidate": "Updated candidate",
-                        "score": 0.9,
-                        "skill_analysis": {
-                            "match_percentage": 100,
-                            "matching_skills": ["python", "software engineer"],
-                            "missing_skills": [],
-                            "extra_skills": [],
-                            "summary": {
-                                "total_required_skills": 2,
-                                "matching_skills_count": 2,
-                                "missing_skills_count": 0,
-                                "extra_skills_count": 0
-                            }
-                        },
-                        "embedding_similarity": 0.95,
-                        "weights": {
-                            "skill_weight": 0.5,
-                            "embedding_weight": 0.5
-                        }
-                    }
-                ]
-            }
-        }
-        response = client.patch(f"{API_V1_PREFIX}/matches/{match_id}", json=match_update_data)
+        
+        response = client.patch(f"{API_V1_PREFIX}/matches/{match_id}", json=match_data_payload)
         assert response.status_code == 200, response.text
         updated_match_res = response.json()
         updated_results = updated_match_res["match_result"]["results"]

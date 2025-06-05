@@ -12,6 +12,7 @@ dependencies = [
     "pydantic-ai>=0.2.6",
     "pydantic[email]>=2.11.4",
     "pymupdf>=1.25.5",
+    "rapidfuzz>=3.13.0",
     "sentence-transformers>=4.1.0",
     "skillner>=1.0.3",
     "spacy>=3.8.5",

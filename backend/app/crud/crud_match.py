@@ -1,6 +1,6 @@
 from typing import Any, Dict, Optional, Union, List, Tuple
 from copy import deepcopy
-
+import time
 from sqlmodel import Session, select
 
 from models.models import Match, Application, Candidate, Job
@@ -58,11 +58,15 @@ def create_match(db: Session, *, match_in: MatchCreate) -> Match:
 
     print(f"\n=== JOB DESCRIPTION ===\n{job_description}")
     print(f"\n=== CANDIDATE TEXT ===\n{candidate_text}")
-
+    candidate_resume = CandidateResume.model_validate(candidate.parsed_resume)
+    print(f"\n=== CANDIDATE SKILLS ===\n{candidate_resume.skills}")
+  
     # Call the AI matcher
     ai_response = match_candidates_client(
         job_description=job_description,
-        candidates=candidates
+        candidates=candidates,
+        candidate_skills=[skill.name for skill in candidate_resume.skills] if candidate_resume.skills else [],
+        
     )
     
     # print("\n\n\nai_response", ai_response)
