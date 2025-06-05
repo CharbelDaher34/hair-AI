@@ -6,6 +6,9 @@ from pathlib import Path
 
 
 from services.matcher.matcher import Matcher
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 matcher_instance = Matcher()
@@ -16,6 +19,7 @@ class MatchRequest(BaseModel):
     candidates: List[str] = Field(..., example=["I am a python developer with 3 years of experience in FastAPI."])
     skill_weight: Optional[float] = Field(0.4, ge=0, le=1, description="Weight for skill-based similarity, between 0 and 1.")
     embedding_weight: Optional[float] = Field(0.6, ge=0, le=1, description="Weight for embedding-based similarity, between 0 and 1.")
+    candidate_skills: Optional[List[str]] = Field([], description="List of skills the candidate possesses.")
 
 class SkillAnalysisDetail(BaseModel):
     match_percentage: float
@@ -55,7 +59,8 @@ async def match_candidates_endpoint(request: MatchRequest):
             job_description=request.job_description,
             candidates=candidates_data,
             skill_weight=request.skill_weight,
-            embedding_weight=request.embedding_weight
+            embedding_weight=request.embedding_weight,
+            candidate_skills=request.candidate_skills
         )
         
         # Convert results back to Pydantic models for the response

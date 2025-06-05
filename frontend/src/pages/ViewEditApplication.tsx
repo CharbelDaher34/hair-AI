@@ -342,11 +342,11 @@ const ViewApplication = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 pt-4">
-              {application_data.form_responses && Object.keys(application_data.form_responses).length > 0 ? (
-                  Object.entries(application_data.form_responses).map(([key, value]) => (
-                  <div key={key} className="space-y-1 pb-3 mb-3 border-b border-slate-200 last:border-b-0 last:pb-0 last:mb-0">
-                    <Label className="text-sm font-semibold text-gray-700">{key.split('_').join(' ').replace(/\b\w/g, l => l.toUpperCase())}</Label>
-                    <p className="text-gray-800 bg-slate-100 p-3 rounded-md whitespace-pre-wrap">{String(value)}</p>
+              {application_data.form_responses && Array.isArray(application_data.form_responses) && application_data.form_responses.length > 0 ? (
+                  application_data.form_responses.map((response: any, index: number) => (
+                  <div key={index} className="space-y-1 pb-3 mb-3 border-b border-slate-200 last:border-b-0 last:pb-0 last:mb-0">
+                    <Label className="text-sm font-semibold text-gray-700">{response.name}</Label>
+                    <p className="text-gray-800 bg-slate-100 p-3 rounded-md whitespace-pre-wrap">{String(response.value)}</p>
                   </div>
                 ))
               ) : (
@@ -368,9 +368,9 @@ const ViewApplication = () => {
                   <div className="space-y-2">
                     <Label className="text-sm font-semibold text-gray-700">Skills</Label>
                     <div className="flex flex-wrap gap-2">
-                      {parsed_resume.skills.map((skill: string, index: number) => (
+                      {parsed_resume.skills.map((skill: any, index: number) => (
                         <Badge key={index} variant="secondary" className="bg-blue-100 text-blue-700 border-blue-200 text-sm px-3 py-1">
-                          {skill}
+                          {typeof skill === 'string' ? skill : skill.name}
                         </Badge>
                       ))}
                     </div>
@@ -413,8 +413,8 @@ const ViewApplication = () => {
               </div>
               <div className="space-y-1">
                 <Label className="text-sm font-semibold text-gray-700">Status</Label>
-                <Badge variant={application_data.status === 'active' ? 'default' : 'secondary'} className="font-medium">
-                    {application_data.status ? application_data.status.charAt(0).toUpperCase() + application_data.status.slice(1) : "N/A"}
+                <Badge variant={application_data.job?.status === 'active' ? 'default' : 'secondary'} className="font-medium">
+                    {application_data.job?.status || "N/A"}
                 </Badge>
               </div>
               <div className="space-y-1">

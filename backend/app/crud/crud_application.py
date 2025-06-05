@@ -1,8 +1,9 @@
 from typing import Any, Dict, Optional, Union, List
 
 from sqlmodel import Session, select, func
+from sqlalchemy.orm import selectinload
 
-from models.models import Application, Match, Job, Candidate
+from models.models import Application, Match, Job, Candidate, FormKey, JobFormKeyConstraint
 from schemas import ApplicationCreate, ApplicationUpdate
 from .crud_job import get_job
 
@@ -37,15 +38,41 @@ def get_random_applications_by_employer(db: Session, employer_id: int, skip: int
 
 
 def get_application_with_details(db: Session, application_id: int) -> Optional[Application]:
-    """Get application with candidate and job details"""
+    """Get application with candidate, job details, and transformed form_responses."""
     statement = (
         select(Application)
         .where(Application.id == application_id)
+        .options(
+            selectinload(Application.candidate),
+            selectinload(Application.job).selectinload(Job.form_key_constraints).selectinload(JobFormKeyConstraint.form_key)
+        )
     )
     application = db.exec(statement).first()
+
     if application:
-        # Load relationships
-        db.refresh(application, ["candidate", "job"])
+        # Transform form_responses from Dict to List[FormResponseItem]
+        if application.form_responses and isinstance(application.form_responses, dict) and application.job:
+            transformed_responses = []
+            
+            # Create a mapping of form_key_id to FormKey.name
+            form_key_mapping = {}
+            if application.job.form_key_constraints:
+                for constraint in application.job.form_key_constraints:
+                    if constraint.form_key:
+                        # Map both the form_key.id and form_key.name as potential keys
+                        form_key_mapping[str(constraint.form_key.id)] = constraint.form_key.name
+                        form_key_mapping[constraint.form_key.name] = constraint.form_key.name
+            
+            # Transform the form_responses using the actual FormKey names
+            for key, value in application.form_responses.items():
+                form_key_name = form_key_mapping.get(key, key)  # Fallback to original key if not found
+                transformed_responses.append({"name": form_key_name, "value": value})
+            
+            application.form_responses = transformed_responses
+        elif not application.form_responses:
+            # Ensure it's an empty list if None or already empty, to match the new schema type
+            application.form_responses = []
+
     return application
 
 

@@ -1,3 +1,4 @@
+import time
 from sqlmodel import Session
 
 from core.database import get_session, create_db_and_tables
@@ -57,8 +58,8 @@ def display_company_relations(db: Session, employer_id: int):
     jobs_posted = get_jobs_by_employer(db, employer_id=company.id)
     if jobs_posted:
         for job in jobs_posted:
-            print(f"    - Job ID: {job.id}, Title: '{job.job_data.get('title', 'N/A')}', Status: {job.status}")
-            hr_creator = get_hr(db, hr_id=job.created_by)
+            print(f"    - Job ID: {job.id}, Title: '{job.title}', Status: {job.status}")
+            hr_creator = get_hr(db, hr_id=job.created_by_hr_id)
             if hr_creator:
                 print(f"      Created By HR: {hr_creator.full_name} (ID: {hr_creator.id})")
             
@@ -85,7 +86,8 @@ def display_company_relations(db: Session, employer_id: int):
                     matches = get_matches_by_application(db, application_id=app.id)
                     if matches:
                         for match_obj in matches: # Renamed to avoid conflict
-                            print(f"            - Match ID: {match_obj.id}, Match Result: {match_obj.match_result}")
+                            print(f"            - Match ID: {match_obj[0].id}, Match Score: {match_obj[0].score}")
+                            print(f"            - Candidate: {match_obj[1].full_name}")
                     else:
                         print("            No matches for this application.")
             else:
@@ -113,10 +115,10 @@ def display_company_relations(db: Session, employer_id: int):
         for job in company.recruited_jobs:
             employer_company = get_company(db, employer_id=job.employer_id) # This is the recruiter company
             employer_info = f"Recruiter: {employer_company.name} (ID: {employer_company.id})" if employer_company else "Unknown Recruiter"
-            hr_creator = get_hr(db, hr_id=job.created_by)
+            hr_creator = get_hr(db, hr_id=job.created_by_hr_id)
             creator_info = f"Created by HR: {hr_creator.full_name} (ID: {hr_creator.id}) at {employer_company.name}" if hr_creator and employer_company else ""
 
-            print(f"    - Job ID: {job.id}, Title: '{job.job_data.get('title', 'N/A')}', Status: {job.status}")
+            print(f"    - Job ID: {job.id}, Title: '{job.title}', Status: {job.status}")
             print(f"      {employer_info}")
             if creator_info:
                 print(f"      {creator_info}")
