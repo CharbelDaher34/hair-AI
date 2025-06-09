@@ -6,13 +6,17 @@ from crud import crud_company
 from schemas.form_key import FormKeyRead
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlmodel import Session
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from core.database import get_session
 from crud import crud_job, crud_form_key
 from schemas import JobCreate, JobUpdate, JobRead, CompanyRead, MatchRead
-from schemas.job import JobAnalytics
+from schemas.job import JobAnalytics, jobGeneratedData
 from core.security import TokenData
+from models.models import Company, JobType, ExperienceLevel, SeniorityLevel
+from services.resume_upload import AgentClient
+from sqlalchemy import Column
+from sqlalchemy.types import Enum as SQLAlchemyEnum
 
 router = APIRouter()
 
@@ -211,6 +215,9 @@ class MatchResponseWithDetails(BaseModel):
     matches: List[MatchCandidateResponse]
     job: JobRead
 
+class JobGenerationRequest(BaseModel):
+    data: str
+
 @router.get("/matches/{job_id}", response_model=MatchResponseWithDetails)
 def get_job_matches(
     *,
@@ -253,3 +260,64 @@ def get_job_matches(
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving matches: {str(e)}")
+  
+  
+  
+@router.post("/generate_description", response_model=jobGeneratedData)
+def generate_description(
+    *,
+    db: Session = Depends(get_session),
+    request_data: JobGenerationRequest,
+    request: Request
+) -> jobGeneratedData:
+    """Generate a description for a job"""
+    current_user: Optional[TokenData] = request.state.user
+    if not current_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials"
+        )
+    employer_id = current_user.employer_id
+    company_data = crud_company.get_company_data(db, employer_id)
+    if not company_data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Company not found"
+        )
+        
+    input = f'''
+    Company data: {company_data}
+    Job data: {request_data.data}
+    '''
+    client = AgentClient(
+        system_prompt="""You are an expert in writing and creating job descriptions for companies. You are given company data and job requirements as input text. Generate comprehensive job data based on this information.
+
+IMPORTANT: You must provide ALL fields in the exact JSON structure specified. Do not leave any field empty or null.
+
+Required JSON structure:
+{
+  "title": "string - Job title",
+  "description": "string - Detailed job description",
+  "compensation": {
+    "base_salary": integer - Annual salary in USD (e.g., 75000),
+    "benefits": ["string", "string"] - Array of benefit strings (e.g., ["Health Insurance", "401k Matching", "Remote Work"])
+  },
+  "job_type": "full_time|part_time|contract|internship",
+  "experience_level": "no_experience|1-3_years|3-5_years|5-7_years|7-10_years|10_plus_years",
+  "seniority_level": "entry|mid|senior",
+  "responsibilities": ["string", "string"] - Array of responsibility strings,
+  "skills": {
+    "hard_skills": ["string", "string"] - Array of technical skills,
+    "soft_skills": ["string", "string"] - Array of soft skills
+  },
+  "location": "string - Job location",
+  "job_category": "string - Job category (e.g., Software Engineering, Marketing, etc.)"
+}
+
+Generate realistic and appropriate values for all fields. If specific information is not provided, infer reasonable values based on the job context and company information.""",
+        schema=jobGeneratedData.model_json_schema(),
+        inputs=[input]
+    )
+    return client.parse()
+
+

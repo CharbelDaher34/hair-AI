@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -25,6 +27,65 @@ const ChatBot = () => {
   ]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const ws = useRef<WebSocket | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      toast({
+        title: "Authentication Error",
+        description: "You must be logged in to use the chat.",
+        variant: "destructive",
+      });
+      // maybe redirect to login page
+      return;
+    }
+
+    // Connect to the WebSocket server
+    ws.current = new WebSocket("ws://84.16.230.94:8017/api/v1/ws");
+
+    ws.current.onopen = () => {
+      console.log("WebSocket connected");
+      // Send the token for authentication
+      ws.current?.send(token);
+      setIsTyping(true); // Show typing indicator while waiting for initial message
+    };
+
+    ws.current.onmessage = (event) => {
+        setMessages(prev => [...prev, {
+            id: prev.length + 1,
+            type: "bot",
+            content: event.data,
+            timestamp: new Date(),
+        }]);
+        setIsTyping(false);
+    };
+
+    ws.current.onerror = (error) => {
+      console.error("WebSocket error:", error);
+      toast({
+        title: "Connection Error",
+        description: "Could not connect to the chat service.",
+        variant: "destructive",
+      });
+      setIsTyping(false);
+    };
+
+    ws.current.onclose = () => {
+      console.log("WebSocket disconnected");
+      setIsTyping(false);
+    };
+
+    // Clean up the connection when the component unmounts
+    return () => {
+      ws.current?.close();
+    };
+  }, []); // Empty dependency array means this effect runs once on mount
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   const quickQuestions = [
     "Show me this month's application trends",
@@ -34,7 +95,7 @@ const ChatBot = () => {
   ];
 
   const handleSendMessage = async () => {
-    if (!input.trim()) return;
+    if (!input.trim() || !ws.current || ws.current.readyState !== WebSocket.OPEN) return;
 
     const userMessage: Message = {
       id: messages.length + 1,
@@ -44,48 +105,12 @@ const ChatBot = () => {
     };
 
     setMessages(prev => [...prev, userMessage]);
+    
+    // Send message to the server
+    ws.current.send(input);
+
     setInput("");
     setIsTyping(true);
-
-    // Simulate AI response delay
-    setTimeout(() => {
-      const botResponse = generateBotResponse(input);
-      const botMessage: Message = {
-        id: messages.length + 2,
-        type: "bot",
-        content: botResponse,
-        timestamp: new Date(),
-      };
-      
-      setMessages(prev => [...prev, botMessage]);
-      setIsTyping(false);
-    }, 1500);
-  };
-
-  const generateBotResponse = (userInput: string): string => {
-    const lowerInput = userInput.toLowerCase();
-    
-    if (lowerInput.includes("application") || lowerInput.includes("trend")) {
-      return "Based on your recent data, applications have increased by 23% this month. The highest activity is for Frontend Developer positions (45 applications) followed by Product Manager roles (32 applications). Would you like me to break this down by week or source?";
-    }
-    
-    if (lowerInput.includes("conversion") || lowerInput.includes("rate")) {
-      return "Your top performing jobs by conversion rate are:\n\n1. UX Designer: 18% (5 hired from 28 applications)\n2. Frontend Developer: 16% (8 hired from 45 applications)\n3. Product Manager: 12% (4 hired from 32 applications)\n\nThe average time from application to hire is 18 days. Would you like strategies to improve these rates?";
-    }
-    
-    if (lowerInput.includes("drop") || lowerInput.includes("abandon")) {
-      return "The main candidate drop-off points are:\n\n• Experience section: 35% drop-off\n• Portfolio upload: 25% drop-off\n• Cover letter: 20% drop-off\n\nI recommend making the portfolio upload optional initially and adding a progress indicator to reduce abandonment. Should I provide more specific recommendations?";
-    }
-    
-    if (lowerInput.includes("interview")) {
-      return "Interview success rates by position:\n\n• UX Designer: 75% (9 successful from 12 interviews)\n• Backend Engineer: 67% (6 successful from 9 interviews)\n• Product Manager: 60% (6 successful from 10 interviews)\n\nThe average interview-to-hire time is 12 days. Would you like me to analyze interviewer performance or suggest interview optimizations?";
-    }
-    
-    if (lowerInput.includes("candidate") || lowerInput.includes("profile")) {
-      return "Your candidate pool shows strong diversity in experience levels. Top candidate sources are:\n\n• LinkedIn: 40%\n• Direct applications: 25%\n• Referrals: 20%\n• Job boards: 15%\n\nCandidates with 3-5 years experience have the highest success rate (72%). Need insights on any specific candidate segment?";
-    }
-    
-    return "I understand you're asking about HR data and insights. While I'm still learning about your specific metrics, I can help you analyze trends, compare performance across jobs, and identify optimization opportunities. Could you be more specific about what data you'd like me to examine?";
   };
 
   const handleQuickQuestion = (question: string) => {
@@ -149,7 +174,21 @@ const ChatBot = () => {
                           ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white ml-auto"
                           : "bg-white border border-gray-200"
                       }`}>
-                        <div className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</div>
+                        <div className="prose prose-sm max-w-none">
+                          <ReactMarkdown 
+                            remarkPlugins={[remarkGfm]}
+                            components={{
+                                table: ({node, ...props}) => <table className="min-w-full divide-y divide-gray-300" {...props} />,
+                                thead: ({node, ...props}) => <thead className="bg-gray-100" {...props} />,
+                                th: ({node, ...props}) => <th scope="col" className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider" {...props} />,
+                                tbody: ({node, ...props}) => <tbody className="bg-white divide-y divide-gray-200" {...props} />,
+                                tr: ({node, ...props}) => <tr className="hover:bg-gray-50" {...props} />,
+                                td: ({node, ...props}) => <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-800" {...props} />,
+                            }}
+                          >
+                            {message.content}
+                          </ReactMarkdown>
+                        </div>
                         <div className={`text-xs mt-2 ${
                           message.type === "user" ? "text-blue-100" : "text-gray-500"
                         }`}>
@@ -172,6 +211,7 @@ const ChatBot = () => {
                       </div>
                     </div>
                   )}
+                  <div ref={messagesEndRef} />
                 </div>
               </ScrollArea>
               

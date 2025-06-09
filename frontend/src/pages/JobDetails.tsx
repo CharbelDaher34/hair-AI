@@ -9,25 +9,31 @@ import { Link, useParams } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
 import apiService from "@/services/api";
 
+interface Compensation {
+  base_salary?: number;
+  benefits?: string[];
+}
+
+interface Skills {
+  hard_skills?: string[];
+  soft_skills?: string[];
+}
+
 interface Job {
   id: number;
   title: string;
   description: string;
   location: string;
-  salary_min?: number;
-  salary_max?: number;
+  department?: string;
+  compensation: Compensation;
   experience_level: string;
   seniority_level: string;
   job_type: string;
   job_category?: string;
+  responsibilities?: string[];
+  skills: Skills;
   status: string;
   recruited_to_id?: number;
-  job_data?: {
-    overview?: string;
-    requirements?: string;
-    objectives?: string;
-    auto_generate?: boolean;
-  };
   created_at?: string;
 }
 
@@ -108,15 +114,15 @@ const JobDetails = () => {
     copy_url();
   };
 
-  const format_salary = (min?: number, max?: number) => {
-    if (!min && !max) return "Not specified";
-    if (min && max) return `$${min.toLocaleString()} - $${max.toLocaleString()}`;
-    if (min) return `$${min.toLocaleString()}+`;
-    if (max) return `Up to $${max.toLocaleString()}`;
+  const format_salary = (compensation: Compensation) => {
+    if (!compensation) return "Not specified";
+    const { base_salary } = compensation;
+    if (base_salary) return `$${base_salary.toLocaleString()}`;
     return "Not specified";
   };
 
   const format_enum_value = (value: string) => {
+    if (!value) return '';
     return value.split('_').map(word => 
       word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
     ).join(' ');
@@ -209,39 +215,47 @@ const JobDetails = () => {
             </CardContent>
           </Card>
 
-          {job.job_data?.overview && (
+          {job.responsibilities && job.responsibilities.length > 0 && (
             <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
               <CardHeader className="pb-4">
-                <CardTitle className="text-xl font-bold text-gray-800">Overview</CardTitle>
+                <CardTitle className="text-xl font-bold text-gray-800">Responsibilities</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-gray-700 leading-relaxed text-base">{job.job_data.overview}</p>
+                <ul className="list-disc pl-5 space-y-2 text-gray-700">
+                  {job.responsibilities.map((item, index) => (
+                    <li key={index}>{item}</li>
+                  ))}
+                </ul>
               </CardContent>
             </Card>
           )}
 
-          {job.job_data?.requirements && (
-            <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
+          {(job.skills?.hard_skills?.length > 0 || job.skills?.soft_skills?.length > 0) && (
+             <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
               <CardHeader className="pb-4">
-                <CardTitle className="text-xl font-bold text-gray-800">Requirements</CardTitle>
+                <CardTitle className="text-xl font-bold text-gray-800">Skills</CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="whitespace-pre-line text-gray-700">
-                  {job.job_data.requirements}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {job.job_data?.objectives && (
-            <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-xl font-bold text-gray-800">Objectives</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="whitespace-pre-line text-gray-700">
-                  {job.job_data.objectives}
-                </div>
+              <CardContent className="space-y-4">
+                {job.skills.hard_skills && job.skills.hard_skills.length > 0 && (
+                  <div>
+                    <h4 className="font-semibold text-gray-700 mb-2">Hard Skills</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {job.skills.hard_skills.map((skill, index) => (
+                        <Badge key={index} variant="secondary">{skill}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {job.skills.soft_skills && job.skills.soft_skills.length > 0 && (
+                  <div>
+                    <h4 className="font-semibold text-gray-700 mb-2">Soft Skills</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {job.skills.soft_skills.map((skill, index) => (
+                        <Badge key={index} variant="outline">{skill}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}
@@ -252,41 +266,61 @@ const JobDetails = () => {
             <CardHeader className="pb-4">
               <CardTitle className="text-xl font-bold text-gray-800">Job Details</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-sm font-medium">Salary:</span>
-                <span className="text-sm text-gray-700">
-                  {format_salary(job.salary_min, job.salary_max)}
-                </span>
+            <CardContent className="space-y-4">
+              <div className="flex justify-between items-center text-gray-700">
+                <span className="font-semibold">Salary</span>
+                <Badge variant="success" className="text-base">{format_salary(job.compensation)}</Badge>
               </div>
-              <div className="flex justify-between">
-                <span className="text-sm font-medium">Job Type:</span>
-                <span className="text-sm text-gray-700">
-                  {format_enum_value(job.job_type)}
-                </span>
+              <Separator />
+              <div className="flex justify-between items-center text-gray-700">
+                <span className="font-semibold">Job Type</span>
+                <span className="font-medium">{format_enum_value(job.job_type)}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-sm font-medium">Experience Level:</span>
-                <span className="text-sm text-gray-700">
-                  {format_enum_value(job.experience_level)}
-                </span>
+              <Separator />
+              <div className="flex justify-between items-center text-gray-700">
+                <span className="font-semibold">Experience</span>
+                <span className="font-medium">{format_enum_value(job.experience_level)}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-sm font-medium">Seniority Level:</span>
-                <span className="text-sm text-gray-700">
-                  {format_enum_value(job.seniority_level)}
-                </span>
+              <Separator />
+              <div className="flex justify-between items-center text-gray-700">
+                <span className="font-semibold">Seniority</span>
+                <span className="font-medium">{format_enum_value(job.seniority_level)}</span>
               </div>
+               {job.department && (
+                <>
+                  <Separator />
+                  <div className="flex justify-between items-center text-gray-700">
+                    <span className="font-semibold">Department</span>
+                    <span className="font-medium">{job.department}</span>
+                  </div>
+                </>
+              )}
               {job.job_category && (
-                <div className="flex justify-between">
-                  <span className="text-sm font-medium">Category:</span>
-                  <span className="text-sm text-gray-700">
-                    {job.job_category}
-                  </span>
-                </div>
+                <>
+                  <Separator />
+                  <div className="flex justify-between items-center text-gray-700">
+                    <span className="font-semibold">Category</span>
+                    <span className="font-medium">{job.job_category}</span>
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>
+
+          {job.compensation?.benefits && job.compensation.benefits.length > 0 && (
+            <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-xl font-bold text-gray-800">Benefits</CardTitle>
+              </CardHeader>
+              <CardContent>
+                 <ul className="list-disc pl-5 space-y-2 text-gray-700">
+                  {job.compensation.benefits.map((item, index) => (
+                    <li key={index}>{item}</li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          )}
 
           <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
             <CardHeader className="pb-4">

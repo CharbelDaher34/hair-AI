@@ -5,7 +5,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, Union, get_args, get_origin
 import inspect
 
-from client import ResumeParserClient
+from client import AgentClient
 from elasticsearch import Elasticsearch
 from pydantic import BaseModel, Field, create_model, field_validator, ValidationInfo
 
@@ -736,7 +736,7 @@ Now, analyze the user's query and provide the appropriate filters:
                     print(f"    (Part of array structure)") 
     
     def generate_filters_from_query(self, query: str):
-        client = ResumeParserClient(
+        client = AgentClient(
             system_prompt=self.generate_system_prompt(),
             schema=self.generate_filter_model().model_json_schema(),
             inputs=[query]
