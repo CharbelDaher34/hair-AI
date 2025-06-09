@@ -1,0 +1,22 @@
+[project]
+name = "mcp-sqlalchemy-server"
+version = "0.3.1"
+description = "A simple MCP ODBC server using FastAPI and ODBC"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+
+]
+[[project.authors]]
+name = "Sergey Malinin"
+email = "sergmalinin@gmail.com"
+
+[build-system]
+requires = [ "hatchling",]
+build-backend = "hatchling.build"
+
+[tool.uv.workspace]
+members = ["mcp"]
+
+[project.scripts]
+mcp-sqlalchemy-server = "mcp_sqlalchemy_server:main"

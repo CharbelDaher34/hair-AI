@@ -1,6 +1,6 @@
-from typing import Optional, List, Dict, Union, Any
-from pydantic import BaseModel
-from models.models import ApplicationBase, Application
+from typing import Optional, List, Any
+from pydantic import BaseModel, field_validator
+from models.models import ApplicationBase
 from utils.pydantic_utils import make_optional
 from schemas.candidate import CandidateRead
 from schemas.job import JobRead
@@ -31,3 +31,9 @@ class ApplicationWithDetails(ApplicationRead):
     job: Optional[JobRead] = None
     # Override form_responses to use the new structure
     form_responses: Optional[List[FormResponseItem]] = None
+
+    @field_validator("form_responses",mode="before")
+    def transform_form_responses_dict_to_list(cls, v):
+        if isinstance(v, dict):
+            return [{"name": str(key), "value": value} for key, value in v.items()]
+        return v

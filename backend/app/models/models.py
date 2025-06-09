@@ -3,7 +3,7 @@ from typing import Optional, List, Dict, Union
 from sqlmodel import SQLModel, Field, Relationship, Column, Text
 from sqlalchemy import Boolean, JSON, Enum as SQLAlchemyEnum, UniqueConstraint
 from datetime import datetime
-from pydantic import validator
+from pydantic import field_validator
 from models.candidate_pydantic import CandidateResume
 
 class TimeBase(SQLModel):
@@ -20,7 +20,6 @@ class CompanyBase(TimeBase):
     logo_url: Optional[str] = None
     is_owner: bool = Field(default=False)
     domain: Optional[str] = Field(default=None,description="The domain of the company example: @gmail.com")
-
 
 class Company(CompanyBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -43,6 +42,10 @@ class Company(CompanyBase, table=True):
         back_populates="recruited_to",
         sa_relationship_kwargs={"foreign_keys": "Job.recruited_to_id"}
     )
+    
+
+    def get_company_data(self):
+        return f"company(name={self.name},/n description={self.description},/n industry={self.industry},/n bio={self.bio},/n website={self.website},/n logo_url={self.logo_url},/n is_owner={self.is_owner},/n domain={self.domain})"
 
 
 class HRBase(TimeBase):
@@ -138,21 +141,61 @@ class ExperienceLevel(str,Enum):
     SEVEN_TO_TEN_YEARS = "7-10_years"
     TEN_PLUS_YEARS = "10_plus_years"
 
+
+class skills_base(SQLModel):
+    hard_skills: list[str] = Field(default=[])
+    soft_skills: list[str] = Field(default=[])
+class compensation_base(SQLModel):
+    base_salary: int = Field(default=None)
+    benefits: list[str] = Field(default=[])
+    
+
 class JobBase(TimeBase):
     employer_id: int = Field(foreign_key="company.id")
     recruited_to_id: Optional[int] = Field(default=None, foreign_key="company.id")
     created_by_hr_id: int = Field(foreign_key="hr.id")
     status: Status = Field(default=Status.DRAFT,sa_column=Column(SQLAlchemyEnum(Status, name="status_enum", create_type=True)))
+    department: Optional[str] = Field(default=None)
     title: str
     description: str
     location: str
-    salary_min: Optional[int] = Field(default=None)
-    salary_max: Optional[int] = Field(default=None)
+    compensation: compensation_base = Field(default=None, sa_column=Column(JSON))
     experience_level: ExperienceLevel = Field(default=ExperienceLevel.NO_EXPERIENCE,sa_column=Column(SQLAlchemyEnum(ExperienceLevel, name="experiencelevel_enum", create_type=True)))
     seniority_level: SeniorityLevel = Field(default=SeniorityLevel.ENTRY,sa_column=Column(SQLAlchemyEnum(SeniorityLevel, name="senioritylevel_enum", create_type=True)))
     job_type: JobType = Field(default=JobType.FULL_TIME,sa_column=Column(SQLAlchemyEnum(JobType, name="jobtype_enum", create_type=True)))
     job_category: Optional[str] = Field(default=None)
-
+    responsibilities: Optional[list[str]] = Field(default=None, sa_column=Column(JSON))
+    skills: skills_base = Field(default=None, sa_column=Column(JSON))
+    
+    @field_validator('compensation','skills')
+    def validate_compensation_and_skills(cls, v, info):
+        if v is not None:
+            # Convert SQLModel objects to dictionaries
+            if hasattr(v, 'model_dump'):
+                v = v.model_dump()
+            
+            if not isinstance(v, dict):
+                raise ValueError(f"{info.field_name} must be a dictionary")
+            
+            # Validate compensation structure
+            if info.field_name == 'compensation':
+                if 'base_salary' not in v:
+                    raise ValueError("compensation must contain a base_salary field")
+                # Ensure base_salary is an integer or None
+                if v.get('base_salary') is not None and not isinstance(v['base_salary'], int):
+                    raise ValueError("compensation.base_salary must be an integer or None")
+            
+            # Validate skills structure
+            elif info.field_name == 'skills':
+                if 'hard_skills' not in v or 'soft_skills' not in v:
+                    raise ValueError("skills must contain hard_skills and soft_skills fields")
+                # Ensure skills are lists
+                if not isinstance(v.get('hard_skills'), list):
+                    raise ValueError("skills.hard_skills must be a list")
+                if not isinstance(v.get('soft_skills'), list):
+                    raise ValueError("skills.soft_skills must be a list")
+        
+        return v
 
 class Job(JobBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)

@@ -3,31 +3,54 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from "recharts";
 import { TrendingUp, Users, FileText, Calendar, Target } from "lucide-react";
+import { useEffect, useState } from "react";
+import apiService from "@/services/api";
 
 const CompanyAnalytics = () => {
+  const [analyticsData, setAnalyticsData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchAnalytics = async () => {
+      try {
+        // Hardcoded company ID for now
+        const data = await apiService.getCompanyAnalytics();
+        setAnalyticsData(data);
+      } catch (error) {
+        console.error("Failed to fetch company analytics:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAnalytics();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex-1 flex items-center justify-center h-screen">
+        <div className="text-2xl font-semibold">Loading analytics...</div>
+      </div>
+    );
+  }
+
+  if (!analyticsData) {
+    return (
+      <div className="flex-1 flex items-center justify-center h-screen">
+        <div className="text-2xl font-semibold text-red-500">Failed to load analytics data.</div>
+      </div>
+    );
+  }
+
   const stats = [
-    { title: "Total Jobs", value: "12", icon: FileText, change: "+16.7%" },
-    { title: "Total Applications", value: "248", icon: Users, change: "+23.1%" },
-    { title: "Total Interviews", value: "42", icon: Calendar, change: "+12.5%" },
-    { title: "Hire Rate", value: "68%", icon: Target, change: "+5.2%" },
+    { title: "Total Jobs", value: analyticsData.total_jobs, icon: FileText, change: "+16.7%" },
+    { title: "Total Applications", value: analyticsData.total_applications, icon: Users, change: "+23.1%" },
+    { title: "Total Interviews", value: analyticsData.total_interviews, icon: Calendar, change: "+12.5%" },
+    { title: "Hire Rate", value: `${analyticsData.hire_rate}%`, icon: Target, change: "+5.2%" },
   ];
 
-  const applicationsOverTime = [
-    { month: "Jan", applications: 45 },
-    { month: "Feb", applications: 52 },
-    { month: "Mar", applications: 48 },
-    { month: "Apr", applications: 61 },
-    { month: "May", applications: 55 },
-    { month: "Jun", applications: 67 },
-  ];
-
-  const jobPerformance = [
-    { job: "Frontend Dev", applications: 45, hired: 8 },
-    { job: "Backend Dev", applications: 38, hired: 6 },
-    { job: "Product Manager", applications: 32, hired: 4 },
-    { job: "UX Designer", applications: 28, hired: 5 },
-    { job: "Data Analyst", applications: 22, hired: 3 },
-  ];
+  const applicationsOverTime = analyticsData.applications_over_time;
+  const jobPerformance = analyticsData.job_performance;
 
   const completionRates = [
     { stage: "Form Started", value: 100, count: 248 },
@@ -134,7 +157,6 @@ const CompanyAnalytics = () => {
                   }} 
                 />
                 <Bar dataKey="applications" fill="#3b82f6" name="Applications" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="hired" fill="#8b5cf6" name="Hired" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>

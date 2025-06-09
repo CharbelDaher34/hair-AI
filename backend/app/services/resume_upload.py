@@ -37,7 +37,7 @@ def get_content_type(file_extension):
     }
     return content_types.get(file_extension)
 
-class ResumeParserClient:
+class AgentClient:
     def __init__(self, system_prompt: str, schema: Any, inputs: List[Any], url: str = "http://localhost:8011/parser/parse"):
         """
         :param system_prompt: The system prompt string for the LLM
@@ -113,7 +113,7 @@ class ResumeParserClient:
                 file_obj.close()
 
 if __name__ == "__main__":
-    print("Testing ResumeParserClient")
+    print("Testing AgentClient")
     print("=" * 40)
     # Example usage
     system_prompt = "Extract structured information from resumes. Focus on contact details, skills, and work experience."
@@ -126,5 +126,5 @@ if __name__ == "__main__":
         "/storage/hussein/matching/ai/app/services/llm/images.jpeg",
         # "Alice Johnson\nalice@example.com\nExpertise: Java, Spring Boot, AWS"
     ]
-    client = ResumeParserClient(system_prompt, schema.model_json_schema(), inputs)
+    client = AgentClient(system_prompt, schema.model_json_schema(), inputs)
     client.parse()

@@ -6,7 +6,7 @@ from elasticsearch import Elasticsearch
 from enum import Enum
 import json
 import time
-from client import ResumeParserClient
+from client import AgentClient
 # Comprehensive type mapping
 ES_TYPE_MAP = {
     "text": str,
@@ -679,14 +679,14 @@ class QueryFilters(BaseModel):
     filters: List[Query]
 
 print(system_prompt)
-client = ResumeParserClient(
+client = AgentClient(
     system_prompt=system_prompt,
     schema=QueryFilters.model_json_schema(),
     inputs=["what did i spend my money last summer? give me the amount spent on trips, expensive items, and using my gold credit card"]
 )
 print(json.dumps(client.parse(), indent=2))
 
-client = ResumeParserClient(
+client = AgentClient(
     system_prompt=system_prompt,
     schema=QueryFilters.model_json_schema(),
     inputs=["what did i spend my money last summer?, focus on tech and food expensive transactions"]

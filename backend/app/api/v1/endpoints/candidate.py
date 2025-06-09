@@ -17,7 +17,7 @@ from crud import crud_candidate
 from schemas import CandidateCreate, CandidateUpdate, CandidateRead
 from utils.file_utils import save_resume_file, get_resume_file_path, delete_resume_file
 from models.candidate_pydantic import CandidateResume
-from services.resume_upload import ResumeParserClient
+from services.resume_upload import AgentClient
 
 router = APIRouter()
 
@@ -43,12 +43,12 @@ def parse_resume_background(candidate_id: int, resume_file_path: str, max_retrie
                 print(f"[Background] Resume file not found: {absolute_resume_file_path}")
                 return
             
-            # Use ResumeParserClient to parse the resume
+            # Use AgentClient to parse the resume
             system_prompt = "Extract structured information from resumes. Focus on contact details, skills, and work experience."
             schema = CandidateResume.model_json_schema()
             
             print(f"[Background] Creating parser client for candidate {candidate_id}")
-            parser_client = ResumeParserClient(system_prompt, schema, [absolute_resume_file_path])
+            parser_client = AgentClient(system_prompt, schema, [absolute_resume_file_path])
             
             print(f"[Background] Starting parsing for candidate {candidate_id}")
             parsed_result = parser_client.parse()

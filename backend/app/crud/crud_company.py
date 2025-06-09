@@ -70,6 +70,14 @@ def get_recruit_to_companies(db: Session, employer_id: int) -> List[CompanyRead]
         companies.append(current_company)
     
     return [CompanyRead.model_validate(company) for company in companies]
+
+
+def get_company_data(db: Session, employer_id: int) -> Optional[str]:
+    """Get the string representation of company data."""
+    company = db.get(Company, employer_id)
+    if company:
+        return company.get_company_data()
+    return None
   
 
   
