@@ -401,6 +401,17 @@ class ApiService {
     return this.request(`/jobs/matches/${jobId}`);
   }
 
+  async generateJobDescription(data) {
+    return this.request('/jobs/generate_description', {
+      method: 'POST',
+      body: JSON.stringify({ data }),
+    });
+  }
+
+  async getCompanyAnalytics() {
+    return this.request(`/analytics/company/`);
+  }
+
   async changePassword(passwordData) {
     return this.request('/auth/change-password', {
       method: 'POST',

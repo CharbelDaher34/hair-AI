@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, HTTPException, Depends
+from fastapi import FastAPI, Request, HTTPException, Depends, APIRouter
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.security import HTTPBearer
@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 import uvicorn
 import os
 from fastapi.middleware.cors import CORSMiddleware
-from api.v1.endpoints import company, hr, recruiter_company_link, form_key, job, job_form_key_constraint, application, match, candidate, auth, interview, scripts
+from api.v1.endpoints import company, hr, recruiter_company_link, form_key, job, job_form_key_constraint, application, match, candidate, auth, interview, scripts, analytics, chatbot
 # from api.v1.endpoints import auth as auth_router
 
 # Get debug mode from environment variable, default to True
@@ -42,8 +42,10 @@ app = FastAPI(
     description="API for the matching application with JWT Bearer authentication.",
     version="1.0.0",
     lifespan=lifespan,
-    dependencies=[Depends(swagger_ui_bearer_scheme)] # Add as global dependency for Swagger UI
 )
+
+# Create a router for all API v1 endpoints that need bearer auth for Swagger
+api_v1_router = APIRouter(dependencies=[Depends(swagger_ui_bearer_scheme)])
 
 app.add_middleware(
     CORSMiddleware,
@@ -88,18 +90,25 @@ app.add_middleware(AuthMiddleware)
 
 
 # Include routers
-app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
-app.include_router(company.router, prefix="/api/v1/companies", tags=["companies"])
-app.include_router(hr.router, prefix="/api/v1/hrs", tags=["hrs"])
-app.include_router(recruiter_company_link.router, prefix="/api/v1/recruiter_company_links", tags=["recruiter_company_links"])
-app.include_router(form_key.router, prefix="/api/v1/form_keys", tags=["form_keys"])
-app.include_router(job.router, prefix="/api/v1/jobs", tags=["jobs"])
-app.include_router(job_form_key_constraint.router, prefix="/api/v1/job_form_key_constraints", tags=["job_form_key_constraints"])
-app.include_router(application.router, prefix="/api/v1/applications", tags=["applications"])
-app.include_router(match.router, prefix="/api/v1/matches", tags=["matches"])
-app.include_router(interview.router, prefix="/api/v1/interviews", tags=["interviews"])
-app.include_router(candidate.router, prefix="/api/v1/candidates", tags=["candidates"])
-app.include_router(scripts.router, prefix="/api/v1/admin/scripts", tags=["admin-scripts"])
+api_v1_router.include_router(auth.router, prefix="/auth", tags=["auth"])
+api_v1_router.include_router(company.router, prefix="/companies", tags=["companies"])
+api_v1_router.include_router(hr.router, prefix="/hrs", tags=["hrs"])
+api_v1_router.include_router(recruiter_company_link.router, prefix="/recruiter_company_links", tags=["recruiter_company_links"])
+api_v1_router.include_router(form_key.router, prefix="/form_keys", tags=["form_keys"])
+api_v1_router.include_router(job.router, prefix="/jobs", tags=["jobs"])
+api_v1_router.include_router(job_form_key_constraint.router, prefix="/job_form_key_constraints", tags=["job_form_key_constraints"])
+api_v1_router.include_router(application.router, prefix="/applications", tags=["applications"])
+api_v1_router.include_router(match.router, prefix="/matches", tags=["matches"])
+api_v1_router.include_router(interview.router, prefix="/interviews", tags=["interviews"])
+api_v1_router.include_router(candidate.router, prefix="/candidates", tags=["candidates"])
+api_v1_router.include_router(scripts.router, prefix="/admin/scripts", tags=["admin-scripts"])
+api_v1_router.include_router(analytics.router, prefix="/analytics", tags=["analytics"])
+
+# Include the v1 router into the main app
+app.include_router(api_v1_router, prefix="/api/v1")
+
+# Include the chatbot router separately since it uses WebSocket protocol
+app.include_router(chatbot.router, prefix="/api/v1", tags=["chatbot"])
 
 @app.get("/", summary="Root endpoint for API health and info")
 async def root():

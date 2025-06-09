@@ -43,8 +43,8 @@ from crud import (
 
 from core.database import get_session, create_db_and_tables
 
-# Add import for ResumeParserClient
-from services.resume_upload import ResumeParserClient
+# Add import for AgentClient
+from services.resume_upload import AgentClient
 
 from pydantic import BaseModel
 from typing import Optional
@@ -179,13 +179,13 @@ def run_sequential_crud_tests():
 
         # --- 6. Candidate ---
         print("\n--- Testing Candidate ---")
-        # Use ResumeParserClient to parse the candidate's resume text
+        # Use AgentClient to parse the candidate's resume text
         resume_text = candidate_data["full_name"] + "\n" + candidate_data["email"] + "\n" + candidate_data["phone"]
         pdf="/storage/hussein/matching/ai/app/services/llm/Charbel_Daher_Resume.pdf"
         system_prompt = "Extract structured information from resumes. Focus on contact details, skills, and work experience."
         # Use the Candidates schema from resume_upload.py
         schema = Resume_Data.model_json_schema()
-        parser_client = ResumeParserClient(system_prompt, schema, [pdf])
+        parser_client = AgentClient(system_prompt, schema, [pdf])
         parsed_result = parser_client.parse()
         # Store the parsed result in parsed_resume field
         candidate_data["parsed_resume"] = parsed_result

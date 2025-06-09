@@ -61,15 +61,27 @@ def run_api_tests():
         "title": "API Software Engineer",
         "description": "Develop software via API",
         "location": "Remote",
-        "salary_min": 100000,
-        "salary_max": 150000,
+        "department": "Engineering",
+        "compensation": {
+            "base_salary": 120000,
+            "benefits": ["Health Insurance", "401(k) Matching", "Remote Work"]
+        },
         "experience_level": "1-3_years",
         "seniority_level": "entry",
         "status": "published",
         "job_type": "full_time",
         "job_category": "software_engineering",
-        "recruited_to_id": None,
-        "job_data": {}
+        "responsibilities": [
+            "Develop and maintain API endpoints",
+            "Write clean, maintainable code",
+            "Collaborate with cross-functional teams",
+            "Participate in code reviews"
+        ],
+        "skills": {
+            "hard_skills": ["Python", "FastAPI", "SQL", "Docker"],
+            "soft_skills": ["Communication", "Problem Solving", "Teamwork"]
+        },
+        "recruited_to_id": None
     }
     candidate_resume_data = {
         "full_name": "Api Test Candidate",
@@ -88,8 +100,8 @@ def run_api_tests():
         ],
         "education": [
             {
-                "level": "Bachelor’s",
-                "degree_type": "Bachelor’s",
+                "level": "Bachelor's",
+                "degree_type": "Bachelor's",
                 "subject": "Computer Science",
                 "start_date": "2017-09-01",
                 "end_date": "2021-06-01",
@@ -232,11 +244,15 @@ def run_api_tests():
     assert created_job["title"] == job_data_payload["title"]
     assert created_job["description"] == job_data_payload["description"]
     assert created_job["location"] == job_data_payload["location"]
-    assert created_job["salary_min"] == job_data_payload["salary_min"]
-    assert created_job["salary_max"] == job_data_payload["salary_max"]
+    assert created_job["department"] == job_data_payload["department"]
+    assert created_job["compensation"] == job_data_payload["compensation"]
     assert created_job["experience_level"] == job_data_payload["experience_level"]
     assert created_job["seniority_level"] == job_data_payload["seniority_level"]
+    assert created_job["status"] == job_data_payload["status"]
     assert created_job["job_type"] == job_data_payload["job_type"]
+    assert created_job["job_category"] == job_data_payload["job_category"]
+    assert created_job["responsibilities"] == job_data_payload["responsibilities"]
+    assert created_job["skills"] == job_data_payload["skills"]
     job_id = created_job["id"]
     print(f"CREATE Job: '{created_job['title']}' (ID: {job_id}) for Company ID: {employer_id}, HR ID: {hr_id}")
 
@@ -406,15 +422,27 @@ def run_api_tests():
         "title": "Senior API Software Engineer",
         "description": "Recruited position for ApiTestCo",
         "location": "Remote",
-        "salary_min": 100000,
-        "salary_max": 150000,
-        "experience_level": "1-3_years",
-        "seniority_level": "entry",
+        "department": "Engineering",
+        "compensation": {
+            "base_salary": 150000,
+            "benefits": ["Health Insurance", "401(k) Matching", "Remote Work", "Stock Options"]
+        },
+        "experience_level": "3-5_years",
+        "seniority_level": "mid",
         "status": "published",
         "job_type": "full_time",
         "job_category": "software_engineering",
-        "recruited_to_id": employer_id,
-        "job_data": {}
+        "responsibilities": [
+            "Lead API development projects",
+            "Mentor junior developers",
+            "Design scalable architectures",
+            "Collaborate with product teams"
+        ],
+        "skills": {
+            "hard_skills": ["Python", "FastAPI", "SQL", "Docker", "Kubernetes", "AWS"],
+            "soft_skills": ["Leadership", "Communication", "Problem Solving", "Teamwork"]
+        },
+        "recruited_to_id": employer_id
     }
     
     recruiter_job_create_data = {
@@ -427,12 +455,14 @@ def run_api_tests():
     assert created_recruiter_job["title"] == recruiter_job_data_payload["title"]
     assert created_recruiter_job["description"] == recruiter_job_data_payload["description"]
     assert created_recruiter_job["location"] == recruiter_job_data_payload["location"]
-    assert created_recruiter_job["salary_min"] == recruiter_job_data_payload["salary_min"]
-    assert created_recruiter_job["salary_max"] == recruiter_job_data_payload["salary_max"]
+    assert created_recruiter_job["compensation"] == recruiter_job_data_payload["compensation"]
     assert created_recruiter_job["experience_level"] == recruiter_job_data_payload["experience_level"]
     assert created_recruiter_job["seniority_level"] == recruiter_job_data_payload["seniority_level"]
+    assert created_recruiter_job["status"] == recruiter_job_data_payload["status"]
     assert created_recruiter_job["job_type"] == recruiter_job_data_payload["job_type"]
     assert created_recruiter_job["job_category"] == recruiter_job_data_payload["job_category"]
+    assert created_recruiter_job["responsibilities"] == recruiter_job_data_payload["responsibilities"]
+    assert created_recruiter_job["skills"] == recruiter_job_data_payload["skills"]
     print(f"CREATE Recruited Job: '{created_recruiter_job['title']}' (ID: {created_recruiter_job_id}) for Target Company ID: {employer_id}")
 
 

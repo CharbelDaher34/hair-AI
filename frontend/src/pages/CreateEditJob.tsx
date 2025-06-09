@@ -9,10 +9,31 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Copy, ExternalLink, Loader2 } from "lucide-react";
+import { Copy, ExternalLink, Loader2, Sparkles, Building2, DollarSign, Briefcase, Target, Users, Settings } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
 import apiService from "@/services/api";
+
+// Helper component for AI-generated field marker
+const AIGeneratedBadge = () => (
+  <Badge variant="secondary" className="ml-2 text-xs bg-gradient-to-r from-blue-100 to-purple-100 text-blue-700 border-blue-200">
+    <span className="mr-1">🤖</span>
+    AI Generated
+  </Badge>
+);
+
+// Helper component for section headers
+const SectionHeader = ({ icon: Icon, title, description }: { icon: any, title: string, description: string }) => (
+  <div className="flex items-center space-x-3 mb-6">
+    <div className="p-2 bg-blue-100 rounded-lg">
+      <Icon className="h-5 w-5 text-blue-600" />
+    </div>
+    <div>
+      <h3 className="text-xl font-semibold text-gray-900">{title}</h3>
+      <p className="text-sm text-gray-600">{description}</p>
+    </div>
+  </div>
+);
 
 interface FormKey {
   id: number;
@@ -35,6 +56,16 @@ interface Company {
   name: string;
   description?: string;
   industry?: string;
+}
+
+interface Compensation {
+  base_salary?: number | null;
+  benefits?: string[] | null;
+}
+
+interface Skills {
+  hard_skills?: string[] | null;
+  soft_skills?: string[] | null;
 }
 
 // Enums matching the backend
@@ -78,18 +109,22 @@ const CreateEditJob = () => {
     title: "",
     description: "",
     location: "",
-    salary_min: "",
-    salary_max: "",
+    department: "",
+    compensation: {
+      base_salary: 0,
+      benefits: [],
+    } as Compensation,
     experience_level: ExperienceLevel.NO_EXPERIENCE,
     seniority_level: SeniorityLevel.ENTRY,
     job_type: JobType.FULL_TIME,
     job_category: "",
+    responsibilities: [],
+    skills: {
+      hard_skills: [],
+      soft_skills: [],
+    } as Skills,
     status: JobStatus.DRAFT,
     recruited_to_id: null,
-    // Legacy fields for job_data JSON
-    overview: "",
-    requirements: "",
-    objectives: "",
     auto_generate: false,
   });
 
@@ -101,6 +136,9 @@ const CreateEditJob = () => {
   const [is_submitting, set_is_submitting] = useState(false);
   const [error, set_error] = useState<string | null>(null);
   const [generated_url, set_generated_url] = useState<string>("");
+  const [ai_input, set_ai_input] = useState<string>("");
+  const [is_generating, set_is_generating] = useState(false);
+  const [ai_generated_fields, set_ai_generated_fields] = useState<Set<string>>(new Set());
 
   const fetch_form_keys = async () => {
     try {
@@ -136,9 +174,9 @@ const CreateEditJob = () => {
     try {
       console.log("Fetching job data for ID:", job_id); // Debug log
       const job = await apiService.getJob(parseInt(job_id));
-      const job_info = job.job_data || {};
       
       console.log("Fetched job data:", job); // Debug log
+      console.log("Responsibilities from API:", job.responsibilities); // Debug log
       
       // Handle recruited_to_id properly
       let recruited_to_value = null;
@@ -150,22 +188,43 @@ const CreateEditJob = () => {
         title: job.title || "",
         description: job.description || "",
         location: job.location || "",
-        salary_min: job.salary_min?.toString() || "",
-        salary_max: job.salary_max?.toString() || "",
+        department: job.department || "",
+        compensation: {
+          base_salary: job.compensation?.base_salary || 0,
+          benefits: Array.isArray(job.compensation?.benefits) 
+            ? job.compensation.benefits 
+            : job.compensation?.benefits && typeof job.compensation.benefits === 'object' 
+              ? Object.values(job.compensation.benefits) 
+              : []
+        },
         experience_level: job.experience_level || ExperienceLevel.NO_EXPERIENCE,
         seniority_level: job.seniority_level || SeniorityLevel.ENTRY,
         job_type: job.job_type || JobType.FULL_TIME,
         job_category: job.job_category || "",
+        responsibilities: Array.isArray(job.responsibilities) 
+          ? job.responsibilities 
+          : job.responsibilities && typeof job.responsibilities === 'object' 
+            ? Object.values(job.responsibilities) 
+            : [],
+        skills: {
+          hard_skills: Array.isArray(job.skills?.hard_skills) 
+            ? job.skills.hard_skills 
+            : job.skills?.hard_skills && typeof job.skills.hard_skills === 'object' 
+              ? Object.values(job.skills.hard_skills) 
+              : [],
+          soft_skills: Array.isArray(job.skills?.soft_skills) 
+            ? job.skills.soft_skills 
+            : job.skills?.soft_skills && typeof job.skills.soft_skills === 'object' 
+              ? Object.values(job.skills.soft_skills) 
+              : []
+        },
         status: job.status || JobStatus.DRAFT,
         recruited_to_id: recruited_to_value,
-        // Legacy fields from job_data JSON
-        overview: job_info.overview || "",
-        requirements: job_info.requirements || "",
-        objectives: job_info.objectives || "",
-        auto_generate: job_info.auto_generate || false,
+        auto_generate: false, // This is a UI state, not from backend model
       };
       
       console.log("Setting job data:", new_job_data); // Debug log
+      console.log("Responsibilities in new_job_data:", new_job_data.responsibilities); // Debug log
       set_job_data(new_job_data);
 
       // Fetch constraints for this job
@@ -262,81 +321,178 @@ const CreateEditJob = () => {
     return url;
   };
 
-  const handle_save = async () => {
-    if (!job_data.title || !job_data.description || !job_data.location) {
+  const handle_ai_generate = async () => {
+    if (!ai_input.trim()) {
       toast({
-        title: "Error",
-        description: "Please fill in all required fields (title, description, location).",
+        title: "Input required",
+        description: "Please enter some text to generate job details.",
         variant: "destructive",
       });
       return;
     }
 
-    set_is_submitting(true);
+    set_is_generating(true);
+    set_ai_generated_fields(new Set()); // Reset on new generation
 
     try {
-      const job_payload = {
-        title: job_data.title,
-        description: job_data.description,
-        location: job_data.location,
-        salary_min: job_data.salary_min ? parseInt(job_data.salary_min) : null,
-        salary_max: job_data.salary_max ? parseInt(job_data.salary_max) : null,
-        experience_level: job_data.experience_level,
-        seniority_level: job_data.seniority_level,
-        job_type: job_data.job_type,
-        job_category: job_data.job_category || null,
-        status: job_data.status,
-        recruited_to_id: job_data.recruited_to_id === "none" ? null : job_data.recruited_to_id,
-        job_data: {
-          overview: job_data.overview,
-          requirements: job_data.requirements,
-          objectives: job_data.objectives,
-          auto_generate: job_data.auto_generate,
-        },
-      };
+      // Fix: Call the API with the correct structure - just pass the data string
+      const response = await apiService.generateJobDescription(ai_input);
+      
+      const new_ai_generated_fields = new Set<string>();
 
-      let saved_job;
-      if (is_editing && current_job_id) {
-        saved_job = await apiService.updateJob(parseInt(current_job_id), job_payload);
-        toast({
-          title: "Success",
-          description: "Job has been updated successfully.",
-        });
-      } else {
-        saved_job = await apiService.createJob(job_payload);
-        toast({
-          title: "Success",
-          description: "Job has been created successfully.",
-        });
+      const update_state_if_changed = (field: keyof typeof job_data, value: any) => {
+        if (value !== null && value !== undefined) {
+          if (typeof value === 'object' && value !== null) {
+            // For nested objects like compensation and skills
+            set_job_data(prev => ({ ...prev, [field]: { ...prev[field], ...value } }));
+          } else {
+            set_job_data(prev => ({ ...prev, [field]: value }));
+          }
+          new_ai_generated_fields.add(field);
+        }
+      };
+      
+      update_state_if_changed("title", response.title);
+      update_state_if_changed("description", response.description);
+      update_state_if_changed("location", response.location);
+      update_state_if_changed("job_type", response.job_type);
+      update_state_if_changed("experience_level", response.experience_level);
+      update_state_if_changed("seniority_level", response.seniority_level);
+      
+      if (response.compensation) {
+        update_state_if_changed("compensation", response.compensation);
+        new_ai_generated_fields.add("compensation.base_salary");
+      }
+      if (response.responsibilities) {
+        update_state_if_changed("responsibilities", response.responsibilities);
+      }
+      if (response.skills) {
+        update_state_if_changed("skills", response.skills);
+        new_ai_generated_fields.add("skills.hard_skills");
+        new_ai_generated_fields.add("skills.soft_skills");
       }
 
-      // Save constraints
-      if (saved_job && saved_job.id) {
-        // If editing, we might want to delete existing constraints first
-        // For now, we'll just create new ones
-        
-        for (const form_key_id of selected_form_keys) {
-          const constraint_data = {
-            job_id: saved_job.id,
-            form_key_id: form_key_id,
-            constraints: constraints[form_key_id] || {},
-          };
+      set_ai_generated_fields(new_ai_generated_fields);
 
-          try {
-            await apiService.createJobFormKeyConstraint(constraint_data);
-          } catch (error) {
-            console.error(`Failed to save constraint for form key ${form_key_id}:`, error);
-            // Continue with other constraints even if one fails
-          }
+      toast({
+        title: "Success",
+        description: "Job details have been generated by AI.",
+      });
+
+    } catch (error) {
+      console.error("AI generation failed:", error);
+      toast({
+        title: "AI Generation Failed",
+        description: error.message || "An unexpected error occurred.",
+        variant: "destructive",
+      });
+    } finally {
+      set_is_generating(false);
+    }
+  };
+
+  const handle_save = async () => {
+    set_is_submitting(true);
+    set_error(null);
+
+    // Basic validation
+    if (!job_data.title) {
+      set_error("Title is required");
+      set_is_submitting(false);
+      toast({
+        title: "Error",
+        description: "Job title is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Helper function to convert object-like arrays to proper arrays
+    const normalizeArray = (data: any): any[] => {
+      if (Array.isArray(data)) {
+        return data;
+      }
+      if (data && typeof data === 'object') {
+        return Object.values(data);
+      }
+      return [];
+    };
+
+    // Deep copy and prepare payload
+    const payload = JSON.parse(JSON.stringify(job_data));
+
+    // Normalize array fields to ensure they're proper arrays
+    payload.responsibilities = normalizeArray(payload.responsibilities);
+    
+    if (payload.skills) {
+      payload.skills.hard_skills = normalizeArray(payload.skills.hard_skills);
+      payload.skills.soft_skills = normalizeArray(payload.skills.soft_skills);
+    }
+    
+    if (payload.compensation && payload.compensation.benefits) {
+      payload.compensation.benefits = normalizeArray(payload.compensation.benefits);
+    }
+
+    // Convert salary to number
+    if (payload.compensation.base_salary) {
+      payload.compensation.base_salary = parseInt(payload.compensation.base_salary, 10);
+      if (isNaN(payload.compensation.base_salary)) {
+        payload.compensation.base_salary = null;
+      }
+    }
+
+    // recruited_to_id should be null if not set, not 0 or empty string
+    if (!payload.recruited_to_id) {
+      payload.recruited_to_id = null;
+    }
+    
+    // Remove UI-specific fields
+    delete payload.auto_generate;
+
+    console.log("Payload being sent to API:", payload); // Debug log
+
+    try {
+      let saved_job;
+      if (is_editing && current_job_id) {
+        saved_job = await apiService.updateJob(parseInt(current_job_id), payload);
+      } else {
+        saved_job = await apiService.createJob(payload);
+      }
+      
+      const new_job_id = saved_job.id;
+
+      // Save constraints if any are selected
+      if (selected_form_keys.length > 0) {
+        const constraint_payload: JobFormKeyConstraint[] = selected_form_keys.map(key_id => ({
+          job_id: new_job_id,
+          form_key_id: key_id,
+          constraints: constraints[key_id] || {},
+        }));
+
+        try {
+          await apiService.setConstraintsForJob(new_job_id, constraint_payload);
+        } catch (constraint_error) {
+          console.error("Failed to save constraints:", constraint_error);
+          toast({
+            title: "Warning",
+            description: "Job saved, but failed to save form constraints.",
+            variant: "destructive",
+          });
         }
       }
 
-      navigate("/jobs");
-    } catch (error) {
-      console.error('Failed to save job:', error);
+      toast({
+        title: "Success",
+        description: `Job ${is_editing ? 'updated' : 'created'} successfully.`,
+      });
+      navigate(`/job/${new_job_id}`);
+    } catch (err) {
+      console.error("Failed to save job:", err);
+      const error_message = err.response?.data?.detail || err.message || "An unexpected error occurred";
+      set_error(error_message);
       toast({
         title: "Error",
-        description: error.message || "Failed to save job.",
+        description: `Failed to save job: ${error_message}`,
         variant: "destructive",
       });
     } finally {
@@ -344,16 +500,24 @@ const CreateEditJob = () => {
     }
   };
 
+  const handle_nested_change = (field: string, subfield: string, value: any) => {
+    set_job_data(prev => ({
+      ...prev,
+      [field]: {
+        ...prev[field],
+        [subfield]: value,
+      },
+    }));
+  };
+
   if (is_loading) {
     return (
-      <div className="flex-1 space-y-8 p-8 bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
-        <div className="flex items-center justify-center h-64">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
           <div className="text-center space-y-4">
             <Loader2 className="h-12 w-12 animate-spin text-blue-600 mx-auto" />
             <span className="text-lg font-medium text-gray-700">
               {is_editing ? "Loading job data..." : "Loading form..."}
             </span>
-          </div>
         </div>
       </div>
     );
@@ -361,246 +525,409 @@ const CreateEditJob = () => {
 
   if (error) {
     return (
-      <div className="flex-1 space-y-8 p-8 bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
-        <div className="flex items-center justify-center h-64">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
           <Card className="w-full max-w-md shadow-xl border-0">
             <CardContent className="text-center p-8 space-y-4">
               <p className="text-red-600 font-semibold text-lg mb-4">Error: {error}</p>
-              <Button onClick={() => window.location.reload()} className="button shadow-lg hover:shadow-xl transition-all duration-300">
+            <Button onClick={() => window.location.reload()} className="w-full">
               Retry
             </Button>
             </CardContent>
           </Card>
-        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex-1 space-y-8 p-8 bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
-      <div className="flex items-center justify-between">
-        <div className="space-y-2">
-          <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+      <div className="container mx-auto p-6 max-w-6xl">
+        {/* Header */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">
             {is_editing ? "Edit Job" : "Create New Job"}
           </h1>
-          <p className="text-lg text-gray-600">
-            {is_editing ? "Update job details and requirements" : "Fill in the details to create a new job posting"}
+              <p className="text-gray-600 mt-2">
+                {is_editing ? "Update the details of the job listing." : "Fill in the form to create a new job listing."}
           </p>
         </div>
         {is_editing && (
           <div className="flex gap-3">
-            <Button
-              variant="outline"
-              onClick={generate_form_url}
-              className="shadow-md hover:shadow-lg transition-all duration-300"
-            >
+                <Button variant="outline" onClick={generate_form_url}>
               <ExternalLink className="mr-2 h-4 w-4" />
               Generate URL
             </Button>
             {generated_url && (
-              <Button
-                variant="outline"
-                onClick={() => {
+                  <Button variant="outline" onClick={() => {
                   navigator.clipboard.writeText(generated_url);
                   toast({
                     title: "URL Copied!",
                     description: "The application URL has been copied to your clipboard.",
                   });
-                }}
-                className="shadow-md hover:shadow-lg transition-all duration-300"
-              >
+                  }}>
                 <Copy className="mr-2 h-4 w-4" />
                 Copy URL
-          </Button>
+              </Button>
             )}
-        </div>
+          </div>
         )}
+          </div>
       </div>
 
-      <div className="grid gap-8 lg:grid-cols-3">
-        <div className="lg:col-span-2 space-y-6">
-          {/* Basic Information */}
-          <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
-            <CardHeader className="pb-4">
-              <CardTitle className="text-xl font-bold text-gray-800">Basic Information</CardTitle>
-              <CardDescription className="text-base text-gray-600">
-                Essential details about the job position
-              </CardDescription>
+        <div className="grid gap-8 lg:grid-cols-3">
+          {/* Main Content */}
+          <div className="lg:col-span-2 space-y-8">
+            {/* AI Generation Section */}
+      {!is_editing && (
+              <Card className="border-0 shadow-lg bg-gradient-to-r from-blue-50 to-purple-50">
+          <CardHeader className="pb-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2 bg-blue-100 rounded-lg">
+                      <Sparkles className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-xl">AI-Powered Job Generation</CardTitle>
+                      <CardDescription>
+                        Describe the job in your own words, and let AI fill in the details.
+            </CardDescription>
+                    </div>
+                  </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+              <Textarea
+                    placeholder="e.g., 'We need a senior frontend developer with React and TypeScript experience to build a new design system. The role is remote, pays 80-120k, and requires 3+ years of experience...'"
+                value={ai_input}
+                onChange={(e) => set_ai_input(e.target.value)}
+                    rows={4}
+                    className="resize-none"
+              />
+            <Button 
+              onClick={handle_ai_generate} 
+              disabled={is_generating || !ai_input.trim()}
+                    className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+            >
+              {is_generating ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                        <Sparkles className="mr-2 h-4 w-4" />
+                        Generate with AI
+                </>
+              )}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+            {/* Core Job Details */}
+            <Card className="border-0 shadow-lg">
+              <CardHeader>
+                <SectionHeader 
+                  icon={Building2} 
+                  title="Core Job Details" 
+                  description="Essential information about the position"
+                />
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                  <Label htmlFor="title" className="text-sm font-semibold text-gray-700">Job Title *</Label>
-                <Input
-                  id="title"
-                  value={job_data.title}
+                <div className="space-y-2">
+                    <Label htmlFor="title" className="text-sm font-medium">
+                      Job Title {ai_generated_fields.has('title') && <AIGeneratedBadge />}
+                  </Label>
+                  <Input
+                    id="title"
+                    value={job_data.title}
                     onChange={(e) => set_job_data({ ...job_data, title: e.target.value })}
-                  placeholder="e.g., Senior Frontend Developer"
-                    required
-                    className="h-12 shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500"
+                    placeholder="e.g., Senior Frontend Developer"
+                      className="h-11"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="location" className="text-sm font-semibold text-gray-700">Location *</Label>
+                    <Label htmlFor="location" className="text-sm font-medium">
+                      Location {ai_generated_fields.has('location') && <AIGeneratedBadge />}
+                  </Label>
                   <Input
                     id="location"
                     value={job_data.location}
                     onChange={(e) => set_job_data({ ...job_data, location: e.target.value })}
-                    placeholder="e.g., San Francisco, CA"
-                    required
-                    className="h-12 shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500"
-                />
+                      placeholder="e.g., San Francisco, CA or Remote"
+                      className="h-11"
+                  />
                 </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="department" className="text-sm font-medium">Department</Label>
+                    <Input
+                      id="department"
+                      value={job_data.department}
+                      onChange={(e) => set_job_data({ ...job_data, department: e.target.value })}
+                      placeholder="e.g., Engineering, Marketing"
+                      className="h-11"
+                    />
               </div>
-              
               <div className="space-y-2">
-                <Label htmlFor="description" className="text-sm font-semibold text-gray-700">Job Description *</Label>
+                    <Label htmlFor="job_category" className="text-sm font-medium">Job Category</Label>
+                    <Input
+                      id="job_category"
+                      value={job_data.job_category}
+                      onChange={(e) => set_job_data({ ...job_data, job_category: e.target.value })}
+                      placeholder="e.g., Software Engineering, Product Management"
+                      className="h-11"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="description" className="text-sm font-medium">
+                    Job Description {ai_generated_fields.has('description') && <AIGeneratedBadge />}
+                </Label>
                 <Textarea
                   id="description"
                   value={job_data.description}
                   onChange={(e) => set_job_data({ ...job_data, description: e.target.value })}
                   placeholder="Describe the role, responsibilities, and what you're looking for..."
-                  rows={4}
-                  required
-                  className="shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500 resize-none"
+                    rows={6}
+                    className="resize-none"
                 />
               </div>
+              </CardContent>
+            </Card>
 
+            {/* Compensation */}
+            <Card className="border-0 shadow-lg">
+              <CardHeader>
+                <SectionHeader 
+                  icon={DollarSign} 
+                  title="Compensation" 
+                  description="Salary and benefits information"
+                />
+              </CardHeader>
+              <CardContent className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                  <Label htmlFor="salary_min" className="text-sm font-semibold text-gray-700">Minimum Salary</Label>
-                <Input
-                    id="salary_min"
+                <div className="space-y-2">
+                    <Label htmlFor="base_salary" className="text-sm font-medium">
+                      Base Salary {ai_generated_fields.has('compensation.base_salary') && <AIGeneratedBadge />}
+                  </Label>
+                  <Input
+                      id="base_salary"
                     type="number"
-                    value={job_data.salary_min}
-                    onChange={(e) => set_job_data({ ...job_data, salary_min: e.target.value })}
-                    placeholder="50000"
-                    className="h-12 shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500"
-                />
-              </div>
-              <div className="space-y-2">
-                  <Label htmlFor="salary_max" className="text-sm font-semibold text-gray-700">Maximum Salary</Label>
-                <Input
-                    id="salary_max"
-                    type="number"
-                    value={job_data.salary_max}
-                    onChange={(e) => set_job_data({ ...job_data, salary_max: e.target.value })}
-                    placeholder="80000"
-                    className="h-12 shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500"
-                />
+                      value={job_data.compensation.base_salary || ""}
+                      onChange={(e) => handle_nested_change("compensation", "base_salary", e.target.value ? parseInt(e.target.value, 10) : null)}
+                      placeholder="e.g., 90000"
+                      className="h-11"
+                  />
                 </div>
-              </div>
-
+                </div>
               <div className="space-y-2">
-                <Label htmlFor="job_category" className="text-sm font-semibold text-gray-700">Job Category</Label>
-                <Input
-                  id="job_category"
-                  value={job_data.job_category}
-                  onChange={(e) => set_job_data({ ...job_data, job_category: e.target.value })}
-                  placeholder="e.g., Engineering, Marketing, Sales"
-                  className="h-12 shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500"
+                  <Label htmlFor="benefits" className="text-sm font-medium">Benefits (one per line)</Label>
+                  <Textarea
+                    id="benefits"
+                    value={Array.isArray(job_data.compensation.benefits) ? job_data.compensation.benefits.join("\n") : ""}
+                    onChange={(e) => set_job_data({ ...job_data, compensation: { ...job_data.compensation, benefits: e.target.value.split("\n") } })}
+                    placeholder="e.g., Health Insurance&#10;401(k) Matching&#10;Remote Work&#10;Stock Options"
+                    rows={4}
+                    className="resize-none"
                 />
               </div>
             </CardContent>
           </Card>
 
-          <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
-            <CardHeader className="pb-4">
-              <CardTitle className="text-xl font-bold text-gray-800">Job Details</CardTitle>
-              <CardDescription className="text-base text-gray-600">
-                Additional information about the job position
-              </CardDescription>
+            {/* Job Attributes */}
+            <Card className="border-0 shadow-lg">
+              <CardHeader>
+                <SectionHeader 
+                  icon={Briefcase} 
+                  title="Job Attributes" 
+                  description="Type, experience, and seniority requirements"
+                />
             </CardHeader>
             <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="space-y-2">
-                <Label htmlFor="experience_level" className="text-sm font-semibold text-gray-700">Experience Level</Label>
+                    <Label htmlFor="job_type" className="text-sm font-medium">
+                      Job Type {ai_generated_fields.has('job_type') && <AIGeneratedBadge />}
+                </Label>
                 <Select
-                  value={job_data.experience_level}
-                  onValueChange={(value) => set_job_data({ ...job_data, experience_level: value })}
+                      value={job_data.job_type}
+                      onValueChange={(value) => set_job_data({ ...job_data, job_type: value })}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select experience level" />
+                      <SelectTrigger className="h-11">
+                        <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {Object.entries(ExperienceLevel).map(([key, value]) => (
+                        {Object.entries(JobType).map(([key, value]) => (
                       <SelectItem key={key} value={value}>
-                        {key}
+                            {value.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-
               <div className="space-y-2">
-                <Label htmlFor="seniority_level" className="text-sm font-semibold text-gray-700">Seniority Level</Label>
+                    <Label htmlFor="experience_level" className="text-sm font-medium">
+                      Experience Level {ai_generated_fields.has('experience_level') && <AIGeneratedBadge />}
+                </Label>
                 <Select
-                  value={job_data.seniority_level}
-                  onValueChange={(value) => set_job_data({ ...job_data, seniority_level: value })}
+                      value={job_data.experience_level}
+                      onValueChange={(value) => set_job_data({ ...job_data, experience_level: value })}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select seniority level" />
+                      <SelectTrigger className="h-11">
+                        <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {Object.entries(SeniorityLevel).map(([key, value]) => (
+                        {Object.entries(ExperienceLevel).map(([key, value]) => (
                       <SelectItem key={key} value={value}>
-                        {key}
+                            {value.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-
               <div className="space-y-2">
-                <Label htmlFor="job_type" className="text-sm font-semibold text-gray-700">Job Type</Label>
+                    <Label htmlFor="seniority_level" className="text-sm font-medium">
+                      Seniority Level {ai_generated_fields.has('seniority_level') && <AIGeneratedBadge />}
+                </Label>
                 <Select
-                  value={job_data.job_type}
-                  onValueChange={(value) => set_job_data({ ...job_data, job_type: value })}
+                      value={job_data.seniority_level}
+                      onValueChange={(value) => set_job_data({ ...job_data, seniority_level: value })}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select job type" />
+                      <SelectTrigger className="h-11">
+                        <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {Object.entries(JobType).map(([key, value]) => (
+                        {Object.entries(SeniorityLevel).map(([key, value]) => (
                       <SelectItem key={key} value={value}>
-                        {key}
+                            {value.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
+                </div>
+              </CardContent>
+            </Card>
 
+            {/* Responsibilities and Skills */}
+            <Card className="border-0 shadow-lg">
+              <CardHeader>
+                <SectionHeader 
+                  icon={Target} 
+                  title="Responsibilities & Skills" 
+                  description="What the role entails and required competencies"
+                />
+              </CardHeader>
+              <CardContent className="space-y-6">
               <div className="space-y-2">
-                <Label htmlFor="status" className="text-sm font-semibold text-gray-700">Status</Label>
+                  <Label htmlFor="responsibilities" className="text-sm font-medium">
+                    Responsibilities (one per line) {ai_generated_fields.has('responsibilities') && <AIGeneratedBadge />}
+                  </Label>
+                  <Textarea
+                    id="responsibilities"
+                    value={(() => {
+                      let responsibilities = job_data.responsibilities;
+                      // Convert object to array if needed
+                      if (!Array.isArray(responsibilities) && responsibilities && typeof responsibilities === 'object') {
+                        responsibilities = Object.values(responsibilities);
+                      }
+                      const value = Array.isArray(responsibilities) ? responsibilities.join("\n") : "";
+                      console.log("Responsibilities textarea value:", value, "from data:", job_data.responsibilities);
+                      return value;
+                    })()}
+                    onChange={(e) => set_job_data({ ...job_data, responsibilities: e.target.value.split("\n").filter(item => item.trim() !== "") })}
+                    placeholder="e.g., Develop and maintain web applications&#10;Collaborate with cross-functional teams&#10;Participate in code reviews&#10;Mentor junior developers"
+                    rows={6}
+                    className="resize-none"
+                  />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="hard_skills" className="text-sm font-medium">
+                      Hard Skills (one per line) {ai_generated_fields.has('skills.hard_skills') && <AIGeneratedBadge />}
+                    </Label>
+                    <Textarea
+                      id="hard_skills"
+                      value={(() => {
+                        let hard_skills = job_data.skills.hard_skills;
+                        if (!Array.isArray(hard_skills) && hard_skills && typeof hard_skills === 'object') {
+                          hard_skills = Object.values(hard_skills);
+                        }
+                        return Array.isArray(hard_skills) ? hard_skills.join("\n") : "";
+                      })()}
+                      onChange={(e) => set_job_data({ ...job_data, skills: { ...job_data.skills, hard_skills: e.target.value.split("\n").filter(item => item.trim() !== "") } })}
+                      placeholder="e.g., React&#10;TypeScript&#10;Node.js&#10;PostgreSQL"
+                      rows={6}
+                      className="resize-none"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="soft_skills" className="text-sm font-medium">
+                      Soft Skills (one per line) {ai_generated_fields.has('skills.soft_skills') && <AIGeneratedBadge />}
+                    </Label>
+                    <Textarea
+                      id="soft_skills"
+                      value={(() => {
+                        let soft_skills = job_data.skills.soft_skills;
+                        if (!Array.isArray(soft_skills) && soft_skills && typeof soft_skills === 'object') {
+                          soft_skills = Object.values(soft_skills);
+                        }
+                        return Array.isArray(soft_skills) ? soft_skills.join("\n") : "";
+                      })()}
+                      onChange={(e) => handle_nested_change("skills", "soft_skills", e.target.value.split("\n").filter(item => item.trim() !== ""))}
+                      placeholder="e.g., Communication&#10;Problem Solving&#10;Teamwork&#10;Leadership"
+                      rows={6}
+                      className="resize-none"
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Sidebar */}
+          <div className="space-y-6">
+            {/* Recruitment Settings */}
+            <Card className="border-0 shadow-lg">
+              <CardHeader>
+                <SectionHeader 
+                  icon={Settings} 
+                  title="Recruitment Settings" 
+                  description="Job status and recruitment options"
+                />
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="status" className="text-sm font-medium">Status</Label>
                 <Select
                   value={job_data.status}
                   onValueChange={(value) => set_job_data({ ...job_data, status: value })}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select job status" />
+                    <SelectTrigger className="h-11">
+                      <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {Object.entries(JobStatus).map(([key, value]) => (
                       <SelectItem key={key} value={value}>
-                        {key}
+                          {value.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-
               <div className="space-y-2">
-                <Label htmlFor="recruited_to_id" className="text-sm font-semibold text-gray-700">Recruited To</Label>
+                  <Label htmlFor="recruited_to_id" className="text-sm font-medium">Recruited To</Label>
                 <Select
                   value={job_data.recruited_to_id?.toString() || "none"}
                   onValueChange={(value) => set_job_data({ ...job_data, recruited_to_id: value === "none" ? null : parseInt(value) })}
                 >
-                  <SelectTrigger>
+                    <SelectTrigger className="h-11">
                     <SelectValue placeholder="Select a company (optional)" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">None</SelectItem>
                     {recruit_to_companies.length === 0 ? (
-                      <SelectItem value="" disabled>No companies available</SelectItem>
+                      <SelectItem value="no-companies" disabled>No companies available</SelectItem>
                     ) : (
                       recruit_to_companies.map((company) => (
                         <SelectItem key={company.id} value={company.id.toString()}>
@@ -610,79 +937,27 @@ const CreateEditJob = () => {
                     )}
                   </SelectContent>
                 </Select>
-                <p className="text-sm text-muted-foreground">
+                  <p className="text-xs text-gray-500">
                   Select a company you are recruiting for (leave empty if recruiting for your own company)
                 </p>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
-            <CardHeader className="pb-4">
-              <CardTitle className="text-xl font-bold text-gray-800">Additional Details</CardTitle>
-              <CardDescription className="text-base text-gray-600">
-                Optional additional information about the position
-              </CardDescription>
+            {/* Form Keys & Constraints */}
+            <Card className="border-0 shadow-lg">
+              <CardHeader>
+                <SectionHeader 
+                  icon={Users} 
+                  title="Form Keys & Constraints" 
+                  description="Custom application form fields"
+                />
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="overview" className="text-sm font-semibold text-gray-700">Overview</Label>
-                <Textarea
-                  id="overview"
-                  value={job_data.overview}
-                  onChange={(e) => set_job_data({ ...job_data, overview: e.target.value })}
-                  placeholder="Brief overview of the role and company"
-                  rows={3}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="requirements" className="text-sm font-semibold text-gray-700">Requirements</Label>
-                <Textarea
-                  id="requirements"
-                  value={job_data.requirements}
-                  onChange={(e) => set_job_data({ ...job_data, requirements: e.target.value })}
-                  placeholder="List the key requirements for this position"
-                  rows={4}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="objectives" className="text-sm font-semibold text-gray-700">Objectives</Label>
-                <Textarea
-                  id="objectives"
-                  value={job_data.objectives}
-                  onChange={(e) => set_job_data({ ...job_data, objectives: e.target.value })}
-                  placeholder="What will the successful candidate achieve?"
-                  rows={4}
-                />
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="auto_generate"
-                  checked={job_data.auto_generate}
-                  onCheckedChange={(checked) => set_job_data({ ...job_data, auto_generate: checked })}
-                />
-                <Label htmlFor="auto_generate" className="text-sm font-semibold text-gray-700">Auto-generate job description</Label>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="space-y-6">
-          <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
-            <CardHeader className="pb-4">
-              <CardTitle className="text-xl font-bold text-gray-800">Form Keys & Constraints</CardTitle>
-              <CardDescription className="text-base text-gray-600">
-                Attach custom form fields and set requirements
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
+              <CardContent className="space-y-4">
               {form_keys.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground mb-4">No form keys available</p>
-                  <Button variant="outline" onClick={() => navigate("/form-keys")}>
+                  <div className="text-center py-6">
+                    <p className="text-gray-500 mb-4">No form keys available</p>
+                    <Button variant="outline" onClick={() => navigate("/form-keys")} className="w-full">
                     Create Form Keys
                   </Button>
                 </div>
@@ -695,18 +970,18 @@ const CreateEditJob = () => {
                         checked={selected_form_keys.includes(form_key.id)}
                         onCheckedChange={() => handle_form_key_toggle(form_key.id)}
                       />
-                      <Label htmlFor={`formKey-${form_key.id}`} className="flex-1">
+                        <Label htmlFor={`formKey-${form_key.id}`} className="flex-1 text-sm">
                         {form_key.name}
                       </Label>
-                      <Badge variant="outline">{form_key.field_type}</Badge>
+                        <Badge variant="outline" className="text-xs">{form_key.field_type}</Badge>
                       {form_key.required && (
                         <Badge variant="secondary" className="text-xs">Required</Badge>
                       )}
                     </div>
 
                     {selected_form_keys.includes(form_key.id) && (
-                      <div className="ml-6 space-y-2 p-3 bg-muted rounded-lg">
-                        <Label className="text-sm font-medium">Constraints</Label>
+                        <div className="ml-6 space-y-2 p-3 bg-gray-50 rounded-lg">
+                          <Label className="text-xs font-medium">Constraints</Label>
                         {form_key.field_type === "number" && (
                           <div className="grid grid-cols-2 gap-2">
                             <div>
@@ -718,6 +993,7 @@ const CreateEditJob = () => {
                                 onChange={(e) => 
                                   handle_constraint_change(form_key.id, "min_value", e.target.value)
                                 }
+                                  className="h-8 text-xs"
                               />
                             </div>
                             <div>
@@ -729,6 +1005,7 @@ const CreateEditJob = () => {
                                 onChange={(e) => 
                                   handle_constraint_change(form_key.id, "max_value", e.target.value)
                                 }
+                                  className="h-8 text-xs"
                               />
                             </div>
                           </div>
@@ -742,6 +1019,7 @@ const CreateEditJob = () => {
                               onChange={(e) => 
                                 handle_constraint_change(form_key.id, "pattern", e.target.value)
                               }
+                                className="h-8 text-xs"
                             />
                           </div>
                         )}
@@ -755,6 +1033,7 @@ const CreateEditJob = () => {
                                 onChange={(e) => 
                                   handle_constraint_change(form_key.id, "after_date", e.target.value)
                                 }
+                                  className="h-8 text-xs"
                               />
                             </div>
                             <div>
@@ -765,6 +1044,7 @@ const CreateEditJob = () => {
                                 onChange={(e) => 
                                   handle_constraint_change(form_key.id, "before_date", e.target.value)
                                 }
+                                  className="h-8 text-xs"
                               />
                             </div>
                           </div>
@@ -802,22 +1082,22 @@ const CreateEditJob = () => {
               )}
             </CardContent>
           </Card>
-              </div>
-              </div>
+        </div>
+      </div>
 
-      <div className="flex items-center justify-between mt-8">
-        <div className="flex gap-2">
+        {/* Action Buttons */}
+        <div className="flex items-center justify-between mt-8 pt-6 border-t border-gray-200">
           <Button variant="outline" onClick={() => navigate("/jobs")} disabled={is_submitting}>
             Cancel
           </Button>
-          <Button onClick={handle_save} disabled={is_submitting}>
+          <Button onClick={handle_save} disabled={is_submitting} className="px-8">
             {is_submitting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 {is_editing ? "Updating..." : "Creating..."}
               </>
             ) : (
-              is_editing ? "Update Job" : "Save Job"
+              is_editing ? "Update Job" : "Create Job"
             )}
           </Button>
         </div>
