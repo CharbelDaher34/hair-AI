@@ -140,7 +140,7 @@ const ChatBot = () => {
 
       <div className="grid gap-8 lg:grid-cols-4">
         <div className="lg:col-span-3">
-          <Card className="h-[650px] flex flex-col card shadow-xl hover:shadow-2xl transition-all duration-300 border-0">
+          <Card className="h-[700px] flex flex-col card shadow-xl hover:shadow-2xl transition-all duration-300 border-0 overflow-hidden">
             <CardHeader className="pb-4">
               <CardTitle className="flex items-center gap-3 text-xl font-bold text-gray-800">
                 <div className="p-2 bg-gradient-to-br from-blue-100 to-purple-100 rounded-lg">
@@ -153,8 +153,8 @@ const ChatBot = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="flex-1 flex flex-col">
-              <ScrollArea className="flex-1 pr-4">
-                <div className="space-y-6">
+              <ScrollArea className="flex-1 pr-4 max-h-[480px] overflow-hidden">
+                <div className="space-y-6 p-2 min-h-full">
                   {messages.map((message) => (
                     <div
                       key={message.id}
@@ -162,19 +162,19 @@ const ChatBot = () => {
                         message.type === "user" ? "flex-row-reverse space-x-reverse" : ""
                       }`}
                     >
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center shadow-md ${
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center shadow-md flex-shrink-0 ${
                         message.type === "user" 
                           ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white" 
                           : "bg-gradient-to-r from-gray-100 to-blue-100 text-gray-700"
                       }`}>
                         {message.type === "user" ? <User className="w-5 h-5" /> : <Bot className="w-5 h-5" />}
                       </div>
-                      <div className={`max-w-[80%] p-4 rounded-2xl shadow-md ${
+                      <div className={`max-w-[75%] p-4 rounded-2xl shadow-md break-words overflow-hidden ${
                         message.type === "user"
                           ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white ml-auto"
                           : "bg-white border border-gray-200"
                       }`}>
-                        <div className={`prose prose-sm max-w-none ${
+                        <div className={`prose prose-sm max-w-none break-words ${
                           message.type === "user" 
                             ? "prose-invert" 
                             : "prose-gray"
@@ -199,12 +199,12 @@ const ChatBot = () => {
                                 code: ({node, ...props}: any) => {
                                   const isInline = !props.className?.includes('language-');
                                   return isInline 
-                                    ? <code className={`px-1 py-0.5 rounded text-sm font-mono ${
+                                    ? <code className={`px-1 py-0.5 rounded text-sm font-mono break-all ${
                                         message.type === "user" 
                                           ? "bg-white/20 text-white" 
                                           : "bg-gray-100 text-gray-800"
                                       }`} {...props} />
-                                    : <code className={`block p-3 rounded-lg text-sm font-mono overflow-x-auto ${
+                                    : <code className={`block p-3 rounded-lg text-sm font-mono overflow-x-auto whitespace-pre-wrap break-words ${
                                         message.type === "user" 
                                           ? "bg-white/10 text-white" 
                                           : "bg-gray-100 text-gray-800"
@@ -215,15 +215,15 @@ const ChatBot = () => {
                                 
                                 // Tables
                                 table: ({node, ...props}) => (
-                                  <div className="overflow-x-auto mb-4">
-                                    <table className="min-w-full divide-y divide-gray-300 border border-gray-200 rounded-lg" {...props} />
+                                  <div className="overflow-x-auto mb-4 max-w-full">
+                                    <table className="w-full divide-y divide-gray-300 border border-gray-200 rounded-lg text-xs" {...props} />
                                   </div>
                                 ),
                                 thead: ({node, ...props}) => <thead className="bg-gray-50" {...props} />,
-                                th: ({node, ...props}) => <th scope="col" className="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200" {...props} />,
+                                th: ({node, ...props}) => <th scope="col" className="px-2 py-1 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200 break-words" {...props} />,
                                 tbody: ({node, ...props}) => <tbody className="bg-white divide-y divide-gray-200" {...props} />,
                                 tr: ({node, ...props}) => <tr className="hover:bg-gray-50" {...props} />,
-                                td: ({node, ...props}) => <td className="px-4 py-2 text-sm text-gray-800 border-b border-gray-100" {...props} />,
+                                td: ({node, ...props}) => <td className="px-2 py-1 text-xs text-gray-800 border-b border-gray-100 break-words max-w-0" {...props} />,
                                 
                                 // Links
                                 a: ({node, ...props}) => <a className={`underline hover:no-underline ${
@@ -259,7 +259,7 @@ const ChatBot = () => {
                   ))}
                   {isTyping && (
                     <div className="flex items-start space-x-4">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-r from-gray-100 to-blue-100 text-gray-700 flex items-center justify-center shadow-md">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-r from-gray-100 to-blue-100 text-gray-700 flex items-center justify-center shadow-md flex-shrink-0">
                         <Bot className="w-5 h-5" />
                       </div>
                       <div className="bg-white border border-gray-200 p-4 rounded-2xl shadow-md">
