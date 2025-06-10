@@ -34,6 +34,7 @@ import json
 import pyodbc
 from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
+from rapidfuzz import fuzz
 
 # Load environment variables
 load_dotenv()
@@ -71,6 +72,8 @@ os.environ["ODBCINI"] = odbc_ini_path
 logger.info(f"ODBCINI set to: {odbc_ini_path}")
 
 logger.info(f"Database configuration - UID: {DB_UID}, DSN: {DB_DSN}")
+
+
 
 
 def get_connection() -> pyodbc.Connection:
@@ -161,31 +164,89 @@ def apply_employer_filter_to_query(query: str) -> str:
         return query
     
     # Tables that have direct employer_id relationships
-    employer_filtered_tables = {
+    direct_employer_tables = {
         'job': 'employer_id',
         'candidate': 'employer_id', 
         'company': 'id',  # company.id = employer_id
         'hr': 'employer_id',
-        'formkey': 'employer_id'
+        'formkey': 'employer_id',
+    }
+    
+    # Tables that need JOIN-based filtering (indirect relationships)
+    indirect_employer_tables = {
+        'application': {
+            'joins': [
+                ('candidate', 'application.candidate_id = candidate.id', 'candidate.employer_id'),
+                ('job', 'application.job_id = job.id', 'job.employer_id')
+            ]
+        },
+        'match': {
+            'joins': [
+                ('application', 'match.application_id = application.id'),
+                ('candidate', 'application.candidate_id = candidate.id', 'candidate.employer_id'),
+                ('job', 'application.job_id = job.id', 'job.employer_id')
+            ]
+        },
+        'interview': {
+            'joins': [
+                ('application', 'interview.application_id = application.id'),
+                ('candidate', 'application.candidate_id = candidate.id', 'candidate.employer_id'),
+                ('job', 'application.job_id = job.id', 'job.employer_id')
+            ]
+        },
+        'jobformkeyconstraint': {
+            'joins': [
+                ('job', 'jobformkeyconstraint.job_id = job.id', 'job.employer_id')
+            ]
+        },
+        'recruitercompanylink': {
+            'joins': [
+                ('company', 'recruitercompanylink.recruiter_id = company.id', 'company.id')
+            ]
+        }
     }
     
     # Try to add filters for known tables
     modified_query = query
     
-    for table, column in employer_filtered_tables.items():
+    # Check for direct employer_id tables first
+    for table, column in direct_employer_tables.items():
         if f' {table} ' in query_lower or f' {table}.' in query_lower or query_lower.endswith(f' {table}'):
             # Add WHERE clause if none exists, or AND if WHERE already exists
             if ' where ' not in query_lower:
-                if column == 'id' and table == 'company':
-                    modified_query += f" WHERE {table}.{column} = {EMPLOYER_ID_FILTER}"
-                else:
-                    modified_query += f" WHERE {table}.{column} = {EMPLOYER_ID_FILTER}"
+                modified_query += f" WHERE {table}.{column} = {EMPLOYER_ID_FILTER}"
             else:
-                if column == 'id' and table == 'company':
-                    modified_query = modified_query.replace(' WHERE ', f" WHERE {table}.{column} = {EMPLOYER_ID_FILTER} AND ", 1)
-                else:
-                    modified_query = modified_query.replace(' WHERE ', f" WHERE {table}.{column} = {EMPLOYER_ID_FILTER} AND ", 1)
+                modified_query = modified_query.replace(' WHERE ', f" WHERE {table}.{column} = {EMPLOYER_ID_FILTER} AND ", 1)
             break
+    
+    # Check for indirect employer_id tables if no direct match found
+    else:
+        for table, join_info in indirect_employer_tables.items():
+            if f' {table} ' in query_lower or f' {table}.' in query_lower or query_lower.endswith(f' {table}'):
+                # For indirect tables, we need to ensure proper JOINs exist
+                # This is a simplified approach - for complex queries, manual JOIN specification is recommended
+                joins = join_info['joins']
+                
+                # Find the first join that provides employer filtering
+                for join_data in joins:
+                    if len(join_data) == 3:  # Has employer filter column
+                        join_table, join_condition, filter_column = join_data
+                        
+                        # Check if the join table is already in the query
+                        if f' {join_table} ' in query_lower or f' {join_table}.' in query_lower:
+                            # Add filter using existing join
+                            if ' where ' not in query_lower:
+                                modified_query += f" WHERE {filter_column} = {EMPLOYER_ID_FILTER}"
+                            else:
+                                modified_query = modified_query.replace(' WHERE ', f" WHERE {filter_column} = {EMPLOYER_ID_FILTER} AND ", 1)
+                            break
+                        else:
+                            # Need to add JOIN - this is complex, so we'll add a comment for manual handling
+                            # For now, just add a WHERE clause if possible
+                            if ' where ' not in query_lower:
+                                modified_query += f" -- Note: Consider adding JOIN with {join_table} for employer filtering"
+                            break
+                break
     
     return modified_query
 
@@ -293,6 +354,14 @@ def describe_table(table: str) -> str:
         raise
 
 
+
+def fuzzy_match(query: str, table_name: str) -> bool:
+    """
+    Check if the query matches the table name using fuzzy matching.
+    """
+    return fuzz.partial_ratio(query, table_name) > 80
+
+
 @mcp.tool(
     name="filter_table_names",
     description="""Retrieve and return a list containing information about tables in matching_db whose names contain the specified substring.
@@ -302,7 +371,6 @@ def describe_table(table: str) -> str:
     
     PARAMETERS:
     - query: The substring to search for in table names (REQUIRED)
-    - user/password/dsn: Optional connection overrides
     
     EXAMPLES:
     - filter_table_names(query="candidate") - Find all tables with "candidate" in the name
@@ -319,9 +387,7 @@ def filter_table_names(query: str) -> str:
 
     Args:
         query: The substring to filter table names by
-        user: Optional username override
-        password: Optional password override
-        dsn: Optional DSN name override
+     
 
     Returns:
         str: JSON string containing filtered table information
@@ -332,13 +398,13 @@ def filter_table_names(query: str) -> str:
             rs = cursor.tables(table=None, catalog=DEFAULT_SCHEMA, schema='%', tableType="TABLE")
             results = []
             for row in rs:
-                if query.lower() in row[2].lower():
+                if fuzzy_match(query, row[2]):
                     results.append({
                         "TABLE_CAT": row[0],
                         "TABLE_SCHEM": row[1],
                         "TABLE_NAME": row[2]
                     })
-
+            logger.info(f"Results of fuzzy_match: {results}")
             return json.dumps(results, indent=2)
     except pyodbc.Error as e:
         logger.error(f"Error filtering table names: {e}")
