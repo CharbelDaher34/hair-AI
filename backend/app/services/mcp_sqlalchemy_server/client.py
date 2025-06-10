@@ -10,14 +10,15 @@ from pydantic_ai.messages import ModelMessage
 class Chat:
     """A chat client that interacts with a Pydantic-AI agent and maintains conversation history."""
 
-    def __init__(self, model: str = "gemini-2.0-flash", employer_id: int = 1):
+    def __init__(self, model: str = "gemini-2.0-flash", company: dict = None):
         """
         Initializes the chat client.
 
         Args:
             model: The name of the LLM model to use.
-            employer_id: The employer ID to filter database queries by.
+            company: The company to filter database queries by.
         """
+        employer_id = company["id"]
         # Create MCP server with employer_id as argument
         server = MCPServerStdio(
             command="uv",
@@ -36,6 +37,8 @@ class Chat:
             system_prompt=f'''You are a helpful assistant that can query the database for the company with id {employer_id}.
 Use tools to get information about the database to answer the user's question.
 Always get the tables info first before writing the query to get the needed information.
+
+You are working for the company {company["name"]} with id {employer_id} only, you can only access the data of this company.
 '''
         )
         

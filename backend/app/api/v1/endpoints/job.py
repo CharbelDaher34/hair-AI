@@ -68,8 +68,8 @@ def read_jobs(
     request: Request
 ) -> List[JobRead]:
     user = request.state.user
-    print(f"user: {user}")
-    return crud_job.get_jobs(db=db, skip=skip, limit=limit)
+    employer_id = user.employer_id
+    return crud_job.get_jobs(db=db, skip=skip, limit=limit, employer_id=employer_id)
 
 @router.get("/by-employer/{employer_id}", response_model=List[JobRead])
 def read_jobs_by_employer(

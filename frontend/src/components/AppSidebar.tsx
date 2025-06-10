@@ -2,10 +2,7 @@ import {
   Building2,
   Users,
   FileText,
-  BarChart3,
   Calendar,
-  MessageSquare,
-  UserPlus,
   Settings,
   Home,
   BrainCircuit,
@@ -81,8 +78,12 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarHeader className="border-b p-6">
         <div className="flex items-center gap-2">
-          <Building2 className="h-6 w-6 text-primary" />
-          <span className="font-bold text-lg">HR Platform</span>
+          <img 
+            src="/eurisko.jpeg" 
+            alt="Eurisko Logo" 
+            className="h-8 w-8 rounded-full object-cover"
+          />
+          <span className="font-bold text-lg">Daher</span>
         </div>
         <SidebarTrigger className="ml-auto" />
       </SidebarHeader>

@@ -1,13 +1,14 @@
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
+from sqlmodel import Session
 from typing import Optional
 
 from core.security import decode_access_token, TokenData
 from services.mcp_sqlalchemy_server.client import Chat
-
+from core.database import get_session
 router = APIRouter()
 
 @router.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
+async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_session)):
     await websocket.accept()
     try:
         # First message is the token
@@ -20,9 +21,11 @@ async def websocket_endpoint(websocket: WebSocket):
             return
 
         employer_id = token_data.employer_id
-        
+        from crud.crud_company import get_company
+        company = get_company(db=next(get_session()), employer_id=employer_id)
+        print(f"company: {company}")
         # Initialize chat client with employer_id
-        chat = Chat(employer_id=employer_id)
+        chat = Chat(company=company.model_dump())
 
         # Start the MCP server process
         async with chat.agent.run_mcp_servers():
