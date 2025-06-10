@@ -338,6 +338,52 @@ class ApiService {
     });
   }
 
+  // Batch method to set constraints for a job
+  async setConstraintsForJob(jobId, constraints) {
+    try {
+      // First, get existing constraints for this job
+      const existingConstraints = await this.getConstraintsByJob(jobId);
+      const existingConstraintMap = new Map();
+      
+      if (existingConstraints && Array.isArray(existingConstraints)) {
+        existingConstraints.forEach(constraint => {
+          existingConstraintMap.set(constraint.form_key_id, constraint);
+        });
+      }
+
+      const results = [];
+      
+      // Create or update constraints
+      for (const constraint of constraints) {
+        const existingConstraint = existingConstraintMap.get(constraint.form_key_id);
+        
+        if (existingConstraint) {
+          // Update existing constraint
+          const updateData = {
+            constraints: constraint.constraints
+          };
+          const result = await this.updateJobFormKeyConstraint(existingConstraint.id, updateData);
+          results.push(result);
+          existingConstraintMap.delete(constraint.form_key_id); // Mark as processed
+        } else {
+          // Create new constraint
+          const result = await this.createJobFormKeyConstraint(constraint);
+          results.push(result);
+        }
+      }
+      
+      // Delete constraints that are no longer selected
+      for (const [formKeyId, existingConstraint] of existingConstraintMap) {
+        await this.deleteJobFormKeyConstraint(existingConstraint.id);
+      }
+      
+      return results;
+    } catch (error) {
+      console.error('Error setting constraints for job:', error);
+      throw error;
+    }
+  }
+
   // Recruiter Company Link endpoints
   async createRecruiterCompanyLink(linkData) {
     return this.request('/recruiter_company_links/', {

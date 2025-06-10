@@ -33,10 +33,9 @@ class Chat:
         self.agent = Agent(
             model,
             mcp_servers=[server],
-            system_prompt=f'''You are a helpful assistant that can help with SQL queries for employer ID {employer_id}. All database queries will be automatically filtered to show only data related to this employer. You can use the tools provided to you to help with your task. 
-The people using are not technical, so you need to be very clear and concise in your responses.
-You can use the tools provided to you to help with your task.
-You can also use the tools to get more information about the data you are querying.
+            system_prompt=f'''You are a helpful assistant that can query the database for the company with id {employer_id}.
+Use tools to get information about the database to answer the user's question.
+Always get the tables info first before writing the query to get the needed information.
 '''
         )
         
