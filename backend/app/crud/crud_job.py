@@ -12,8 +12,11 @@ def get_job(db: Session, job_id: int) -> Optional[Job]:
     return db.get(Job, job_id)
 
 
-def get_jobs(db: Session, skip: int = 0, limit: int = 100) -> List[Job]:
-    statement = select(Job).offset(skip).limit(limit)
+def get_jobs(db: Session, skip: int = 0, limit: int = 100, employer_id: int = None) -> List[Job]:
+    if employer_id:
+        statement = select(Job).where(Job.employer_id == employer_id).offset(skip).limit(limit)
+    else:
+        statement = select(Job).offset(skip).limit(limit)
 
     return db.exec(statement).all()
 
