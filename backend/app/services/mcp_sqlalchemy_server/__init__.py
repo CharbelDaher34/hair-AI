@@ -7,7 +7,6 @@ from .server import (
     describe_table,
     filter_table_names,
     execute_query,
-    execute_query_md,
     query_database,
     mcp,
 )
@@ -18,7 +17,6 @@ __all__ = [
     "describe_table",
     "filter_table_names",
     "execute_query",
-    "execute_query_md",
     "query_database",
 ]
 

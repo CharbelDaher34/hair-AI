@@ -51,11 +51,6 @@ const menuItems = [
     icon: Calendar,
   },
   {
-    title: "Analytics",
-    url: "/analytics",
-    icon: BarChart3,
-  },
-  {
     title: "Form Keys",
     url: "/form-keys",
     icon: Settings,

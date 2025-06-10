@@ -301,13 +301,15 @@ const CreateEditJob = () => {
   };
 
   const handle_constraint_change = (key_id: number, constraint_type: string, value: any) => {
-    set_constraints({
+    const new_constraints = {
       ...constraints,
       [key_id]: {
         ...constraints[key_id],
         [constraint_type]: value,
       },
-    });
+    };
+    console.log("Constraint changed:", { key_id, constraint_type, value, new_constraints }); // Debug log
+    set_constraints(new_constraints);
   };
 
   const generate_form_url = () => {
@@ -463,16 +465,32 @@ const CreateEditJob = () => {
 
       // Save constraints if any are selected
       if (selected_form_keys.length > 0) {
-        const constraint_payload: JobFormKeyConstraint[] = selected_form_keys.map(key_id => ({
-          job_id: new_job_id,
-          form_key_id: key_id,
-          constraints: constraints[key_id] || {},
-        }));
+        const constraint_payload: JobFormKeyConstraint[] = selected_form_keys.map(key_id => {
+          // Clean up constraints by removing empty values
+          const raw_constraints = constraints[key_id] || {};
+          const cleaned_constraints = {};
+          
+          Object.entries(raw_constraints).forEach(([key, value]) => {
+            if (value !== null && value !== undefined && value !== "") {
+              cleaned_constraints[key] = value;
+            }
+          });
+
+          return {
+            job_id: new_job_id,
+            form_key_id: key_id,
+            constraints: cleaned_constraints,
+          };
+        });
+
+        console.log("Constraint payload being sent:", constraint_payload); // Debug log
 
         try {
-          await apiService.setConstraintsForJob(new_job_id, constraint_payload);
+          const result = await apiService.setConstraintsForJob(new_job_id, constraint_payload);
+          console.log("Constraints saved successfully:", result); // Debug log
         } catch (constraint_error) {
           console.error("Failed to save constraints:", constraint_error);
+          console.error("Constraint error details:", constraint_error.response?.data || constraint_error.message);
           toast({
             title: "Warning",
             description: "Job saved, but failed to save form constraints.",
@@ -991,7 +1009,7 @@ const CreateEditJob = () => {
                                 placeholder="0"
                                 value={constraints[form_key.id]?.min_value || ""}
                                 onChange={(e) => 
-                                  handle_constraint_change(form_key.id, "min_value", e.target.value)
+                                  handle_constraint_change(form_key.id, "min_value", e.target.value ? parseInt(e.target.value, 10) : "")
                                 }
                                   className="h-8 text-xs"
                               />
@@ -1003,7 +1021,7 @@ const CreateEditJob = () => {
                                 placeholder="10"
                                 value={constraints[form_key.id]?.max_value || ""}
                                 onChange={(e) => 
-                                  handle_constraint_change(form_key.id, "max_value", e.target.value)
+                                  handle_constraint_change(form_key.id, "max_value", e.target.value ? parseInt(e.target.value, 10) : "")
                                 }
                                   className="h-8 text-xs"
                               />

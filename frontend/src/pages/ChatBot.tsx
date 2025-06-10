@@ -18,12 +18,12 @@ interface Message {
 
 const ChatBot = () => {
   const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 1,
-      type: "bot",
-      content: "Hello! I'm your HR AI Assistant. I can help you with analytics, candidate insights, job performance data, and recruitment trends. What would you like to know?",
-      timestamp: new Date(),
-    },
+    // {
+    //   id: 1,
+    //   type: "bot",
+    //   content: "Hello! I'm your HR AI Assistant. I can help you with analytics, candidate insights, job performance data, and recruitment trends. What would you like to know?",
+    //   timestamp: new Date(),
+    // },
   ]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
@@ -174,16 +174,76 @@ const ChatBot = () => {
                           ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white ml-auto"
                           : "bg-white border border-gray-200"
                       }`}>
-                        <div className="prose prose-sm max-w-none">
+                        <div className={`prose prose-sm max-w-none ${
+                          message.type === "user" 
+                            ? "prose-invert" 
+                            : "prose-gray"
+                        }`}>
                           <ReactMarkdown 
                             remarkPlugins={[remarkGfm]}
                             components={{
-                                table: ({node, ...props}) => <table className="min-w-full divide-y divide-gray-300" {...props} />,
-                                thead: ({node, ...props}) => <thead className="bg-gray-100" {...props} />,
-                                th: ({node, ...props}) => <th scope="col" className="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider" {...props} />,
+                                // Headers
+                                h1: ({node, ...props}) => <h1 className={`text-xl font-bold mb-2 ${message.type === "user" ? "text-white" : "text-gray-900"}`} {...props} />,
+                                h2: ({node, ...props}) => <h2 className={`text-lg font-semibold mb-2 ${message.type === "user" ? "text-white" : "text-gray-800"}`} {...props} />,
+                                h3: ({node, ...props}) => <h3 className={`text-base font-medium mb-1 ${message.type === "user" ? "text-white" : "text-gray-700"}`} {...props} />,
+                                
+                                // Paragraphs
+                                p: ({node, ...props}) => <p className={`mb-2 ${message.type === "user" ? "text-white" : "text-gray-800"}`} {...props} />,
+                                
+                                // Lists
+                                ul: ({node, ...props}) => <ul className={`list-disc list-inside mb-2 ${message.type === "user" ? "text-white" : "text-gray-800"}`} {...props} />,
+                                ol: ({node, ...props}) => <ol className={`list-decimal list-inside mb-2 ${message.type === "user" ? "text-white" : "text-gray-800"}`} {...props} />,
+                                li: ({node, ...props}) => <li className={`mb-1 ${message.type === "user" ? "text-white" : "text-gray-800"}`} {...props} />,
+                                
+                                // Code
+                                code: ({node, ...props}: any) => {
+                                  const isInline = !props.className?.includes('language-');
+                                  return isInline 
+                                    ? <code className={`px-1 py-0.5 rounded text-sm font-mono ${
+                                        message.type === "user" 
+                                          ? "bg-white/20 text-white" 
+                                          : "bg-gray-100 text-gray-800"
+                                      }`} {...props} />
+                                    : <code className={`block p-3 rounded-lg text-sm font-mono overflow-x-auto ${
+                                        message.type === "user" 
+                                          ? "bg-white/10 text-white" 
+                                          : "bg-gray-100 text-gray-800"
+                                      }`} {...props} />;
+                                },
+                                
+                                pre: ({node, ...props}) => <pre className="mb-2 overflow-x-auto" {...props} />,
+                                
+                                // Tables
+                                table: ({node, ...props}) => (
+                                  <div className="overflow-x-auto mb-4">
+                                    <table className="min-w-full divide-y divide-gray-300 border border-gray-200 rounded-lg" {...props} />
+                                  </div>
+                                ),
+                                thead: ({node, ...props}) => <thead className="bg-gray-50" {...props} />,
+                                th: ({node, ...props}) => <th scope="col" className="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200" {...props} />,
                                 tbody: ({node, ...props}) => <tbody className="bg-white divide-y divide-gray-200" {...props} />,
                                 tr: ({node, ...props}) => <tr className="hover:bg-gray-50" {...props} />,
-                                td: ({node, ...props}) => <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-800" {...props} />,
+                                td: ({node, ...props}) => <td className="px-4 py-2 text-sm text-gray-800 border-b border-gray-100" {...props} />,
+                                
+                                // Links
+                                a: ({node, ...props}) => <a className={`underline hover:no-underline ${
+                                  message.type === "user" ? "text-white hover:text-blue-100" : "text-blue-600 hover:text-blue-800"
+                                }`} {...props} />,
+                                
+                                // Blockquotes
+                                blockquote: ({node, ...props}) => <blockquote className={`border-l-4 pl-4 italic mb-2 ${
+                                  message.type === "user" ? "border-white/30 text-white/90" : "border-gray-300 text-gray-600"
+                                }`} {...props} />,
+                                
+                                // Strong/Bold
+                                strong: ({node, ...props}) => <strong className={`font-semibold ${
+                                  message.type === "user" ? "text-white" : "text-gray-900"
+                                }`} {...props} />,
+                                
+                                // Emphasis/Italic
+                                em: ({node, ...props}) => <em className={`italic ${
+                                  message.type === "user" ? "text-white" : "text-gray-800"
+                                }`} {...props} />,
                             }}
                           >
                             {message.content}
