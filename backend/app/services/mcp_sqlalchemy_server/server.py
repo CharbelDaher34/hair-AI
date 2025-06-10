@@ -73,17 +73,13 @@ logger.info(f"ODBCINI set to: {odbc_ini_path}")
 logger.info(f"Database configuration - UID: {DB_UID}, DSN: {DB_DSN}")
 
 
-def get_connection(readonly: bool = True, uid: Optional[str] = None, pwd: Optional[str] = None, 
-                   dsn: Optional[str] = None) -> pyodbc.Connection:
+def get_connection() -> pyodbc.Connection:
     """
     Create a database connection using pyodbc.
     
     Args:
         readonly: Whether the connection should be read-only
-        uid: Username (defaults to DB_UID from environment)
-        pwd: Password (defaults to DB_PWD from environment)
-        dsn: DSN name (defaults to DB_DSN from environment)
-    
+  
     Returns:
         pyodbc.Connection: Database connection object
     
@@ -91,8 +87,8 @@ def get_connection(readonly: bool = True, uid: Optional[str] = None, pwd: Option
         ValueError: If required credentials are missing
         pyodbc.Error: If connection fails
     """
-    uid = uid or DB_UID
-    pwd = pwd or DB_PWD
+    uid = DB_UID
+    pwd = DB_PWD
 
     if not uid:
         raise ValueError("ODBC_USER environment variable is not set.")
@@ -112,7 +108,7 @@ def get_connection(readonly: bool = True, uid: Optional[str] = None, pwd: Option
     logger.info(f"Connecting to PostgreSQL with UID: {uid}")
     
     try:
-        return pyodbc.connect(connection_string, autocommit=True, readonly=readonly)
+        return pyodbc.connect(connection_string, autocommit=True, readonly=True)
     except pyodbc.Error as e:
         logger.error(f"Failed to connect to database: {e}")
         logger.error(f"Connection string used: {connection_string}")
@@ -213,8 +209,7 @@ mcp = FastMCP('mcp-sqlalchemy-server')
     NEXT STEPS: Use describe_table(table="table_name") to get detailed table structure.
     """
 )
-def get_tables(user: Optional[str] = None, password: Optional[str] = None, 
-               dsn: Optional[str] = None) -> str:
+def get_tables() -> str:
     """
     Retrieve and return a list containing information about all tables in matching_db.
 
@@ -227,7 +222,7 @@ def get_tables(user: Optional[str] = None, password: Optional[str] = None,
         str: JSON string containing table information
     """
     try:
-        with get_connection(True, user, password, dsn) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
             rs = cursor.tables(table=None, catalog=DEFAULT_SCHEMA, schema="%", tableType="TABLE")
             results = []
@@ -266,8 +261,7 @@ def get_tables(user: Optional[str] = None, password: Optional[str] = None,
     NEXT STEPS: Use this information to write proper SQL queries with execute_query() or query_database().
     """
 )
-def describe_table(table: str, user: Optional[str] = None, 
-                   password: Optional[str] = None, dsn: Optional[str] = None) -> str:
+def describe_table(table: str) -> str:
     """
     Retrieve and return a dictionary containing the definition of a table in matching_db.
 
@@ -281,7 +275,7 @@ def describe_table(table: str, user: Optional[str] = None,
         str: JSON string containing the table definition
     """
     try:
-        with get_connection(True, user, password, dsn) as conn:
+        with get_connection() as conn:
             has_table, table_info = _has_table(conn, catalog=DEFAULT_SCHEMA, table=table)
             if not has_table:
                 return json.dumps({"error": f"Table {table} not found in matching_db"}, indent=2)
@@ -319,8 +313,7 @@ def describe_table(table: str, user: Optional[str] = None,
     NEXT STEPS: Use describe_table(table="found_table_name") to understand the structure of found tables.
     """
 )
-def filter_table_names(query: str, user: Optional[str] = None, 
-                       password: Optional[str] = None, dsn: Optional[str] = None) -> str:
+def filter_table_names(query: str) -> str:
     """
     Retrieve and return a list containing information about tables whose names contain the substring.
 
@@ -334,7 +327,7 @@ def filter_table_names(query: str, user: Optional[str] = None,
         str: JSON string containing filtered table information
     """
     try:
-        with get_connection(True, user, password, dsn) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
             rs = cursor.tables(table=None, catalog=DEFAULT_SCHEMA, schema='%', tableType="TABLE")
             results = []
@@ -352,93 +345,90 @@ def filter_table_names(query: str, user: Optional[str] = None,
         raise
 
 
+# @mcp.tool(
+#     name="execute_query",
+#     description="""Execute a SQL query on the matching_db database and return results in JSONL format with row limit.
+    
+#     USAGE: Use this for exploratory queries or when you want to limit the number of results.
+#     This is the primary tool for running SELECT queries and getting data from matching_db.
+    
+#     PARAMETERS:
+#     - query: The SQL query to execute (REQUIRED)
+#     - max_rows: Maximum number of rows to return (default: 100)
+#     - params: Optional dictionary of parameters for parameterized queries
+#     - user/password/dsn: Optional connection overrides
+    
+#     EXAMPLES:
+#     - execute_query("SELECT * FROM candidate LIMIT 5") - Get first 5 candidates
+#     - execute_query("SELECT * FROM job WHERE status = 'published' LIMIT 10") - Filter for published jobs
+#     - execute_query("SELECT title, location FROM job WHERE experience_level = '5-7_years'") - Find jobs for a specific experience level
+#     - execute_query("SELECT c.full_name, j.title FROM application a JOIN candidate c ON a.candidate_id = c.id JOIN job j ON a.job_id = j.id LIMIT 10") - Get candidates and the jobs they applied for
+    
+#     BEST PRACTICES:
+#     - Always use LIMIT in your queries for large tables
+#     - Use parameterized queries to prevent SQL injection
+#     - Check table structure with describe_table() first
+#     - Use appropriate WHERE clauses to filter data
+#     - All queries run against the matching_db database
+    
+#     NEXT STEPS: Use query_database() if you need all results without row limit.
+#     """
+# )
+# def execute_query(query: str, max_rows: int = DEFAULT_MAX_ROWS, 
+#                   params: Optional[Dict[str, Any]] = None) -> str:
+#     """
+#     Execute a SQL query and return results in JSONL format.
+
+#     Args:
+#         query: The SQL query to execute
+#         max_rows: Maximum number of rows to return
+#         params: Optional dictionary of parameters to pass to the query
+ 
+
+#     Returns:
+#         str: Results in JSONL format
+#     """
+#     try:
+#         # Apply employer filter to the query
+#         filtered_query = apply_employer_filter_to_query(query)
+#         logger.info(f"Original query: {query}")
+#         if filtered_query != query:
+#             logger.info(f"Filtered query: {filtered_query}")
+        
+#         with get_connection() as conn:
+#             cursor = conn.cursor()
+#             rs = cursor.execute(filtered_query, params) if params else cursor.execute(filtered_query)
+            
+#             if not rs.description:
+#                 return json.dumps({"message": "Query executed successfully", "affected_rows": rs.rowcount})
+            
+#             columns = [column[0] for column in rs.description]
+#             results = []
+            
+#             for row in rs:
+#                 row_dict = dict(zip(columns, row))
+#                 # Truncate long string values
+#                 truncated_row = {
+#                     key: (str(value)[:MAX_LONG_DATA] if value is not None else None) 
+#                     for key, value in row_dict.items()
+#                 }
+#                 results.append(truncated_row)
+                
+#                 if len(results) >= max_rows:
+#                     break
+                
+#             # Convert the results to JSONL format
+#             jsonl_results = "\n".join(json.dumps(row) for row in results)
+#             return jsonl_results
+            
+#     except pyodbc.Error as e:
+#         logger.error(f"Error executing query: {e}")
+#         raise
+
+
 @mcp.tool(
     name="execute_query",
-    description="""Execute a SQL query on the matching_db database and return results in JSONL format with row limit.
-    
-    USAGE: Use this for exploratory queries or when you want to limit the number of results.
-    This is the primary tool for running SELECT queries and getting data from matching_db.
-    
-    PARAMETERS:
-    - query: The SQL query to execute (REQUIRED)
-    - max_rows: Maximum number of rows to return (default: 100)
-    - params: Optional dictionary of parameters for parameterized queries
-    - user/password/dsn: Optional connection overrides
-    
-    EXAMPLES:
-    - execute_query("SELECT * FROM candidate LIMIT 5") - Get first 5 candidates
-    - execute_query("SELECT * FROM job WHERE status = 'published' LIMIT 10") - Filter for published jobs
-    - execute_query("SELECT title, location FROM job WHERE experience_level = '5-7_years'") - Find jobs for a specific experience level
-    - execute_query("SELECT c.full_name, j.title FROM application a JOIN candidate c ON a.candidate_id = c.id JOIN job j ON a.job_id = j.id LIMIT 10") - Get candidates and the jobs they applied for
-    
-    BEST PRACTICES:
-    - Always use LIMIT in your queries for large tables
-    - Use parameterized queries to prevent SQL injection
-    - Check table structure with describe_table() first
-    - Use appropriate WHERE clauses to filter data
-    - All queries run against the matching_db database
-    
-    NEXT STEPS: Use query_database() if you need all results without row limit.
-    """
-)
-def execute_query(query: str, max_rows: int = DEFAULT_MAX_ROWS, 
-                  params: Optional[Dict[str, Any]] = None, user: Optional[str] = None, 
-                  password: Optional[str] = None, dsn: Optional[str] = None) -> str:
-    """
-    Execute a SQL query and return results in JSONL format.
-
-    Args:
-        query: The SQL query to execute
-        max_rows: Maximum number of rows to return
-        params: Optional dictionary of parameters to pass to the query
-        user: Optional username override
-        password: Optional password override
-        dsn: Optional DSN name override
-
-    Returns:
-        str: Results in JSONL format
-    """
-    try:
-        # Apply employer filter to the query
-        filtered_query = apply_employer_filter_to_query(query)
-        logger.info(f"Original query: {query}")
-        if filtered_query != query:
-            logger.info(f"Filtered query: {filtered_query}")
-        
-        with get_connection(True, user, password, dsn) as conn:
-            cursor = conn.cursor()
-            rs = cursor.execute(filtered_query, params) if params else cursor.execute(filtered_query)
-            
-            if not rs.description:
-                return json.dumps({"message": "Query executed successfully", "affected_rows": rs.rowcount})
-            
-            columns = [column[0] for column in rs.description]
-            results = []
-            
-            for row in rs:
-                row_dict = dict(zip(columns, row))
-                # Truncate long string values
-                truncated_row = {
-                    key: (str(value)[:MAX_LONG_DATA] if value is not None else None) 
-                    for key, value in row_dict.items()
-                }
-                results.append(truncated_row)
-                
-                if len(results) >= max_rows:
-                    break
-                
-            # Convert the results to JSONL format
-            jsonl_results = "\n".join(json.dumps(row) for row in results)
-            return jsonl_results
-            
-    except pyodbc.Error as e:
-        logger.error(f"Error executing query: {e}")
-        raise
-
-
-@mcp.tool(
-    name="execute_query_md",
-    description="""Execute a SQL query on the matching_db database and return results in Markdown table format.
+    description="""Execute a SQL query and return results in Markdown table format.
     
     USAGE: Use this when you want results formatted as a nice markdown table for display.
     This is great for reports, documentation, or when you want to show results in a readable format.
@@ -447,21 +437,19 @@ def execute_query(query: str, max_rows: int = DEFAULT_MAX_ROWS,
     - query: The SQL query to execute (REQUIRED)
     - max_rows: Maximum number of rows to return (default: 100)
     - params: Optional dictionary of parameters for parameterized queries
-    - user/password/dsn: Optional connection overrides
     
     EXAMPLES:
-    - execute_query_md("SELECT title, location, job_type FROM job WHERE status = 'published' LIMIT 10") - Nicely formatted table of published jobs
-    - execute_query_md("SELECT status, COUNT(*) as count FROM job GROUP BY status") - Summary table of jobs by status
-    - execute_query_md("SELECT c.full_name, j.title FROM application a JOIN candidate c ON a.candidate_id = c.id JOIN job j ON a.job_id = j.id LIMIT 5") - Show which candidates applied to which jobs
+    - execute_query("SELECT title, location, job_type FROM job WHERE status = 'published' LIMIT 10") - Nicely formatted table of published jobs
+    - execute_query("SELECT status, COUNT(*) as count FROM job GROUP BY status") - Summary table of jobs by status
+    - execute_query("SELECT c.full_name, j.title FROM application a JOIN candidate c ON a.candidate_id = c.id JOIN job j ON a.job_id = j.id LIMIT 5") - Show which candidates applied to which jobs
     
     RETURNS: Markdown-formatted table that can be directly displayed or included in documents.
     
     NEXT STEPS: Use execute_query() if you need JSONL format for further processing.
     """
 )
-def execute_query_md(query: str, max_rows: int = DEFAULT_MAX_ROWS, 
-                     params: Optional[Dict[str, Any]] = None, user: Optional[str] = None, 
-                     password: Optional[str] = None, dsn: Optional[str] = None) -> str:
+def execute_query(query: str, max_rows: int = DEFAULT_MAX_ROWS, 
+                     params: Optional[Dict[str, Any]] = None) -> str:
     """
     Execute a SQL query and return results in Markdown table format.
 
@@ -469,9 +457,7 @@ def execute_query_md(query: str, max_rows: int = DEFAULT_MAX_ROWS,
         query: The SQL query to execute
         max_rows: Maximum number of rows to return
         params: Optional dictionary of parameters to pass to the query
-        user: Optional username override
-        password: Optional password override
-        dsn: Optional DSN name override
+      
 
     Returns:
         str: Results in Markdown table format
@@ -483,7 +469,7 @@ def execute_query_md(query: str, max_rows: int = DEFAULT_MAX_ROWS,
         if filtered_query != query:
             logger.info(f"Filtered query: {filtered_query}")
         
-        with get_connection(True, user, password, dsn) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
             rs = cursor.execute(filtered_query, params) if params else cursor.execute(filtered_query)
             
@@ -529,7 +515,6 @@ def execute_query_md(query: str, max_rows: int = DEFAULT_MAX_ROWS,
     
     PARAMETERS:
     - query: The SQL query to execute (REQUIRED)
-    - user/password/dsn: Optional connection overrides
     
     EXAMPLES:
     - query_database("SELECT * FROM company") - Get all companies
@@ -539,20 +524,15 @@ def execute_query_md(query: str, max_rows: int = DEFAULT_MAX_ROWS,
     
     WARNING: Use with caution on large tables. Consider using execute_query() with LIMIT for exploration.
     
-    NEXT STEPS: Use execute_query() for limited results or execute_query_md() for formatted output.
+    NEXT STEPS: Use execute_query() for limited results or execute_query() for formatted output.
     """
 )
-def query_database(query: str, user: Optional[str] = None, password: Optional[str] = None, 
-                   dsn: Optional[str] = None) -> str:
+def query_database(query: str) -> str:
     """
     Execute a SQL query and return all results in JSONL format.
 
     Args:
         query: The SQL query to execute
-        user: Optional username override
-        password: Optional password override
-        dsn: Optional DSN name override
-
     Returns:
         str: All results in JSONL format
     """
@@ -563,7 +543,7 @@ def query_database(query: str, user: Optional[str] = None, password: Optional[st
         if filtered_query != query:
             logger.info(f"Filtered query: {filtered_query}")
         
-        with get_connection(True, user, password, dsn) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
             rs = cursor.execute(filtered_query)
             
@@ -582,9 +562,15 @@ def query_database(query: str, user: Optional[str] = None, password: Optional[st
                 }
                 results.append(truncated_row)
                 
-            # Convert the results to JSONL format
-            jsonl_results = "\n".join(json.dumps(row) for row in results)
-            return jsonl_results
+            # Create the Markdown table header
+            md_table = "| " + " | ".join(columns) + " |\n"
+            md_table += "| " + " | ".join(["---"] * len(columns)) + " |\n"
+
+            # Add rows to the Markdown table
+            for row in results:
+                md_table += "| " + " | ".join(str(row[col]) for col in columns) + " |\n"
+
+            return md_table
             
     except pyodbc.Error as e:
         logger.error(f"Error executing query: {e}")
@@ -612,8 +598,7 @@ def query_database(query: str, user: Optional[str] = None, password: Optional[st
     RETURNS: A list of matching rows from the table in JSONL format, ordered by similarity.
     """
 )
-def fuzzy_search_table(table: str, column: str, query: str, limit: int = 5, min_similarity: float = 0.3, 
-                       user: Optional[str] = None, password: Optional[str] = None, dsn: Optional[str] = None) -> str:
+def fuzzy_search_table(table: str, column: str, query: str, limit: int = 5, min_similarity: float = 0.3) -> str:
     """
     Performs a fuzzy search on a table column using trigram similarity.
     """
@@ -639,7 +624,7 @@ def fuzzy_search_table(table: str, column: str, query: str, limit: int = 5, min_
     params = (query, query, min_similarity, limit)
     
     try:
-        with get_connection(True, user, password, dsn) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
 
             # Validate table and column to prevent SQL injection

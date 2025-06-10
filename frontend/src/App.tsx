@@ -7,7 +7,6 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 
 // Lazy load page components
-const Index = lazy(() => import("./pages/Index"));
 const Signup = lazy(() => import("./pages/SignUp"));
 const JobDashboard = lazy(() => import("./pages/JobDashboard"));
 const FormKeysManagement = lazy(() => import("./pages/FormKeysManagement"));
@@ -16,7 +15,7 @@ const JobDetails = lazy(() => import("./pages/JobDetails"));
 const ApplicationDashboard = lazy(() => import("./pages/ApplicationDashboard"));
 const ViewEditApplication = lazy(() => import("./pages/ViewEditApplication"));
 const AddApplication = lazy(() => import("./pages/AddApplication"));
-const CompanyAnalytics = lazy(() => import("./pages/CompanyAnalytics"));
+const Index = lazy(() => import("./pages/Index"));
 const JobAnalytics = lazy(() => import("./pages/JobAnalytics"));
 const InterviewList = lazy(() => import("./pages/InterviewList"));
 const AddEditInterview = lazy(() => import("./pages/AddEditInterview"));
@@ -78,7 +77,6 @@ const App = () => (
               <Route path="/applications/create" element={<AddApplication />} />
               <Route path="/applications/:id" element={<ViewEditApplication />} />
               <Route path="/applications/:id/edit" element={<ViewEditApplication />} />
-              <Route path="/analytics" element={<CompanyAnalytics />} />
               <Route path="/interviews" element={<InterviewList />} />
               <Route path="/interviews/create" element={<AddEditInterview />} />
               <Route path="/interviews/:id/edit" element={<AddEditInterview />} />

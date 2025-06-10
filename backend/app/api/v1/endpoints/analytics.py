@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from core.security import TokenData
-from sqlmodel import Session, select, func
+from sqlmodel import Session, select, func, case, and_
 from sqlalchemy.orm import joinedload
 from core.database import get_session
-from models.models import Company, Job, Application, Interview
+from models.models import Company, Job, Application, Interview, Status
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime, timedelta
@@ -21,6 +21,13 @@ class ApplicationsOverTimeData(BaseModel):
     applications: int
 
 
+class RecentJobData(BaseModel):
+    title: str
+    applications: int
+    status: str
+    created_at: datetime
+
+
 class CompanyAnalyticsData(BaseModel):
     total_jobs: int
     total_applications: int
@@ -28,6 +35,7 @@ class CompanyAnalyticsData(BaseModel):
     hire_rate: float
     applications_over_time: List[ApplicationsOverTimeData]
     job_performance: List[JobPerformanceData]
+    recent_jobs: List[RecentJobData]
 
 
 @router.get("/company/", response_model=CompanyAnalyticsData)
@@ -40,6 +48,7 @@ def get_company_analytics(request: Request, db: Session = Depends(get_session)):
          )
     
     employer_id = current_user.employer_id   
+    
     # 1. Total Jobs
     total_jobs = db.exec(select(func.count(Job.id)).where(Job.employer_id == employer_id)).one()
 
@@ -58,21 +67,43 @@ def get_company_analytics(request: Request, db: Session = Depends(get_session)):
         .where(Job.employer_id == employer_id)
     ).one()
 
-    # 4. Hire Rate (dummy data as requested)
-    hire_rate = 68.0
+    # 4. Calculate real hire rate based on interviews marked as "done" vs total applications
+    completed_interviews = db.exec(
+        select(func.count(Interview.id))
+        .join(Application)
+        .join(Job)
+        .where(Job.employer_id == employer_id)
+        .where(Interview.status == "done")
+    ).one()
+    
+    hire_rate = round((completed_interviews / max(total_applications, 1)) * 100, 1) if total_applications > 0 else 0.0
 
     # 5. Applications Over Time (last 6 months)
     applications_over_time_data = []
     today = datetime.utcnow()
+    
     for i in range(6):
-        month_end = today - timedelta(days=today.day)
-        month_start = (month_end - timedelta(days=1)).replace(day=1)
-        
-        if i > 0:
-            month_start = (datetime(today.year, today.month, 1) - timedelta(days=i*30)).replace(day=1)
-            next_month = month_start.replace(day=28) + timedelta(days=4) # to get to next month
-            month_end = next_month - timedelta(days=next_month.day)
-
+        # Calculate month boundaries
+        if i == 0:
+            month_start = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            if today.month == 12:
+                month_end = today.replace(year=today.year + 1, month=1, day=1) - timedelta(days=1)
+            else:
+                month_end = today.replace(month=today.month + 1, day=1) - timedelta(days=1)
+        else:
+            # Go back i months
+            year = today.year
+            month = today.month - i
+            if month <= 0:
+                month += 12
+                year -= 1
+            month_start = datetime(year, month, 1)
+            
+            # Calculate month end
+            if month == 12:
+                month_end = datetime(year + 1, 1, 1) - timedelta(days=1)
+            else:
+                month_end = datetime(year, month + 1, 1) - timedelta(days=1)
 
         count = db.exec(
             select(func.count(Application.id))
@@ -81,17 +112,19 @@ def get_company_analytics(request: Request, db: Session = Depends(get_session)):
             .where(Application.created_at >= month_start)
             .where(Application.created_at <= month_end)
         ).one()
+        
         applications_over_time_data.append(
             ApplicationsOverTimeData(month=month_start.strftime("%b"), applications=count)
         )
+    
     applications_over_time_data.reverse()
 
-    # 6. Job Performance (top 5)
+    # 6. Job Performance (top 5 jobs by application count)
     job_performance_query = (
         select(Job.title, func.count(Application.id).label("application_count"))
         .join(Application, Job.id == Application.job_id)
         .where(Job.employer_id == employer_id)
-        .group_by(Job.title)
+        .group_by(Job.id, Job.title)
         .order_by(func.count(Application.id).desc())
         .limit(5)
     )
@@ -101,6 +134,26 @@ def get_company_analytics(request: Request, db: Session = Depends(get_session)):
         for title, count in job_performance_results
     ]
 
+    # 7. Recent Jobs (last 5 jobs with application counts)
+    recent_jobs_query = (
+        select(Job.title, func.count(Application.id).label("application_count"), Job.status, Job.created_at)
+        .outerjoin(Application, Job.id == Application.job_id)
+        .where(Job.employer_id == employer_id)
+        .group_by(Job.id, Job.title, Job.status, Job.created_at)
+        .order_by(Job.created_at.desc())
+        .limit(5)
+    )
+    recent_jobs_results = db.exec(recent_jobs_query).all()
+    recent_jobs_data = [
+        RecentJobData(
+            title=title, 
+            applications=count, 
+            status=status.value if status else "draft",
+            created_at=created_at
+        )
+        for title, count, status, created_at in recent_jobs_results
+    ]
+
     return CompanyAnalyticsData(
         total_jobs=total_jobs,
         total_applications=total_applications,
@@ -108,4 +161,5 @@ def get_company_analytics(request: Request, db: Session = Depends(get_session)):
         hire_rate=hire_rate,
         applications_over_time=applications_over_time_data,
         job_performance=job_performance_data,
+        recent_jobs=recent_jobs_data,
     )
