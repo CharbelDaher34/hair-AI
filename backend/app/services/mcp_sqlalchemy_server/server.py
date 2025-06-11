@@ -252,7 +252,7 @@ def apply_employer_filter_to_query(query: str) -> str:
 
 
 # MCP Server initialization
-mcp = FastMCP('mcp-sqlalchemy-server')
+mcp = FastMCP('mcp-sqlalchemy-server',port=5437, transport="sse")
 
 
 @mcp.tool(
@@ -309,7 +309,6 @@ def get_tables() -> str:
     
     PARAMETERS:
     - table: The table name in matching_db (REQUIRED)
-    - user/password/dsn: Optional connection overrides
     
     EXAMPLE: describe_table(table="job")
     
