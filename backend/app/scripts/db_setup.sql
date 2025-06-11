@@ -15,14 +15,25 @@ EXCEPTION WHEN undefined_object THEN
    RAISE NOTICE 'app_user does not exist, skipping revoke sequences';
 END $$;
 
--- Step 3: Revoke default privileges (tables and sequences)
+-- Step 3: Revoke all default privileges involving app_user
+DO $$
+BEGIN
 ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM app_user;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON SEQUENCES FROM app_user;
+EXCEPTION WHEN undefined_object THEN
+   RAISE NOTICE 'app_user does not exist, skipping revoke default privileges';
+END $$;
+
+DO $$
+BEGIN
+   EXECUTE 'ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON SEQUENCES FROM app_user';
+EXCEPTION WHEN undefined_object THEN
+   RAISE NOTICE 'app_user does not exist, skipping revoke default privileges';
+END $$;
 
 -- Step 4: Drop user only if exists
 DROP USER IF EXISTS app_user;
 
--- Step 5: Recreate the user
+-- Step 5: Recreate user
 CREATE USER app_user WITH LOGIN PASSWORD 'a';
 
 -- Step 6: Grant permissions
@@ -37,9 +48,6 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public
     GRANT USAGE, SELECT ON SEQUENCES TO app_user;
 
 -- Step 8: Create schema for RLS
-CREATE SCHEMA IF NOT EXISTS multi_tenancy;
-
---create schema for row level security
 CREATE SCHEMA IF NOT EXISTS multi_tenancy;
 
 /* ------------------------------------------------------------------

@@ -10,11 +10,15 @@ load_dotenv()
 
 DATABASE_URL = f"postgresql://{os.getenv('POSTGRES_USER')}:{os.getenv('POSTGRES_PASSWORD')}@{os.getenv('POSTGRES_SERVER')}:{os.getenv('POSTGRES_PORT')}/{os.getenv('POSTGRES_DB')}"
 print(DATABASE_URL)
-engine = create_engine(DATABASE_URL, echo=False)
+
+
+def get_engine():
+    return create_engine(DATABASE_URL, echo=False)
 
 def get_admin_engine():
     DATABASE_URL = f"postgresql://charbel:charbel@{os.getenv('POSTGRES_SERVER')}:{os.getenv('POSTGRES_PORT')}/{os.getenv('POSTGRES_DB')}"
     return create_engine(DATABASE_URL, echo=False)
+engine = get_admin_engine()
 
 def create_db_and_tables(admin=False):
     if admin:

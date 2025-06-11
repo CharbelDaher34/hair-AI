@@ -3,6 +3,13 @@ FROM python:3.13
 
 # Copy the uv package manager and its binary
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+# Install system dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        unixodbc \
+        unixodbc-dev && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -10,9 +17,7 @@ WORKDIR /app
 COPY app/pyproject.toml .
 
 # Install dependencies and ensure they're in PATH
-RUN uv lock && \
-    uv pip install --system uvicorn && \
-    uv sync --locked
+RUN uv sync
 
 # Copy the application code
 COPY app/ .
@@ -20,8 +25,4 @@ COPY app/ .
 # Make port 8017 available to the world outside this container
 EXPOSE 8017
 
-# Make the entrypoint script executable
-RUN chmod +x /app/entrypoint.sh
-
-# Use the entrypoint script
-ENTRYPOINT ["/app/entrypoint.sh"]
+CMD ["/bin/bash", "-c", "uv run scripts/create_tables.py && uv run main.py"]

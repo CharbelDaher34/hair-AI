@@ -61,10 +61,9 @@ DEFAULT_SCHEMA = "matching_db"
 EMPLOYER_ID_FILTER: Optional[int] = None
 
 # Database configuration
-DB_UID = os.getenv("ODBC_USER")
-DB_PWD = os.getenv("ODBC_PASSWORD")
-DB_DSN = os.getenv("ODBC_DSN")
-API_KEY = os.getenv("API_KEY")
+DB_UID = "app_user"
+DB_PWD = "a"
+DB_DSN = "matching_db"
 
 # Set custom ODBC configuration file path
 odbc_ini_path = os.path.join(os.path.dirname(__file__), "odbc.ini")
