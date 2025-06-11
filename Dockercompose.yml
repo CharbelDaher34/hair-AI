@@ -1,0 +1,52 @@
+services:
+  db:
+    image: postgres
+    container_name: local_pgdb
+    restart: no
+    ports:
+      - "5437:5432"
+    environment:
+      POSTGRES_USER: charbel
+      POSTGRES_PASSWORD: charbel
+      POSTGRES_DB: matching_db
+    volumes:
+      - local_pgdata:/var/lib/postgresql/data
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: pgadmin4_container
+    restart: always
+    ports:
+      - "8888:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: charbeldaher34@gmail.com
+      PGADMIN_DEFAULT_PASSWORD: charbel
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: backend
+    restart: always
+    ports: 
+      - "8017:8017"
+    depends_on:
+      - db
+    environment:
+      - POSTGRES_USER=app_user
+      - POSTGRES_PASSWORD=a
+      - POSTGRES_DB=matching_db
+      - POSTGRES_PORT=5437
+      - POSTGRES_HOST=db
+      - POSTGRES_HOST_AUTH_METHOD=trust
+  ai:
+    build:
+      context: ./ai
+      dockerfile: Dockerfile
+    container_name: ai
+    restart: always
+    ports: 
+      - "8011:8011"
+volumes:
+  local_pgdata:
+  pgadmin-data:
