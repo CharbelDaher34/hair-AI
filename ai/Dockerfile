@@ -10,18 +10,13 @@ WORKDIR /app
 COPY app/pyproject.toml .
 
 # Install dependencies and ensure they're in PATH
-RUN uv lock && \
-    uv pip install --system uvicorn && \
-    uv sync --locked
-
+RUN sync
 # Copy the application code
 COPY app/ .
 
 # Make port 8011 available to the world outside this container
 EXPOSE 8011
+RUN uv run python -m ensurepip --upgrade && \
+    uv run python -m spacy download en_core_web_lg
 
-# Make the entrypoint script executable
-RUN chmod +x /app/entrypoint.sh
-
-# Use the entrypoint script
-ENTRYPOINT ["/app/entrypoint.sh"]
+CMD ["uv","run","main.py"]
