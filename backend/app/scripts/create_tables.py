@@ -39,10 +39,8 @@ def main():
         create_db_and_tables(admin=True)
         apply_rls_policies()
         print("Database tables created successfully!")
-        return 0
     except Exception as e:
         print(f"Error creating database tables: {e}")
-        return 1
 
 if __name__ == "__main__":
     exit(main()) 
