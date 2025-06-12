@@ -11,11 +11,10 @@ from core.security import TokenData
 
 router = APIRouter()
 
+
 @router.post("/", response_model=CompanyRead, status_code=status.HTTP_201_CREATED)
 def create_company(
-    *,
-    db: Session = Depends(get_session),
-    company_in: CompanyCreate
+    *, db: Session = Depends(get_session), company_in: CompanyCreate
 ) -> CompanyRead:
     """
     Create a new company.
@@ -28,11 +27,10 @@ def create_company(
         raise e
     return company
 
+
 @router.get("/recruit_to", response_model=List[CompanyRead])
 def read_recruit_to_companies(
-    *,
-    db: Session = Depends(get_session),
-    request: Request
+    *, db: Session = Depends(get_session), request: Request
 ) -> List[CompanyRead]:
     """
     Get all companies that the current user can recruit to.
@@ -41,19 +39,18 @@ def read_recruit_to_companies(
     if not current_user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials"
+            detail="Could not validate credentials",
         )
-    
+
     employer_id = current_user.employer_id
     print(f"employer_id: {employer_id}")
     companies = crud_company.get_recruit_to_companies(db=db, employer_id=employer_id)
     return companies
 
+
 @router.get("/{employer_id}", response_model=CompanyRead)
 def read_company(
-    *,
-    db: Session = Depends(get_session),
-    employer_id: int
+    *, db: Session = Depends(get_session), employer_id: int
 ) -> CompanyRead:
     """
     Get a specific company by ID.
@@ -61,17 +58,14 @@ def read_company(
     company = crud_company.get_company(db=db, employer_id=employer_id)
     if not company:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Company not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Company not found"
         )
     return company
 
+
 @router.get("/", response_model=List[CompanyRead])
 def read_companies(
-    *,
-    db: Session = Depends(get_session),
-    skip: int = 0,
-    limit: int = 100
+    *, db: Session = Depends(get_session), skip: int = 0, limit: int = 100
 ) -> List[CompanyRead]:
     """
     Get all companies with pagination.
@@ -79,11 +73,10 @@ def read_companies(
     companies = crud_company.get_companies(db=db, skip=skip, limit=limit)
     return companies
 
+
 @router.get("/by-name/{name}", response_model=CompanyRead)
 def read_company_by_name(
-    *,
-    db: Session = Depends(get_session),
-    name: str
+    *, db: Session = Depends(get_session), name: str
 ) -> CompanyRead:
     """
     Get a specific company by name.
@@ -91,17 +84,14 @@ def read_company_by_name(
     company = crud_company.get_company_by_name(db=db, name=name)
     if not company:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Company not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Company not found"
         )
     return company
 
+
 @router.patch("/{employer_id}", response_model=CompanyRead)
 def update_company(
-    *,
-    db: Session = Depends(get_session),
-    employer_id: int,
-    company_in: CompanyUpdate
+    *, db: Session = Depends(get_session), employer_id: int, company_in: CompanyUpdate
 ) -> CompanyRead:
     """
     Update a company.
@@ -109,17 +99,17 @@ def update_company(
     company = crud_company.get_company(db=db, employer_id=employer_id)
     if not company:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Company not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Company not found"
         )
-    company = crud_company.update_company(db=db, db_company=company, company_in=company_in)
+    company = crud_company.update_company(
+        db=db, db_company=company, company_in=company_in
+    )
     return company
+
 
 @router.delete("/{employer_id}", response_model=CompanyRead)
 def delete_company(
-    *,
-    db: Session = Depends(get_session),
-    employer_id: int
+    *, db: Session = Depends(get_session), employer_id: int
 ) -> CompanyRead:
     """
     Delete a company.
@@ -127,16 +117,14 @@ def delete_company(
     company = crud_company.delete_company(db=db, employer_id=employer_id)
     if not company:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Company not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Company not found"
         )
     return company
 
+
 @router.get("/by_hr/", response_model=CompanyRead)
 def get_current_company(
-    *,
-    db: Session = Depends(get_session),
-    request: Request
+    *, db: Session = Depends(get_session), request: Request
 ) -> CompanyRead:
     """
     Get the current company.
@@ -145,7 +133,7 @@ def get_current_company(
     if not current_user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials"
+            detail="Could not validate credentials",
         )
     company = crud_company.get_company(db=db, employer_id=current_user.employer_id)
     return company
@@ -153,9 +141,7 @@ def get_current_company(
 
 @router.get("/candidates/", response_model=List[CandidateRead])
 def get_candidates_by_company(
-    *,
-    db: Session = Depends(get_session),
-    request: Request
+    *, db: Session = Depends(get_session), request: Request
 ) -> CandidateRead:
     """
     Get all candidates.
@@ -164,7 +150,9 @@ def get_candidates_by_company(
     if not current_user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials"
+            detail="Could not validate credentials",
         )
-    candidates = crud_candidate.get_candidates_by_company(db=db, employer_id=current_user.employer_id)
+    candidates = crud_candidate.get_candidates_by_company(
+        db=db, employer_id=current_user.employer_id
+    )
     return candidates

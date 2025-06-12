@@ -3,7 +3,7 @@
 # import os
 
 # system_prompt = """
-# You are a skilled resume parser. Extract all relevant information from the provided resume 
+# You are a skilled resume parser. Extract all relevant information from the provided resume
 # and structure it according to the Candidate schema. Follow these guidelines:
 
 # """
@@ -46,13 +46,17 @@ import requests
 from pydantic import BaseModel
 import json
 from enum import Enum
+
+
 class Skills(BaseModel):
     name: str
     level: str
 
+
 class Gender(Enum):
     MALE = "Male"
     FEMALE = "Female"
+
 
 class Candidate(BaseModel):
     name: str
@@ -60,15 +64,15 @@ class Candidate(BaseModel):
     gender: Gender
     skills: list[Skills]
 
+
 class Candidates(BaseModel):
     candidates: list[Candidate]
+
 
 url = "http://84.16.230.94:8011/parser/parse"
 
 schema_json = json.dumps(Candidate.model_json_schema())
-system_prompt = (
-    "You are a resume parser. Extract all relevant information from the provided resume and structure it according to the Candidate schema. Follow these guidelines:"
-)
+system_prompt = "You are a resume parser. Extract all relevant information from the provided resume and structure it according to the Candidate schema. Follow these guidelines:"
 
 # resume_texts = [
 #     "John Doe\nEmail: john@example.com\nSkills: Python, FastAPI, Machine Learning",
@@ -133,9 +137,21 @@ candidate_schema_for_batch_json = Candidate.model_json_schema()
 
 # Prepare file paths and open files
 batch_file_paths = [
-    ("alice_resume.pdf", "/storage/hussein/matching/ai/app/services/llm/Charbel_Daher_Resume.pdf", "application/pdf"),
-    ("alice_cert.png", "/storage/hussein/matching/ai/app/services/llm/images.jpeg", "image/png"),
-    ("bob_resume.pdf", "/storage/hussein/matching/ai/app/services/llm/Charbel_Daher_Resume.pdf", "application/pdf"),
+    (
+        "alice_resume.pdf",
+        "/storage/hussein/matching/ai/app/services/llm/Charbel_Daher_Resume.pdf",
+        "application/pdf",
+    ),
+    (
+        "alice_cert.png",
+        "/storage/hussein/matching/ai/app/services/llm/images.jpeg",
+        "image/png",
+    ),
+    (
+        "bob_resume.pdf",
+        "/storage/hussein/matching/ai/app/services/llm/Charbel_Daher_Resume.pdf",
+        "application/pdf",
+    ),
 ]
 opened_files = []
 files = []
@@ -154,30 +170,28 @@ batch_metadata = [
         ],
         "resume_files": ["alice_resume.pdf", "alice_cert.png"],
         "schema": json.dumps(candidate_schema_for_batch_json),
-        "system_prompt": "Extract candidate details for Alice."
+        "system_prompt": "Extract candidate details for Alice.",
     },
     {
         "resume_texts": None,
         "resume_files": ["bob_resume.pdf"],
         "schema": json.dumps(candidate_schema_for_batch_json),
-        "system_prompt": "Extract candidate details for Bob."
+        "system_prompt": "Extract candidate details for Bob.",
     },
     {
         "resume_texts": [],
         "resume_files": [],
         "schema": json.dumps(candidate_schema_for_batch_json),
-        "system_prompt": "This prompt will also be ignored."
-    }
+        "system_prompt": "This prompt will also be ignored.",
+    },
 ]
 
-batch_data = {
-    'batch_metadata': json.dumps(batch_metadata)
-}
+batch_data = {"batch_metadata": json.dumps(batch_metadata)}
 
 try:
     batch_response = requests.post(batch_url, data=batch_data, files=files)
     print("Batch parse response status:", batch_response.status_code)
-    print("Batch parse response headers:", batch_response.headers.get('Content-Type'))
+    print("Batch parse response headers:", batch_response.headers.get("Content-Type"))
     batch_response_json = batch_response.json()
     print("Batch parse response JSON:", json.dumps(batch_response_json, indent=2))
     # Parse each batch result as Candidate
@@ -197,4 +211,4 @@ except requests.exceptions.RequestException as e:
     print(f"Error during batch parse request: {e}")
 finally:
     for f in opened_files:
-        f.close()   
+        f.close()

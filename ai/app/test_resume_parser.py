@@ -45,7 +45,8 @@ Microsoft Certified: Azure Data Scientist Associate | Microsoft | 2019-11
 """
 
 
-input_data_list=["""
+input_data_list = [
+    """
             Sarah Johnson
 Senior Data Scientist
 sarah.johnson@example.com | (555) 987-6543 | New York, NY
@@ -60,7 +61,7 @@ Data Scientist | Tech Solutions Corp | 2018-09 to 2021-02
 - Developed predictive models for customer churn
 - Created data visualization dashboards using Tableau
 - Collaborated with cross-functional teams on product improvements""",
-"""
+    """
 EDUCATION
 Ph.D. in Statistics | Cornell University | 2014-09 to 2018-08
 Master of Science in Applied Mathematics | University of Michigan | 2012-09 to 2014-05
@@ -72,32 +73,41 @@ Python, R, TensorFlow, PyTorch, SQL, Big Data, Machine Learning, Deep Learning, 
 CERTIFICATIONS
 Google Cloud Professional Data Engineer | Google | 2020-05
 Microsoft Certified: Azure Data Scientist Associate | Microsoft | 2019-11
-"""]
+""",
+]
 
 
 async def test_parser(input_data=SAMPLE_RESUME):
     """Test the parsing functionality."""
-    parser = LLM(api_key=os.environ.get("API_KEY"), result_type=Candidate, system_prompt=system_prompt)
+    parser = LLM(
+        api_key=os.environ.get("API_KEY"),
+        result_type=Candidate,
+        system_prompt=system_prompt,
+    )
     # If input_data is a list of multiple resumes, use batch processing
     if isinstance(input_data, list) and len(input_data) > 1:
         results = await parser.parse_batch_async(input_data)
         type_data = "batch"
         for idx, result in enumerate(results):
-            print(f"\n=== Testing Parser for Resume {idx+1} in batch ===")
+            print(f"\n=== Testing Parser for Resume {idx + 1} in batch ===")
             print(f"Parsed Name: {result['candidate_name']}")
-            print(f"Email: {result['email_addresses'][0] if result['email_addresses'] else 'Not found'}")
+            print(
+                f"Email: {result['email_addresses'][0] if result['email_addresses'] else 'Not found'}"
+            )
             print("\nWork History:")
-            for job in result['work_history']:
-                print(f"- {job['job_title']} at {job['employer']} ({job['start_date']} to {job['end_date'] or 'Present'})")
+            for job in result["work_history"]:
+                print(
+                    f"- {job['job_title']} at {job['employer']} ({job['start_date']} to {job['end_date'] or 'Present'})"
+                )
             print("\nEducation:")
-            for edu in result['education']:
+            for edu in result["education"]:
                 print(f"- {edu['level']} in {edu['subject']} from {edu['institution']}")
             print("\nSkills:")
-            for skill in result['skills']:
+            for skill in result["skills"]:
                 print(f"- {skill['name']} ({skill['category']}, {skill['level']})")
-            with open(f"./services/llm/parsed_resume_batch_{idx+1}.json", "w") as f:
+            with open(f"./services/llm/parsed_resume_batch_{idx + 1}.json", "w") as f:
                 json.dump(result, f, indent=2, default=str)
-            print(f"\nFull result saved to parsed_resume_batch_{idx+1}.json")
+            print(f"\nFull result saved to parsed_resume_batch_{idx + 1}.json")
     else:
         if isinstance(input_data, list):
             input_data = input_data[0]
@@ -108,24 +118,29 @@ async def test_parser(input_data=SAMPLE_RESUME):
         result = await parser.parse_async(input_data)
         print(f"\n=== Testing Parser with {type_data} ===")
         print(f"Parsed Name: {result['candidate_name']}")
-        print(f"Email: {result['email_addresses'][0] if result['email_addresses'] else 'Not found'}")
+        print(
+            f"Email: {result['email_addresses'][0] if result['email_addresses'] else 'Not found'}"
+        )
         print("\nWork History:")
-        for job in result['work_history']:
-            print(f"- {job['job_title']} at {job['employer']} ({job['start_date']} to {job['end_date'] or 'Present'})")
+        for job in result["work_history"]:
+            print(
+                f"- {job['job_title']} at {job['employer']} ({job['start_date']} to {job['end_date'] or 'Present'})"
+            )
         print("\nEducation:")
-        for edu in result['education']:
+        for edu in result["education"]:
             print(f"- {edu['level']} in {edu['subject']} from {edu['institution']}")
         print("\nSkills:")
-        for skill in result['skills']:
+        for skill in result["skills"]:
             print(f"- {skill['name']} ({skill['category']}, {skill['level']})")
         with open(f"./services/llm/parsed_resume_{type_data}.json", "w") as f:
             json.dump(result, f, indent=2, default=str)
         print(f"\nFull result saved to parsed_resume_{type_data}.json")
 
+
 if __name__ == "__main__":
     pdf_path = "/storage/hussein/matching/ai/app/services/llm/Charbel_Daher_Resume.pdf"
     image_path = "/storage/hussein/matching/ai/app/services/llm/images.jpeg"
-    
+
     async def run_tests():
         try:
             await test_parser(input_data=input_data_list)
@@ -137,5 +152,5 @@ if __name__ == "__main__":
             print(f"Error: File not found - {e}")
         except Exception as e:
             print(f"Error occurred: {e}")
+
     asyncio.run(run_tests())
-    

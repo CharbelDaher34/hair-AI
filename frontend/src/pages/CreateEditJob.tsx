@@ -358,6 +358,7 @@ const CreateEditJob = () => {
       update_state_if_changed("description", response.description);
       update_state_if_changed("location", response.location);
       update_state_if_changed("job_type", response.job_type);
+      update_state_if_changed("job_category", response.job_category);
       update_state_if_changed("experience_level", response.experience_level);
       update_state_if_changed("seniority_level", response.seniority_level);
       
@@ -687,7 +688,9 @@ const CreateEditJob = () => {
                     />
               </div>
               <div className="space-y-2">
-                    <Label htmlFor="job_category" className="text-sm font-medium">Job Category</Label>
+                    <Label htmlFor="job_category" className="text-sm font-medium">
+                      Job Category {ai_generated_fields.has('job_category') && <AIGeneratedBadge />}
+                    </Label>
                     <Input
                       id="job_category"
                       value={job_data.job_category}

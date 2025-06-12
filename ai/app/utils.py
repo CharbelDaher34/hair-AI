@@ -47,8 +47,8 @@ def create_enum(enum_name: str, enum_values: list, globals_dict: dict) -> type[E
     # Pydantic uses __module__ to determine where the type comes from.
     # Setting it to a known module (like the calling module via globals_dict['__name__'])
     # can help, but adding to globals is usually the most direct way for dynamic types.
-    if '__name__' in globals_dict:
-        enum_type.__module__ = globals_dict['__name__']
+    if "__name__" in globals_dict:
+        enum_type.__module__ = globals_dict["__name__"]
     globals_dict[enum_name] = enum_type
     return enum_type
 
@@ -58,7 +58,9 @@ def create_model_from_schema(schema: dict, globals_dict: dict) -> type[BaseModel
     models: dict[str, type[BaseModel]] = {}
     enums: dict[str, type[Enum]] = {}
 
-    def resolve_field_type(field_schema_item: dict, field_name_context: str = "") -> type[Any]:
+    def resolve_field_type(
+        field_schema_item: dict, field_name_context: str = ""
+    ) -> type[Any]:
         """Resolves field type, including optional types, nullability, enums, and $refs."""
         nonlocal models, enums, schema, globals_dict
 
@@ -68,21 +70,36 @@ def create_model_from_schema(schema: dict, globals_dict: dict) -> type[BaseModel
                 return models[model_reference]
             if model_reference in enums:
                 return enums[model_reference]
-            
+
             defs = schema.get("$defs", {})
             if model_reference in defs:
                 def_schema_ref = defs[model_reference]
                 if def_schema_ref.get("enum") and model_reference not in enums:
-                    enums[model_reference] = create_enum(model_reference, def_schema_ref["enum"], globals_dict)
+                    enums[model_reference] = create_enum(
+                        model_reference, def_schema_ref["enum"], globals_dict
+                    )
                     return enums[model_reference]
-                if def_schema_ref.get("type") == "object" and model_reference not in models:
+                if (
+                    def_schema_ref.get("type") == "object"
+                    and model_reference not in models
+                ):
                     # Eagerly create the referenced model if it's an object
                     def_fields = {}
-                    for prop_name, prop_schema in def_schema_ref.get("properties", {}).items():
-                        field_type = resolve_field_type(field_schema_item=prop_schema, field_name_context=prop_name)
-                        field_params = get_field_params_from_field_schema(field_schema=prop_schema)
+                    for prop_name, prop_schema in def_schema_ref.get(
+                        "properties", {}
+                    ).items():
+                        field_type = resolve_field_type(
+                            field_schema_item=prop_schema, field_name_context=prop_name
+                        )
+                        field_params = get_field_params_from_field_schema(
+                            field_schema=prop_schema
+                        )
                         def_fields[prop_name] = (field_type, Field(**field_params))
-                    model = create_model(model_reference, **def_fields, __doc__=def_schema_ref.get("description", ""))
+                    model = create_model(
+                        model_reference,
+                        **def_fields,
+                        __doc__=def_schema_ref.get("description", ""),
+                    )
                     models[model_reference] = model
                     globals_dict[model_reference] = model
                     return model
@@ -90,24 +107,26 @@ def create_model_from_schema(schema: dict, globals_dict: dict) -> type[BaseModel
             # Fallback: return string name for forward ref (should be rare now)
             return model_reference
 
-        if "enum" in field_schema_item: # Inline enum definition
+        if "enum" in field_schema_item:  # Inline enum definition
             explicit_title = field_schema_item.get("title")
             if explicit_title:
                 base_name = explicit_title
             elif field_name_context:
                 base_name = field_name_context.capitalize() + "Enum"
             else:
-                base_name = "AnonymousEnum" # Fallback for truly anonymous inline enum
+                base_name = "AnonymousEnum"  # Fallback for truly anonymous inline enum
 
             enum_name_candidate = base_name
             counter = 0
             while enum_name_candidate in enums or enum_name_candidate in globals_dict:
                 counter += 1
                 enum_name_candidate = f"{base_name}{counter}"
-            
+
             final_enum_name = enum_name_candidate
             # enums dict is for local tracking during this creation process
-            enums[final_enum_name] = create_enum(final_enum_name, field_schema_item["enum"], globals_dict)
+            enums[final_enum_name] = create_enum(
+                final_enum_name, field_schema_item["enum"], globals_dict
+            )
             return enums[final_enum_name]
 
         if "anyOf" in field_schema_item:
@@ -117,26 +136,28 @@ def create_model_from_schema(schema: dict, globals_dict: dict) -> type[BaseModel
                 if sub_schema.get("type") == "null":
                     has_none = True
                 else:
-                    types.append(resolve_field_type(sub_schema, field_name_context)) # Recursive call
-            
-            if not types: # Only "null" was present or empty anyOf
+                    types.append(
+                        resolve_field_type(sub_schema, field_name_context)
+                    )  # Recursive call
+
+            if not types:  # Only "null" was present or empty anyOf
                 return type(None)
 
             # Filter out type(None) if Optional is used
             actual_types = [t for t in types if t is not type(None)]
-            
+
             if len(actual_types) == 1:
                 resolved_type = actual_types[0]
             elif actual_types:
                 # Pydantic uses Union for anyOf with multiple types
                 # Ensure Union is imported from typing
                 from typing import Union as TypingUnion
-                resolved_type = TypingUnion[tuple(actual_types)] # type: ignore
-            else: # Only type(None) was effectively present in types after filtering
-                 return type(None)
+
+                resolved_type = TypingUnion[tuple(actual_types)]  # type: ignore
+            else:  # Only type(None) was effectively present in types after filtering
+                return type(None)
 
             return Optional[resolved_type] if has_none else resolved_type
-
 
         field_type_str = field_schema_item.get("type")
         py_type = TYPE_MAPPING.get(field_type_str, Any)
@@ -145,26 +166,31 @@ def create_model_from_schema(schema: dict, globals_dict: dict) -> type[BaseModel
             item_schema = field_schema_item["items"]
             # Pass a modified context name for items, e.g. "MyFieldItem"
             item_py_type = resolve_field_type(item_schema, field_name_context + "Item")
-            return List[item_py_type] # type: ignore
+            return List[item_py_type]  # type: ignore
 
         if py_type is dict and "additionalProperties" in field_schema_item:
             # Assuming additionalProperties defines the type of values in the dict
             # JSON schema for object with unspecified keys uses additionalProperties for value type
             value_schema = field_schema_item["additionalProperties"]
-            if isinstance(value_schema, dict): # If additionalProperties is a schema
-                 # Pass a modified context name for values, e.g. "MyFieldValue"
-                value_py_type = resolve_field_type(value_schema, field_name_context + "Value")
-                return Dict[str, value_py_type] # type: ignore
-            elif value_schema is True: # Allows any type for values
+            if isinstance(value_schema, dict):  # If additionalProperties is a schema
+                # Pass a modified context name for values, e.g. "MyFieldValue"
+                value_py_type = resolve_field_type(
+                    value_schema, field_name_context + "Value"
+                )
+                return Dict[str, value_py_type]  # type: ignore
+            elif value_schema is True:  # Allows any type for values
                 return Dict[str, Any]
-            else: # additionalProperties is false, no extra props allowed (empty dict essentially)
-                return Dict[str, Any] # Or raise error / use a more restrictive type
-        
+            else:  # additionalProperties is false, no extra props allowed (empty dict essentially)
+                return Dict[str, Any]  # Or raise error / use a more restrictive type
+
         # Handle simple object type if not using additionalProperties for value types
         # This typically means a generic dict without specified value types from schema
-        if py_type is dict and "properties" not in field_schema_item and "additionalProperties" not in field_schema_item:
+        if (
+            py_type is dict
+            and "properties" not in field_schema_item
+            and "additionalProperties" not in field_schema_item
+        ):
             return Dict[str, Any]
-
 
         return py_type
 
@@ -172,53 +198,75 @@ def create_model_from_schema(schema: dict, globals_dict: dict) -> type[BaseModel
     # This ensures they are in globals_dict before being referenced by main model or other defs.
     definitions = schema.get("$defs", {})
     for def_name, def_schema in definitions.items():
-        if def_schema.get("type") == "object": # It's a Pydantic model definition
-            if def_name not in models: # Avoid reprocessing if already created by a forward ref
+        if def_schema.get("type") == "object":  # It's a Pydantic model definition
+            if (
+                def_name not in models
+            ):  # Avoid reprocessing if already created by a forward ref
                 def_fields = {}
                 for prop_name, prop_schema in def_schema.get("properties", {}).items():
-                    field_type = resolve_field_type(field_schema_item=prop_schema, field_name_context=prop_name)
-                    field_params = get_field_params_from_field_schema(field_schema=prop_schema)
+                    field_type = resolve_field_type(
+                        field_schema_item=prop_schema, field_name_context=prop_name
+                    )
+                    field_params = get_field_params_from_field_schema(
+                        field_schema=prop_schema
+                    )
                     def_fields[prop_name] = (field_type, Field(**field_params))
-                
-                model = create_model(def_name, **def_fields, __doc__=def_schema.get("description", ""))
-                models[def_name] = model
-                globals_dict[def_name] = model # Crucial for Pydantic to find it by name
 
-        elif def_schema.get("enum"): # It's an Enum definition in $defs
+                model = create_model(
+                    def_name, **def_fields, __doc__=def_schema.get("description", "")
+                )
+                models[def_name] = model
+                globals_dict[def_name] = (
+                    model  # Crucial for Pydantic to find it by name
+                )
+
+        elif def_schema.get("enum"):  # It's an Enum definition in $defs
             if def_name not in enums:
                 # create_enum adds it to globals_dict
-                enums[def_name] = create_enum(def_name, def_schema["enum"], globals_dict)
+                enums[def_name] = create_enum(
+                    def_name, def_schema["enum"], globals_dict
+                )
 
     # Now, create the main model, resolving references
     main_fields = {}
     for field_name, field_schema_item in schema.get("properties", {}).items():
-        field_type = resolve_field_type(field_schema_item=field_schema_item, field_name_context=field_name)
-        field_params = get_field_params_from_field_schema(field_schema=field_schema_item)
+        field_type = resolve_field_type(
+            field_schema_item=field_schema_item, field_name_context=field_name
+        )
+        field_params = get_field_params_from_field_schema(
+            field_schema=field_schema_item
+        )
         main_fields[field_name] = (field_type, Field(**field_params))
 
     # Use the title directly from the schema for the main model
     final_main_model_title = schema.get("title", "MainModel")
 
-    main_model = create_model(final_main_model_title, **main_fields, __doc__=schema.get("description", ""))
-    globals_dict[final_main_model_title] = main_model # Add/update main model in globals
+    main_model = create_model(
+        final_main_model_title, **main_fields, __doc__=schema.get("description", "")
+    )
+    globals_dict[final_main_model_title] = (
+        main_model  # Add/update main model in globals
+    )
 
     # After all models are created and placed in globals_dict,
     # rebuild them to resolve any forward references.
-    
+
     # Collect all dynamically created Pydantic model classes
     all_pydantic_model_classes_to_rebuild = []
     # Add models from $defs (stored in the 'models' dictionary)
     for model_class in models.values():
         if isinstance(model_class, type) and issubclass(model_class, BaseModel):
             all_pydantic_model_classes_to_rebuild.append(model_class)
-    
+
     # Add the main model itself
     if isinstance(main_model, type) and issubclass(main_model, BaseModel):
         # Avoid adding main_model if it's already in the list by reference
         # (e.g., if main_model was one of the models from $defs, though unlikely for the root model)
-        is_main_model_already_in_list = any(mc is main_model for mc in all_pydantic_model_classes_to_rebuild)
+        is_main_model_already_in_list = any(
+            mc is main_model for mc in all_pydantic_model_classes_to_rebuild
+        )
         if not is_main_model_already_in_list:
-             all_pydantic_model_classes_to_rebuild.append(main_model)
+            all_pydantic_model_classes_to_rebuild.append(main_model)
 
     # Call model_rebuild() on each collected Pydantic model class.
     # This helps Pydantic resolve all forward references using the types now available
@@ -229,7 +277,9 @@ def create_model_from_schema(schema: dict, globals_dict: dict) -> type[BaseModel
         except Exception as e:
             # Log a warning if a model fails to rebuild, as this might indicate
             # an unresolvable type or a deeper schema issue.
-            print(f"Warning: Error during model_rebuild for {p_model_class.__name__}: {e}")
+            print(
+                f"Warning: Error during model_rebuild for {p_model_class.__name__}: {e}"
+            )
             # Depending on requirements, one might choose to raise an error here.
 
     return main_model

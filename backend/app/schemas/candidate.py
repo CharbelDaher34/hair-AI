@@ -3,6 +3,7 @@ from sqlmodel import SQLModel
 from models.models import CandidateBase, Candidate
 from utils.pydantic_utils import make_optional
 
+
 class CandidateCreate(CandidateBase):
     pass
 
@@ -10,8 +11,6 @@ class CandidateCreate(CandidateBase):
 @make_optional
 class CandidateUpdate(CandidateBase):
     id: int
-    
-
 
 
 class CandidateRead(CandidateBase):

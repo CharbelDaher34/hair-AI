@@ -7,6 +7,7 @@ from utils.pydantic_utils import make_optional
 class CompanyCreate(CompanyBase):
     pass
 
+
 @make_optional
 class CompanyUpdate(CompanyBase):
     id: int

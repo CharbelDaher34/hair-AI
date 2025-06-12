@@ -4,10 +4,9 @@ from sqlmodel import SQLModel
 
 from pydantic import BaseModel
 
-from models.models import  InterviewBase
+from models.models import InterviewBase
 from schemas.application import ApplicationWithDetails
 from utils.pydantic_utils import make_optional
-
 
 
 class InterviewCreate(InterviewBase):
@@ -22,11 +21,10 @@ class InterviewUpdate(InterviewBase):
 class InterviewRead(InterviewBase):
     id: int
 
-
     model_config = {"from_attributes": True}
 
 
 class InterviewReadWithApplication(InterviewRead):
     application: ApplicationWithDetails
 
-    model_config = {"from_attributes": True} 
+    model_config = {"from_attributes": True}

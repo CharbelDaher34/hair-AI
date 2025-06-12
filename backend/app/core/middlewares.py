@@ -8,10 +8,7 @@ from starlette.types import ASGIApp
 
 class ErrorTracebackMiddleware(BaseHTTPMiddleware):
     def __init__(
-        self,
-        app: ASGIApp,
-        include_traceback: bool = True,
-        debug_mode: bool = True
+        self, app: ASGIApp, include_traceback: bool = True, debug_mode: bool = True
     ):
         super().__init__(app)
         self.include_traceback = include_traceback
@@ -24,7 +21,7 @@ class ErrorTracebackMiddleware(BaseHTTPMiddleware):
         except Exception as e:
             # Get the full traceback
             tb = traceback.format_exc()
-            
+
             # Print the error and traceback for debugging
             print("\n=== Error Traceback ===")
             print(f"Request: {request.method} {request.url}")
@@ -37,14 +34,11 @@ class ErrorTracebackMiddleware(BaseHTTPMiddleware):
             error_response = {
                 "detail": str(e),
                 "status_code": 500,
-                "path": str(request.url)
+                "path": str(request.url),
             }
 
             # Include traceback in response only if debug mode is enabled
             if self.debug_mode and self.include_traceback:
                 error_response["traceback"] = tb.split("\n")
 
-            return JSONResponse(
-                status_code=500,
-                content=error_response
-            )
+            return JSONResponse(status_code=500, content=error_response)

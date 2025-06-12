@@ -15,6 +15,7 @@ class EducationLevel(str, Enum):
     certificate = "Certificate"
     other = "Other"
 
+
 class EmploymentType(str, Enum):
     full_time = "Full-time"
     part_time = "Part-time"
@@ -22,6 +23,8 @@ class EmploymentType(str, Enum):
     internship = "Internship"
     freelance = "Freelance"
     volunteer = "Volunteer"
+
+
 class DegreeType(str, Enum):
     bachelor = "Bachelor’s"
     master = "Master’s"
@@ -29,43 +32,65 @@ class DegreeType(str, Enum):
     diploma = "Diploma"
     other = "Other"
 
+
 # Sub-models
 class WorkHistoryItem(BaseModel):
     job_title: str = Field(..., description="Job title in this role.")
     employer: str = Field(..., description="Name of the employer.")
     location: str = Field(..., description="Location where the job was held.")
-    employment_type: EmploymentType = Field(..., description="Type of employment (e.g., Full-time, Part-time).")
+    employment_type: EmploymentType = Field(
+        ..., description="Type of employment (e.g., Full-time, Part-time)."
+    )
     # naics_code: Optional[str] = Field(None, description="Industry classification code (NAICS).")
     # naics_industry_name: Optional[str] = Field(None, description="Industry name from NAICS code.")
-    start_date: date|str = Field(..., description="Job start date.")
-    end_date: Optional[date|str] = Field(None, description="Job end date, null if currently employed.")
+    start_date: date | str = Field(..., description="Job start date.")
+    end_date: Optional[date | str] = Field(
+        None, description="Job end date, null if currently employed."
+    )
     summary: str = Field(..., description="Brief summary of role and responsibilities.")
 
 
-
 class EducationItem(BaseModel):
-    level: EducationLevel = Field(..., description="Education level (e.g., Bachelor’s, Master’s).")
-    degree_type: DegreeType = Field(..., description="Degree name (e.g., BS in Computer Science).")
+    level: EducationLevel = Field(
+        ..., description="Education level (e.g., Bachelor’s, Master’s)."
+    )
+    degree_type: DegreeType = Field(
+        ..., description="Degree name (e.g., BS in Computer Science)."
+    )
     subject: str = Field(..., description="Major or field of study.")
-    start_date: date|str = Field(..., description="Start date of the program.")
-    end_date: Optional[date|str] = Field(None, description="End or expected graduation date.")
+    start_date: date | str = Field(..., description="Start date of the program.")
+    end_date: Optional[date | str] = Field(
+        None, description="End or expected graduation date."
+    )
     institution: str = Field(..., description="Name of the educational institution.")
     gpa: Optional[float] = Field(None, description="Grade Point Average if available.")
-    summary: Optional[str] = Field(None, description="Additional notes such as honors or thesis.")
+    summary: Optional[str] = Field(
+        None, description="Additional notes such as honors or thesis."
+    )
 
 
 class SkillItem(BaseModel):
     name: str = Field(..., description="Name of the skill (e.g., Python).")
-    category: str = Field(..., description="Category of the skill (e.g., Programming Language).")
-    level: str = Field(..., description="Proficiency level (e.g., Beginner, Intermediate, Expert).")
+    category: str = Field(
+        ..., description="Category of the skill (e.g., Programming Language)."
+    )
+    level: str = Field(
+        ..., description="Proficiency level (e.g., Beginner, Intermediate, Expert)."
+    )
 
 
 class CertificationItem(BaseModel):
     certification: str = Field(..., description="Name of the certification.")
-    certification_group: Optional[str] = Field(None, description="High-level category of the certification.")
+    certification_group: Optional[str] = Field(
+        None, description="High-level category of the certification."
+    )
     # certification_family: Optional[str] = Field(None, description="Sub-category of the certification.")
-    issued_by: Optional[str] = Field(None, description="Issuing organization (e.g., AWS).")
-    issue_date: Optional[date|str] = Field(None, description="Date when the certification was issued.")
+    issued_by: Optional[str] = Field(
+        None, description="Issuing organization (e.g., AWS)."
+    )
+    issue_date: Optional[date | str] = Field(
+        None, description="Date when the certification was issued."
+    )
     # expiry_date: Optional[date] = Field(None, description="Expiry date of the certification if applicable.")
     # cert_id: Optional[str] = Field(None, description="Unique certificate ID.")
     # url: Optional[HttpUrl] = Field(None, description="URL to the certification credential.")
@@ -99,7 +124,15 @@ class CandidateResume(BaseModel):
     # web_addresses: List[HttpUrl] = Field(..., description="List of personal/professional websites.")
 
     # Candidate background
-    work_history: Optional[List[WorkHistoryItem]] = Field(None, description="List of work experience entries.")
-    education: Optional[List[EducationItem]] = Field(None, description="List of education history entries.")
-    skills: Optional[List[SkillItem]] = Field(None, description="List of skills the candidate possesses.")
-    certifications: Optional[List[CertificationItem]] = Field(None, description="List of certifications held by the candidate.")
+    work_history: Optional[List[WorkHistoryItem]] = Field(
+        None, description="List of work experience entries."
+    )
+    education: Optional[List[EducationItem]] = Field(
+        None, description="List of education history entries."
+    )
+    skills: Optional[List[SkillItem]] = Field(
+        None, description="List of skills the candidate possesses."
+    )
+    certifications: Optional[List[CertificationItem]] = Field(
+        None, description="List of certifications held by the candidate."
+    )
