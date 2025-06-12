@@ -3,6 +3,7 @@ from sqlmodel import SQLModel
 from models.models import MatchBase, Match
 from utils.pydantic_utils import make_optional
 
+
 class MatchCreate(MatchBase):
     pass
 
@@ -11,5 +12,6 @@ class MatchCreate(MatchBase):
 class MatchUpdate(MatchBase):
     id: int
 
+
 class MatchRead(MatchBase):
-    id: int 
+    id: int

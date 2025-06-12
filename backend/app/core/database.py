@@ -2,7 +2,9 @@ from contextlib import contextmanager
 import time
 from sqlmodel import create_engine, SQLModel, Session
 from sqlalchemy import inspect, text
-from models.models import target_metadata  # Import metadata to ensure all models are registered
+from models.models import (
+    target_metadata,
+)  # Import metadata to ensure all models are registered
 import os
 from dotenv import load_dotenv
 
@@ -15,18 +17,23 @@ print(DATABASE_URL)
 def get_engine():
     return create_engine(DATABASE_URL, echo=False)
 
+
 def get_admin_engine():
     DATABASE_URL = f"postgresql://charbel:charbel@{os.getenv('POSTGRES_SERVER')}:{os.getenv('POSTGRES_PORT')}/{os.getenv('POSTGRES_DB')}"
     return create_engine(DATABASE_URL, echo=False)
+
+
 engine = get_admin_engine()
 
+
 def create_db_and_tables(admin=False):
-    if admin:
-        target_metadata.drop_all(get_admin_engine())
+    all_exist, missing_tables = check_db_tables()
+    if not all_exist:
         target_metadata.create_all(get_admin_engine())
+        print(f"Created {len(missing_tables)} missing tables: {missing_tables}")
     else:
-        target_metadata.drop_all(engine)
-        target_metadata.create_all(engine)
+        print("All tables already exist")
+
 
 def check_db_tables():
     """
@@ -39,6 +46,7 @@ def check_db_tables():
     missing_tables = list(expected_tables - existing_tables)
     all_exist = len(missing_tables) == 0
     return all_exist, missing_tables
+
 
 def get_session():
     with Session(engine) as session:
@@ -57,13 +65,16 @@ def get_session_rls(company_id: int):
             # Use query parameters to prevent SQL injection
             session.execute(
                 text("SET LOCAL multi_tenancy.current_company_id = :company_id"),
-                {"company_id": str(company_id)} # The value is cast to string here to match the RLS policy's expectation
+                {
+                    "company_id": str(company_id)
+                },  # The value is cast to string here to match the RLS policy's expectation
             )
             yield session
         finally:
             # The 'with' block ensures the session is properly closed, and the
             # transaction-local setting is discarded automatically.
             pass
+
 
 def test_rls(company_id: int):
     from models.models import HR, Company, Job, Candidate, Application, Match
@@ -73,7 +84,9 @@ def test_rls(company_id: int):
     print(f"Testing row level security with company id = {company_id}")
     with get_session_rls(company_id) as session:
         # Check if the session variable is set correctly
-        session_var = session.execute(text("SELECT current_setting('multi_tenancy.current_company_id', TRUE)")).scalar()
+        session_var = session.execute(
+            text("SELECT current_setting('multi_tenancy.current_company_id', TRUE)")
+        ).scalar()
         print(f"Session variable value is: '{session_var}'")
 
         stmt = select(Company)
@@ -92,13 +105,17 @@ def test_rls(company_id: int):
         candidates = session.exec(stmt).all()
         print(f"Found {len(candidates)} Candidate(s):")
         for candidate in candidates:
-            print(f"  - Candidate: {candidate.full_name}, Company ID: {candidate.employer_id}")
+            print(
+                f"  - Candidate: {candidate.full_name}, Company ID: {candidate.employer_id}"
+            )
 
         stmt = select(Application)
         applications = session.exec(stmt).all()
         print(f"Found {len(applications)} Application(s):")
         for application in applications:
-            print(f"  - Application: {application.id}, Candidate ID: {application.candidate_id}, Job ID: {application.job_id}")
+            print(
+                f"  - Application: {application.id}, Candidate ID: {application.candidate_id}, Job ID: {application.job_id}"
+            )
 
         stmt = select(Match)
         matches = session.exec(stmt).all()

@@ -12,12 +12,13 @@ import shutil
 
 router = APIRouter()
 
+
 # This model is for the items in the JSON payload of the /batch_parse endpoint
 class BatchParseItem(BaseModel):
     resume_texts: Optional[List[str]] = None
     resume_files: Optional[Any] = None  # Client sends null/None for this in tests.
-                                        # Actual file content would need different handling (e.g., base64).
-    schema_str: str # Expects a JSON string for the schema
+    # Actual file content would need different handling (e.g., base64).
+    schema_str: str  # Expects a JSON string for the schema
     system_prompt: Optional[str] = None
 
     class Config:
@@ -29,32 +30,38 @@ class BatchParseItem(BaseModel):
         # So, let's rename fields to match the test client.
         pass
 
+
 # Re-defining BatchParseItem to match keys used in test_parser_endpoint.py for batch_payload
 class CleanBatchParseItem(BaseModel):
     resume_texts: Optional[List[str]] = None
-    resume_files: Optional[Any] = None 
+    resume_files: Optional[Any] = None
     schema: str  # This will be the JSON string for the schema, matching "schema" key in client
-    system_prompt: Optional[str] = None # Matches "system_prompt" key in client
+    system_prompt: Optional[str] = None  # Matches "system_prompt" key in client
 
 
 # Helper function to process uploaded files asynchronously
-async def process_uploaded_files(resume_files: List[UploadFile]) -> tuple[List[str], str]:
+async def process_uploaded_files(
+    resume_files: List[UploadFile],
+) -> tuple[List[str], str]:
     temp_dir = tempfile.mkdtemp()
     processed_file_paths = []
     for file in resume_files:
-        safe_filename = os.path.basename(file.filename) 
+        safe_filename = os.path.basename(file.filename)
         temp_file_path = os.path.join(temp_dir, safe_filename)
-        
+
         try:
             async with aiofiles.open(temp_file_path, "wb") as f:
-                content = await file.read() 
+                content = await file.read()
                 await f.write(content)
             processed_file_paths.append(temp_file_path)
         except Exception as e:
             shutil.rmtree(temp_dir)
-            raise HTTPException(status_code=500, detail=f"Error processing file {file.filename}: {e}")
+            raise HTTPException(
+                status_code=500, detail=f"Error processing file {file.filename}: {e}"
+            )
 
     return processed_file_paths, temp_dir
+
 
 # @router.post("/parse")
 # async def parse_resume(
@@ -68,7 +75,7 @@ async def process_uploaded_files(resume_files: List[UploadFile]) -> tuple[List[s
 #     """
 #     if not resume_texts and not resume_files:
 #         raise HTTPException(status_code=400, detail="Either resume_texts or resume_files must be provided.")
-    
+
 #     api_key = os.environ.get("API_KEY")
 #     if not api_key:
 #         raise HTTPException(status_code=500, detail="API_KEY not configured.")
@@ -78,7 +85,7 @@ async def process_uploaded_files(resume_files: List[UploadFile]) -> tuple[List[s
 #         schema_dict = json.loads(schema)
 #     except Exception as e:
 #         raise HTTPException(status_code=400, detail=f"Schema is not valid JSON: {e}")
-    
+
 #     schema_model = create_model_from_schema(schema_dict, globals_dict=globals())
 #     if not issubclass(schema_model, BaseModel): # create_model_from_schema should ideally raise or return None on failure
 #         raise HTTPException(status_code=400, detail="Schema must be a valid Pydantic model.")
@@ -100,8 +107,8 @@ async def process_uploaded_files(resume_files: List[UploadFile]) -> tuple[List[s
 #             # Pass resume_files (List[UploadFile]) directly to process_uploaded_files
 #             processed_file_paths, temp_dir_to_clean = await process_uploaded_files(resume_files)
 #             input_data.extend(processed_file_paths)
-        
-#         if not input_data: 
+
+#         if not input_data:
 #              raise HTTPException(status_code=400, detail="No data to parse.")
 
 #         result = await llm_parser.parse_async(input_data)
@@ -110,11 +117,12 @@ async def process_uploaded_files(resume_files: List[UploadFile]) -> tuple[List[s
 #         if temp_dir_to_clean and os.path.exists(temp_dir_to_clean):
 #             shutil.rmtree(temp_dir_to_clean)
 
+
 @router.post("/parse")
 async def parse_resume(
     inputs: List[Union[str, UploadFile]] = Form(...),
     schema: str = Form(...),
-    system_prompt: Optional[str] = Form(default=None)
+    system_prompt: Optional[str] = Form(default=None),
 ):
     """
     Parse resumes from ordered list of text strings or files (PDF/images) and return structured candidate data.
@@ -130,13 +138,13 @@ async def parse_resume(
         schema_dict = json.loads(schema)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Schema is not valid JSON: {e}")
-    
+
     schema_model = create_model_from_schema(schema_dict, globals_dict=globals())
     if not issubclass(schema_model, BaseModel):
-        raise HTTPException(status_code=400, detail="Schema must be a valid Pydantic model.")
-    
-    
-    
+        raise HTTPException(
+            status_code=400, detail="Schema must be a valid Pydantic model."
+        )
+
     llm_parser = LLM(
         api_key=api_key,
         system_prompt=system_prompt,
@@ -146,30 +154,34 @@ async def parse_resume(
     processed_inputs = []
     files_to_process = []
     temp_dir_to_clean = None
-    
+
     try:
         for input_item in inputs:
-            print(f"input_item: {input_item}, type: {type(input_item)}, filename: {getattr(input_item, 'filename', None)}")
-            if hasattr(input_item, 'filename') and hasattr(input_item, 'read'):
+            print(
+                f"input_item: {input_item}, type: {type(input_item)}, filename: {getattr(input_item, 'filename', None)}"
+            )
+            if hasattr(input_item, "filename") and hasattr(input_item, "read"):
                 if input_item.filename:  # It's a real file
                     files_to_process.append(input_item)
                     processed_inputs.append(None)
                 else:  # It's a text field sent as a file
-                    text = (await input_item.read()).decode('utf-8')
+                    text = (await input_item.read()).decode("utf-8")
                     processed_inputs.append(text)
             else:
                 processed_inputs.append(str(input_item))
-        
+
         if files_to_process:
-            processed_file_paths, temp_dir_to_clean = await process_uploaded_files(files_to_process)
-           
+            processed_file_paths, temp_dir_to_clean = await process_uploaded_files(
+                files_to_process
+            )
+
             # Replace placeholders with actual file paths in order
             file_index = 0
             for i, item in enumerate(processed_inputs):
                 if item is None:
                     processed_inputs[i] = processed_file_paths[file_index]
                     file_index += 1
- 
+
         result = await llm_parser.parse_async(processed_inputs)
         return result
     finally:
@@ -180,7 +192,7 @@ async def parse_resume(
 @router.post("/batch_parse")
 async def batch_parse_resume(
     batch_metadata: str = Form(...),
-    resume_files: Optional[List[UploadFile]] = File(None)
+    resume_files: Optional[List[UploadFile]] = File(None),
 ):
     """
     Parse a batch of resumes, supporting both text and file uploads per batch item.
@@ -190,10 +202,14 @@ async def batch_parse_resume(
     try:
         batch_requests = json.loads(batch_metadata)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"batch_metadata is not valid JSON: {e}")
+        raise HTTPException(
+            status_code=400, detail=f"batch_metadata is not valid JSON: {e}"
+        )
 
     if not batch_requests:
-        raise HTTPException(status_code=400, detail="No requests provided for batch parsing.")
+        raise HTTPException(
+            status_code=400, detail="No requests provided for batch parsing."
+        )
 
     first_request = batch_requests[0]
 
@@ -202,20 +218,28 @@ async def batch_parse_resume(
         raise HTTPException(status_code=500, detail="API_KEY not configured.")
 
     if not first_request.get("schema"):
-        raise HTTPException(status_code=400, detail="Schema must be provided in the first request for batch processing.")
-    
+        raise HTTPException(
+            status_code=400,
+            detail="Schema must be provided in the first request for batch processing.",
+        )
+
     try:
         schema_dict = json.loads(first_request["schema"])
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Schema in the first request is not valid JSON: {e}")
-    
+        raise HTTPException(
+            status_code=400,
+            detail=f"Schema in the first request is not valid JSON: {e}",
+        )
+
     schema_model = create_model_from_schema(schema_dict, globals_dict=globals())
     if not issubclass(schema_model, BaseModel):
         raise HTTPException(
             status_code=400,
-            detail="Schema in the first request must define a valid Pydantic model."
+            detail="Schema in the first request must define a valid Pydantic model.",
         )
-    print(f"Batch processing with schema model: {schema_model.__name__} and system prompt: '{first_request.get('system_prompt')}'")
+    print(
+        f"Batch processing with schema model: {schema_model.__name__} and system prompt: '{first_request.get('system_prompt')}'"
+    )
     print(json.dumps(schema_model.model_json_schema(), indent=2))
     llm_parser = LLM(
         api_key=api_key,
@@ -240,14 +264,20 @@ async def batch_parse_resume(
                 current_input_data.extend(request_item["resume_texts"])
             # Files
             item_file_names = request_item.get("resume_files") or []
-            item_files = [file_map[name] for name in item_file_names if name in file_map]
+            item_files = [
+                file_map[name] for name in item_file_names if name in file_map
+            ]
             if item_files:
-                processed_file_paths, temp_dir = await process_uploaded_files(item_files)
+                processed_file_paths, temp_dir = await process_uploaded_files(
+                    item_files
+                )
                 current_input_data.extend(processed_file_paths)
                 if temp_dir:
                     temp_dirs_to_clean.append(temp_dir)
             if not current_input_data:
-                print(f"Info: Request at index {req_idx} in batch has no input data. A None will be placed in the results for this item.")
+                print(
+                    f"Info: Request at index {req_idx} in batch has no input data. A None will be placed in the results for this item."
+                )
                 payloads_for_llm_markers.append(None)
             else:
                 payloads_for_llm_markers.append(current_input_data)
@@ -255,7 +285,9 @@ async def batch_parse_resume(
         actual_llm_payloads = [p for p in payloads_for_llm_markers if p is not None]
         processed_llm_results_iter = iter([])
         if actual_llm_payloads:
-            raw_results_from_llm = await llm_parser.parse_batch_async(actual_llm_payloads)
+            raw_results_from_llm = await llm_parser.parse_batch_async(
+                actual_llm_payloads
+            )
             processed_llm_results_iter = iter(raw_results_from_llm)
         final_results = []
         for marker in payloads_for_llm_markers:
@@ -265,13 +297,16 @@ async def batch_parse_resume(
                 try:
                     final_results.append(next(processed_llm_results_iter))
                 except StopIteration:
-                    print(f"ERROR: LLM result iteration exhausted prematurely. Appending None as fallback.")
+                    print(
+                        f"ERROR: LLM result iteration exhausted prematurely. Appending None as fallback."
+                    )
                     final_results.append(None)
         return final_results
     finally:
         for temp_dir in temp_dirs_to_clean:
             if os.path.exists(temp_dir):
                 shutil.rmtree(temp_dir)
+
 
 # Example usage comment block can remain as is or be removed if not current.
 # from services.llm.entities_models.candidate_pydantic import Candidate

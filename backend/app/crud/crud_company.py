@@ -29,16 +29,19 @@ def create_company(db: Session, *, company_in: CompanyCreate) -> Company:
 
 
 def update_company(
-    db: Session, *, db_company: Company, company_in: Union[CompanyUpdate, Dict[str, Any]]
+    db: Session,
+    *,
+    db_company: Company,
+    company_in: Union[CompanyUpdate, Dict[str, Any]],
 ) -> Company:
     if isinstance(company_in, dict):
         update_data = company_in
     else:
         update_data = company_in.model_dump(exclude_unset=True)
-    
+
     for field, value in update_data.items():
         setattr(db_company, field, value)
-    
+
     db.add(db_company)
     db.commit()
     db.refresh(db_company)
@@ -59,16 +62,16 @@ def get_recruit_to_companies(db: Session, employer_id: int) -> List[CompanyRead]
     statement = select(RecruiterCompanyLink).where(
         RecruiterCompanyLink.recruiter_id == employer_id
     )
-    
+
     recruited_to_links = db.exec(statement).all()
     target_employer_ids = [link.target_employer_id for link in recruited_to_links]
     statement = select(Company).where(Company.id.in_(target_employer_ids))
     companies = db.exec(statement).all()
-    
+
     current_company = get_company(db, employer_id)
     if current_company:
         companies.append(current_company)
-    
+
     return [CompanyRead.model_validate(company) for company in companies]
 
 
@@ -78,7 +81,3 @@ def get_company_data(db: Session, employer_id: int) -> Optional[str]:
     if company:
         return company.get_company_data()
     return None
-  
-
-  
-

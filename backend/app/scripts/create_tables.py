@@ -2,6 +2,7 @@
 """
 Script to create database tables using SQLModel metadata
 """
+
 import sys
 import os
 
@@ -13,6 +14,7 @@ from sqlalchemy import text
 
 from core.database import get_admin_engine
 from core.database import test_rls
+
 
 def read_sql_file() -> str:
     """Read the RLS setup SQL file and return its content as a string."""
@@ -29,8 +31,8 @@ def apply_rls_policies() -> None:
     print("Row-level security policies applied successfully.")
 
 
-
 from core.database import create_db_and_tables
+
 
 def main():
     """Create all database tables"""
@@ -42,5 +44,6 @@ def main():
     except Exception as e:
         print(f"Error creating database tables: {e}")
 
+
 if __name__ == "__main__":
-    exit(main()) 
+    exit(main())

@@ -5,6 +5,7 @@ from sqlalchemy import pool
 
 from alembic import context
 import sqlmodel
+
 # --- Load environment variables from .env and set sqlalchemy.url dynamically ---
 import os
 from dotenv import load_dotenv
@@ -18,7 +19,7 @@ db_url = (
 )
 
 config = context.config
-config.set_main_option('sqlalchemy.url', db_url)
+config.set_main_option("sqlalchemy.url", db_url)
 # -----------------------------------------------------------------------------
 
 # Interpret the config file for Python logging.
@@ -76,9 +77,7 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        context.configure(
-            connection=connection, target_metadata=target_metadata
-        )
+        context.configure(connection=connection, target_metadata=target_metadata)
 
         with context.begin_transaction():
             context.run_migrations()
