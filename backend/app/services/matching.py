@@ -1,7 +1,33 @@
 import httpx
 from typing import List, Optional
+import requests
+import os
 
-MATCHER_URL = "http://ai:8011/matcher/match_candidates"
+
+def _get_matcher_url():
+    """
+    Determines the correct matcher URL by checking health endpoints of potential hosts.
+    """
+    hosts = [os.getenv("AI_HOST", "ai"), "localhost"]
+    port = os.getenv("AI_PORT", "8011")
+
+    for host in hosts:
+        base_url = f"http://{host}:{port}"
+        health_url = f"{base_url}/health"
+        try:
+            print(f"Trying to connect to {health_url}")
+            response = requests.get(health_url, timeout=5)
+            response.raise_for_status()
+            print(f"✅ AI service is running at {base_url}")
+            return f"{base_url}/matcher/match_candidates"
+        except requests.exceptions.RequestException as e:
+            print(f"❌ Could not connect to {health_url}: {e}")
+
+    print("❌ AI service is not running or not accessible.")
+    return ""
+
+
+MATCHER_URL = _get_matcher_url()
 
 
 def match_candidates_client(

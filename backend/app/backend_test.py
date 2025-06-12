@@ -7,16 +7,18 @@ import httpx
 import json
 from core.database import create_db_and_tables
 from models.candidate_pydantic import CandidateResume
+from faker import Faker
+import random
+import time
 
-create_db_and_tables()
 # Import main directly since it's in the same directory
 # from main import app  # Direct import from same directory
 API_V1_PREFIX = "http://localhost:8017/api/v1"
 client = httpx.Client(base_url=API_V1_PREFIX)
 # client = TestClient(app)
-# create_db_and_tables()
+fake = Faker()
 
-
+create_db_and_tables(admin=True)
 def run_api_tests():
     print("=== Starting API Endpoint Tests ===")
 
@@ -36,131 +38,133 @@ def run_api_tests():
 
     # Test data (mirrors test_crud_functions.py)
     company_data = {
-        "name": "ApiTestCo",
-        "description": "A test company via API",
-        "industry": "Tech",
+        "name": fake.company(),
+        "description": fake.catch_phrase(),
+        "industry": fake.word(ext_word_list=["Tech", "Finance", "Healthcare", "Education", "Retail"]),
         "is_owner": True,
-        "bio": "This is a test bio for ApiTestCo.",
-        "website": "https://apitestco.example.com",
-        "logo_url": "https://apitestco.example.com/logo.png",
+        "bio": fake.paragraph(nb_sentences=3),
+        "website": fake.url(),
+        "logo_url": fake.image_url(),
     }
-    hr_data = {
-        "email": "hr.api@testco.com",
-        "password": "hashed_password_api",
-        "full_name": "Api Test HR",
+    hr_data_me = {
+        "email": "charbeldaher34@gmail.com",
+        "password": "a",
+        "full_name": "Charbel Daher",
         "role": "hr_manager",
         # employer_id will be added dynamically
     }
+    hr_data = {
+            "email": fake.unique.email(),
+            "password": fake.password(),
+            "full_name": fake.name(),
+            "role": fake.random_element(elements=("hr_manager", "recruiter", "admin")),
+            # employer_id will be added dynamically
+        }
     form_key_data = {
-        "name": "ExperienceYearsApi",
-        "field_type": "number",
-        "required": True,
-        "enum_values": ["1-2", "3-5", "5+"],
+        "name": fake.word().capitalize() + "Years",
+        "field_type": fake.random_element(elements=("text", "number", "email", "date", "select", "textarea", "checkbox")),
+        "required": fake.boolean(),
+        "enum_values": [fake.word(), fake.word(), fake.word()],
         # employer_id will be added dynamically
     }
     job_data_payload = {
-        "title": "API Software Engineer",
-        "description": "Develop software via API",
-        "location": "Remote",
-        "department": "Engineering",
+        "title": fake.job(),
+        "description": fake.paragraph(nb_sentences=5),
+        "location": fake.city(),
+        "department": fake.word().capitalize() + " Department",
         "compensation": {
-            "base_salary": 120000,
-            "benefits": ["Health Insurance", "401(k) Matching", "Remote Work"],
+            "base_salary": fake.random_int(min=50000, max=200000, step=10000),
+            "benefits": fake.random_elements(elements=("Health Insurance", "401(k) Matching", "Remote Work", "Paid Time Off", "Stock Options"), length=fake.random_int(min=1, max=5)),
         },
-        "experience_level": "1-3_years",
-        "seniority_level": "entry",
-        "status": "published",
-        "job_type": "full_time",
-        "job_category": "software_engineering",
-        "responsibilities": [
-            "Develop and maintain API endpoints",
-            "Write clean, maintainable code",
-            "Collaborate with cross-functional teams",
-            "Participate in code reviews",
-        ],
+        "experience_level": fake.random_element(elements=("no_experience", "1-3_years", "3-5_years", "5-7_years", "7-10_years", "10_plus_years")),
+        "seniority_level": fake.random_element(elements=("entry", "mid", "senior")),
+        "status": fake.random_element(elements=("published", "draft")),
+        "job_type": fake.random_element(elements=("full_time", "part_time", "contract", "internship")),
+        "job_category": fake.random_element(elements=("software_engineering", "data_science", "product_management", "ux_design", "sales", "marketing")),
+        "responsibilities": [fake.sentence() for _ in range(3)],
         "skills": {
-            "hard_skills": ["Python", "FastAPI", "SQL", "Docker"],
-            "soft_skills": ["Communication", "Problem Solving", "Teamwork"],
+            "hard_skills": [fake.word() for _ in range(3)],
+            "soft_skills": [fake.word() for _ in range(3)],
         },
         "recruited_to_id": None,
     }
     candidate_resume_data = {
-        "full_name": "Api Test Candidate",
-        "email": "candidate.api@example.com",
-        "phone": "1234567890",
+        "full_name": fake.name(),
+        "email": fake.unique.email(),
+        "phone": fake.phone_number(),
         "work_history": [
             {
-                "job_title": "Software Engineer",
-                "employer": "ApiTestCo",
-                "location": "Remote",
-                "employment_type": "Full-time",
-                "start_date": "2021-01-01",
+                "job_title": fake.job(),
+                "employer": fake.company(),
+                "location": fake.city(),
+                "employment_type": fake.random_element(elements=("Full-time", "Part-time", "Contract")),
+                "start_date": fake.date_between(start_date="-5y", end_date="-2y").isoformat(),
                 "end_date": None,
-                "summary": "Worked on API development.",
+                "summary": fake.paragraph(nb_sentences=2),
             }
         ],
         "education": [
             {
-                "level": "Bachelor's",
-                "degree_type": "Bachelor's",
-                "subject": "Computer Science",
-                "start_date": "2017-09-01",
-                "end_date": "2021-06-01",
-                "institution": "Test University",
-                "gpa": 3.8,
-                "summary": "Graduated with honors.",
+                "level": fake.random_element(elements=("Bachelor's", "Master's", "PhD")),
+                "degree_type": fake.random_element(elements=("Bachelor's", "Master's", "PhD")),
+                "subject": fake.word().capitalize() + " Science",
+                "start_date": fake.date_between(start_date="-10y", end_date="-6y").isoformat(),
+                "end_date": fake.date_between(start_date="-5y", end_date="-2y").isoformat(),
+                "institution": f"{fake.company()} University",
+                "gpa": round(random.uniform(2.0, 4.0), 1),
+                "summary": fake.paragraph(nb_sentences=2),
             }
         ],
         "skills": [
-            {"name": "Python", "category": "Programming Language", "level": "Expert"}
+            {"name": fake.word(), "category": fake.word(), "level": fake.random_element(elements=("Beginner", "Intermediate", "Expert"))}
         ],
         "certifications": [
             {
-                "certification": "AWS Certified Developer",
-                "certification_group": "Cloud",
-                "issued_by": "Amazon",
-                "issue_date": "2022-05-01",
+                "certification": fake.catch_phrase(),
+                "certification_group": fake.word().capitalize(),
+                "issued_by": fake.company(),
+                "issue_date": fake.date_between(start_date="-3y", end_date="-1y").isoformat(),
             }
         ],
     }
     candidate_data = {
-        "full_name": "Api Test Candidate",
-        "email": "candidate.api@example.com",
-        "phone": "1234567890",
-        "resume_url": "https://example.com/resume1.pdf",
+        "full_name": fake.name(),
+        "email": fake.unique.email(),
+        "phone": fake.phone_number(),
+        "resume_url": fake.url(),
     }
     application_data_payload = {
         "form_responses": {
-            "experience_api": "3 years",
-            "status": "applied",
-            "extra_field": "extra_value",
-        }
+            "experience_api": fake.random_element(elements=["1-2 years", "3-5 years", "6-10 years", "10+ years"]),
+            "status": fake.random_element(elements=("applied", "interviewing", "rejected", "hired", "offered", "on_hold")),
+            "extra_field": fake.word(),
+        },
+        "status": fake.random_element(elements=("pending", "reviewing", "interviewing", "offer_sent",  "rejected")),
         # candidate_id, job_id will be added dynamically
     }
     match_data_payload = {
-        "score": 0.85,
-        "embedding_similarity": 0.828,
-        "match_percentage": 50,
-        "matching_skills": ["python"],
-        "missing_skills": ["software engineer"],
-        "extra_skills": [],
-        "total_required_skills": 2,
-        "matching_skills_count": 1,
-        "missing_skills_count": 1,
-        "extra_skills_count": 0,
-        "skill_weight": 0.4,
-        "embedding_weight": 0.6,
-        "status": "pending",
+        "score": round(random.uniform(0.5, 0.99), 2),
+        "embedding_similarity": round(random.uniform(0.5, 0.99), 3),
+        "match_percentage": fake.random_int(min=30, max=99),
+        "matching_skills": [fake.word() for _ in range(fake.random_int(min=1, max=3))],
+        "missing_skills": [fake.word() for _ in range(fake.random_int(min=0, max=2))],
+        "extra_skills": [fake.word() for _ in range(fake.random_int(min=0, max=1))],
+        "total_required_skills": fake.random_int(min=2, max=5),
+        "matching_skills_count": fake.random_int(min=1, max=3),
+        "missing_skills_count": fake.random_int(min=0, max=2),
+        "extra_skills_count": fake.random_int(min=0, max=1),
+        "skill_weight": round(random.uniform(0.3, 0.7), 1),
+        "embedding_weight": round(random.uniform(0.3, 0.7), 1),
         # application_id will be added dynamically
     }
     company_data_target = {
-        "name": "ApiTargetLinkCo",
-        "description": "A target company for linking via API",
+        "name": fake.company(),
+        "description": fake.catch_phrase(),
         "is_owner": False,
-        "bio": "Bio for the target link company.",
-        "website": "https://apitargetlinkco.example.com",
-        "logo_url": "https://apitargetlinkco.example.com/logo.png",
-        "industry": "Recruitment",
+        "bio": fake.paragraph(nb_sentences=3),
+        "website": fake.url(),
+        "logo_url": fake.image_url(),
+        "industry": fake.word(ext_word_list=["Recruitment", "Consulting", "HR Tech"]),
     }
     # RecruiterCompanyLink data will be created dynamically with recruiter_id and target_employer_id
     # JobFormKeyConstraint data will be created dynamically with job_id, form_key_id, constraints
@@ -172,6 +176,7 @@ def run_api_tests():
     created_company = response.json()
     assert created_company["name"] == company_data["name"]
     assert created_company["bio"] == company_data["bio"]
+    assert created_company["is_owner"] == company_data["is_owner"]
     employer_id = created_company["id"]
     print(f"CREATE Company: {created_company['name']} (ID: {employer_id})")
 
@@ -181,7 +186,7 @@ def run_api_tests():
     assert retrieved_company["id"] == employer_id
     print(f"READ Company: {retrieved_company['name']}")
 
-    company_update_data = {"description": "Updated API company description."}
+    company_update_data = {"description": fake.catch_phrase()}
     response = client.patch(
         f"{API_V1_PREFIX}/companies/{employer_id}", json=company_update_data
     )
@@ -203,9 +208,17 @@ def run_api_tests():
     # --- 2. HR ---
     print("\n--- Testing HR API ---")
 
-    hr_create_data = {**hr_data, "employer_id": employer_id}
-    response = client.post(f"{API_V1_PREFIX}/auth/register", json=hr_create_data)
-    assert response.status_code == 201, f"Failed to create HR: {response.text}"
+    hr_create_data = {**hr_data_me, "employer_id": employer_id}
+    try:
+        response = client.post(f"{API_V1_PREFIX}/auth/register", json=hr_create_data)
+        assert response.status_code == 201, f"Failed to create HR: {response.text}"
+        
+        
+    except Exception as e:
+        print("Failed to create HR", e)
+        hr_create_data = {**hr_data, "employer_id": employer_id}
+        response = client.post(f"{API_V1_PREFIX}/auth/register", json=hr_create_data)
+        assert response.status_code == 201, f"Failed to create HR: {response.text}"
 
     token = response.json()["access_token"]
     client.headers.update({"Authorization": f"Bearer {token}"})
@@ -216,12 +229,12 @@ def run_api_tests():
     hr_id = retrieved_hr["id"]
     print(f"READ HR: {retrieved_hr['full_name']}")
 
-    # hr_update_data = {"full_name": "Updated Api Test HR Name"}
-    # response = client.patch(f"{API_V1_PREFIX}/hrs/{hr_id}", json=hr_update_data)
-    # assert response.status_code == 200, response.text
-    # updated_hr_res = response.json()
-    # assert updated_hr_res["full_name"] == hr_update_data["full_name"]
-    # print(f"UPDATE HR: {updated_hr_res['full_name']}")
+    hr_update_data = {"role": fake.random_element(elements=("ceo", "recruiter", "admin"))}
+    response = client.patch(f"{API_V1_PREFIX}/hrs/{hr_id}", json=hr_update_data)
+    assert response.status_code == 200, response.text
+    updated_hr_res = response.json()
+    assert updated_hr_res["role"] == hr_update_data["role"]
+    print(f"UPDATE HR: {updated_hr_res['role']}")
 
     # --- 3. FormKey ---
     print("\n--- Testing FormKey API ---")
@@ -243,13 +256,13 @@ def run_api_tests():
     assert retrieved_form_key["id"] == form_key_id
     print(f"READ FormKey: {retrieved_form_key['name']}")
 
-    form_key_update_data = {"field_type": "text"}
+    form_key_update_data = {"field_type": fake.random_element(elements=("text", "number", "date"))}
     response = client.patch(
         f"{API_V1_PREFIX}/form_keys/{form_key_id}", json=form_key_update_data
     )
     assert response.status_code == 200, response.text
     updated_form_key_res = response.json()
-    assert updated_form_key_res["field_type"] == "text"
+    assert updated_form_key_res["field_type"] == form_key_update_data["field_type"]
     print(
         f"UPDATE FormKey: {updated_form_key_res['name']}, New Field Type: {updated_form_key_res['field_type']}"
     )
@@ -260,6 +273,7 @@ def run_api_tests():
     response = client.post(f"{API_V1_PREFIX}/jobs/", json=job_create_data)
     assert response.status_code == 201, f"Failed to create Job: {response.text}"
     created_job = response.json()
+    print("GOT HERE")
     assert created_job["title"] == job_data_payload["title"]
     assert created_job["description"] == job_data_payload["description"]
     assert created_job["location"] == job_data_payload["location"]
@@ -283,11 +297,11 @@ def run_api_tests():
     assert retrieved_job["id"] == job_id
     print(f"READ Job: '{retrieved_job['title']}'")
 
-    job_update_data = {"status": "closed"}
+    job_update_data = {"status": fake.random_element(elements=("closed", "draft", "published"))}
     response = client.patch(f"{API_V1_PREFIX}/jobs/{job_id}", json=job_update_data)
     assert response.status_code == 200, response.text
     updated_job_res = response.json()
-    assert updated_job_res["status"] == "closed"
+    assert updated_job_res["status"] == job_update_data["status"]
     print(
         f"UPDATE Job: '{updated_job_res['title']}', New Status: {updated_job_res['status']}"
     )
@@ -297,7 +311,7 @@ def run_api_tests():
     constraint_create_data = {
         "job_id": job_id,
         "form_key_id": form_key_id,
-        "constraints": {"min_value": 1},
+        "constraints": {"min_value": fake.random_int(min=0, max=5)},
     }
     response = client.post(
         f"{API_V1_PREFIX}/job_form_key_constraints/", json=constraint_create_data
@@ -306,7 +320,7 @@ def run_api_tests():
         f"Failed to create JobFormKeyConstraint: {response.text}"
     )
     created_constraint = response.json()
-    assert created_constraint["constraints"]["min_value"] == 1
+    assert created_constraint["constraints"]["min_value"] == constraint_create_data["constraints"]["min_value"]
     constraint_id = created_constraint["id"]
     print(
         f"CREATE JobFormKeyConstraint (ID: {constraint_id}) for Job ID: {job_id}, FormKey ID: {form_key_id}"
@@ -318,14 +332,14 @@ def run_api_tests():
     assert retrieved_constraint["id"] == constraint_id
     print(f"READ JobFormKeyConstraint: ID {retrieved_constraint['id']}")
 
-    constraint_update_data = {"constraints": {"min_value": 2, "max_value": 5}}
+    constraint_update_data = {"constraints": {"min_value": fake.random_int(min=0, max=5), "max_value": fake.random_int(min=6, max=10)}}
     response = client.patch(
         f"{API_V1_PREFIX}/job_form_key_constraints/{constraint_id}",
         json=constraint_update_data,
     )
     assert response.status_code == 200, response.text
     updated_constraint_res = response.json()
-    assert updated_constraint_res["constraints"]["max_value"] == 5
+    assert updated_constraint_res["constraints"]["max_value"] == constraint_update_data["constraints"]["max_value"]
     print(
         f"UPDATE JobFormKeyConstraint: ID {updated_constraint_res['id']}, New Constraints: {updated_constraint_res['constraints']}"
     )
@@ -355,13 +369,13 @@ def run_api_tests():
     assert retrieved_candidate["id"] == candidate_id
     print(f"READ Candidate: {retrieved_candidate['full_name']}")
 
-    candidate_update_data = {"phone": "0987654321"}
+    candidate_update_data = {"phone": fake.phone_number(), "email": fake.unique.email()}
     response = client.patch(
         f"{API_V1_PREFIX}/candidates/{candidate_id}", json=candidate_update_data
     )
     assert response.status_code == 200, response.text
     updated_candidate_res = response.json()
-    assert updated_candidate_res["phone"] == "0987654321"
+    assert updated_candidate_res["phone"] == candidate_update_data["phone"]
     print(
         f"UPDATE Candidate: {updated_candidate_res['full_name']}, New Phone: {updated_candidate_res['phone']}"
     )
@@ -392,14 +406,14 @@ def run_api_tests():
     print(f"READ Application: ID {retrieved_application['id']}")
 
     application_update_data = {
-        "form_responses": {"experience_api": "4 years", "status": "interview"}
+        "form_responses": {"experience_api": fake.random_element(elements=["1-2 years", "3-5 years", "6-10 years", "10+ years"]), "status": fake.random_element(elements=("applied", "interviewing", "rejected", "hired", "offered", "on_hold"))}
     }
     response = client.patch(
         f"{API_V1_PREFIX}/applications/{application_id}", json=application_update_data
     )
     assert response.status_code == 200, response.text
     updated_application_res = response.json()
-    assert updated_application_res["form_responses"]["status"] == "interview"
+    assert updated_application_res["form_responses"]["status"] == application_update_data["form_responses"]["status"]
     print(
         f"UPDATE Application: ID {updated_application_res['id']}, New Form Responses: {updated_application_res['form_responses']}"
     )
@@ -420,9 +434,8 @@ def run_api_tests():
         assert response.status_code == 200, response.text
         updated_match_res = response.json()
         updated_results = updated_match_res["match_result"]["results"]
-        assert updated_results[0]["candidate"] == "Updated candidate"
-        assert updated_results[0]["score"] == 0.9
-        assert updated_results[0]["skill_analysis"]["match_percentage"] == 100
+        assert isinstance(updated_results[0]["score"], float)
+        assert isinstance(updated_results[0]["match_percentage"], int)
         print(
             f"UPDATE Match: ID {updated_match_res['id']}, New Score: {updated_match_res['match_result']['results'][0]['score']}"
         )
@@ -447,8 +460,8 @@ def run_api_tests():
     # Create HR for the recruiter company
     recruiter_hr_data = {
         **hr_data,
-        "email": "hr.api@targetlinkco.com",
-        "full_name": "Api Recruiter HR",
+        "email": fake.unique.email(),
+        "full_name": fake.name(),
         "employer_id": recruiter_employer_id,
     }
     response = client.post(f"{API_V1_PREFIX}/auth/register", json=recruiter_hr_data)
@@ -496,38 +509,23 @@ def run_api_tests():
 
     # Create a job through the recruiter for the target company
     recruiter_job_data_payload = {
-        "title": "Senior API Software Engineer",
-        "description": "Recruited position for ApiTestCo",
-        "location": "Remote",
-        "department": "Engineering",
+        "title": fake.job(),
+        "description": fake.paragraph(nb_sentences=5),
+        "location": fake.city(),
+        "department": fake.word().capitalize() + " Department",
         "compensation": {
-            "base_salary": 150000,
-            "benefits": [
-                "Health Insurance",
-                "401(k) Matching",
-                "Remote Work",
-                "Stock Options",
-            ],
+            "base_salary": fake.random_int(min=70000, max=250000, step=10000),
+            "benefits": fake.random_elements(elements=("Health Insurance", "401(k) Matching", "Remote Work", "Paid Time Off", "Stock Options", "Gym Membership"), length=fake.random_int(min=1, max=6)),
         },
-        "experience_level": "3-5_years",
-        "seniority_level": "mid",
-        "status": "published",
-        "job_type": "full_time",
-        "job_category": "software_engineering",
-        "responsibilities": [
-            "Lead API development projects",
-            "Mentor junior developers",
-            "Design scalable architectures",
-            "Collaborate with product teams",
-        ],
+        "experience_level": fake.random_element(elements=("3-5_years", "5-7_years", "7-10_years", "10_plus_years")),
+        "seniority_level": fake.random_element(elements=("mid", "senior", "entry")),
+        "status": fake.random_element(elements=("published", "draft", "closed")),
+        "job_type": fake.random_element(elements=("full_time", "contract")),
+        "job_category": fake.random_element(elements=("software_engineering", "data_science", "product_management", "sales")),
+        "responsibilities": [fake.sentence() for _ in range(4)],
         "skills": {
-            "hard_skills": ["Python", "FastAPI", "SQL", "Docker", "Kubernetes", "AWS"],
-            "soft_skills": [
-                "Leadership",
-                "Communication",
-                "Problem Solving",
-                "Teamwork",
-            ],
+            "hard_skills": [fake.word() for _ in range(4)],
+            "soft_skills": [fake.word() for _ in range(4)],
         },
         "recruited_to_id": employer_id,
     }

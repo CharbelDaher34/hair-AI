@@ -39,7 +39,6 @@ class JobAnalytics(SQLModel):
 
     # Matching metrics
     total_matches: int
-    matches_by_status: Dict[str, int]
     average_match_score: Optional[float]
     top_match_score: Optional[float]
 

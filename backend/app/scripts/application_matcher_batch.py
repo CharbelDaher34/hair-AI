@@ -94,7 +94,7 @@ def create_match_for_application(application_id: int, max_retries: int = 3) -> b
 
                 # Create match using CRUD (which will call the AI service)
                 match_create = MatchCreate(
-                    application_id=application_id, status="pending"
+                    application_id=application_id
                 )
 
                 new_match = crud_match.create_match(db=db, match_in=match_create)
@@ -103,7 +103,6 @@ def create_match_for_application(application_id: int, max_retries: int = 3) -> b
                     print(
                         f"[Matcher] Successfully created match {new_match.id} for application {application_id}"
                     )
-                    print(f"[Matcher] Match status: {new_match.status}")
                     return True
                 else:
                     print(

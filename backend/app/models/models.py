@@ -281,11 +281,19 @@ class Candidate(CandidateBase, table=True):
 
     applications: List["Application"] = Relationship(back_populates="candidate")
 
+class ApplicationStatus(str, Enum):
+    PENDING = "pending"
+    REVIEWING = "reviewing"
+    INTERVIEWING = "interviewing"
+    OFFER_SENT = "offer_sent"
+    HIRED = "hired"
+    REJECTED = "rejected"
 
 class ApplicationBase(TimeBase):
     candidate_id: int = Field(foreign_key="candidate.id")
     job_id: int = Field(foreign_key="job.id")
     form_responses: Dict = Field(default=None, sa_column=Column(JSON))
+    status: ApplicationStatus = Field(default=ApplicationStatus.PENDING, sa_column=Column(SQLAlchemyEnum(ApplicationStatus, name="applicationstatus_enum", create_type=True)))
 
 
 class Application(ApplicationBase, table=True):
@@ -347,9 +355,6 @@ class MatchBase(TimeBase):
     # Weights used in matching
     skill_weight: Optional[float] = Field(default=None)
     embedding_weight: Optional[float] = Field(default=None)
-
-    # Match status
-    status: str = Field(default="pending")
 
 
 class Match(MatchBase, table=True):

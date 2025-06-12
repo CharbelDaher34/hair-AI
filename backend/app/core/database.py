@@ -27,6 +27,7 @@ engine = get_admin_engine()
 
 
 def create_db_and_tables(admin=False):
+    target_metadata.drop_all(get_admin_engine())
     all_exist, missing_tables = check_db_tables()
     if not all_exist:
         target_metadata.create_all(get_admin_engine())
@@ -60,6 +61,7 @@ def get_session_rls(company_id: int):
     It sets a session-local variable 'myapp.current_company_id' which should be used
     in RLS policies in the database. This is a context manager.
     """
+    engine = get_engine()
     with Session(engine) as session:
         try:
             # Use query parameters to prevent SQL injection
