@@ -4,7 +4,7 @@ from collections import Counter
 
 from sqlmodel import Session, select, func
 
-from models.models import Job, Application, Match, Interview, Candidate
+from models.models import Job, Application, Match, Interview, Candidate, Status
 from schemas import JobCreate, JobUpdate
 from schemas.job import JobAnalytics
 
@@ -14,24 +14,26 @@ def get_job(db: Session, job_id: int) -> Optional[Job]:
 
 
 def get_jobs(
-    db: Session, skip: int = 0, limit: int = 100, employer_id: int = None
+    db: Session, skip: int = 0, limit: int = 100, closed: bool = False
 ) -> List[Job]:
-    if employer_id:
-        statement = (
-            select(Job).where(Job.employer_id == employer_id).offset(skip).limit(limit)
-        )
-    else:
+    if closed:
         statement = select(Job).offset(skip).limit(limit)
-
+    else:
+        statement = select(Job).where(Job.status != Status.CLOSED).offset(skip).limit(limit)
     return db.exec(statement).all()
 
 
 def get_jobs_by_employer(
-    db: Session, employer_id: int, skip: int = 0, limit: int = 100
+    db: Session, employer_id: int, skip: int = 0, limit: int = 100, closed: bool = False
 ) -> List[Job]:
-    statement = (
-        select(Job).where(Job.recruited_to_id == employer_id).offset(skip).limit(limit)
-    )
+    if closed:
+        statement = (
+            select(Job).where(Job.employer_id == employer_id).offset(skip).limit(limit)
+        )
+    else:
+        statement = (
+            select(Job).where(Job.employer_id == employer_id,Job.status != Status.CLOSED).offset(skip).limit(limit)
+        )
     return db.exec(statement).all()
 
 
@@ -152,11 +154,11 @@ def get_job_analytics(db: Session, job_id: int) -> JobAnalytics:
     )
     top_match_score = max(match_scores) if match_scores else None
 
-    # Group matches by status
-    matches_by_status = {}
-    for match in matches:
-        status = match.status or "pending"
-        matches_by_status[status] = matches_by_status.get(status, 0) + 1
+    # Group applications by status (status moved from match to application)
+    applications_by_status = {}
+    for application in applications:
+        status = application.status.value if application.status else "pending"
+        applications_by_status[status] = applications_by_status.get(status, 0) + 1
 
     # Group interviews by type and status
     interviews_by_type = {}
@@ -211,9 +213,6 @@ def get_job_analytics(db: Session, job_id: int) -> JobAnalytics:
         round((total_interviews / total_matches * 100), 1) if total_matches > 0 else 0.0
     )
 
-    # Simple application status (we don't have application status in the model)
-    applications_by_status = {"submitted": total_applications}
-
     return JobAnalytics(
         job_id=job.id,
         job_title=job.title,
@@ -223,7 +222,6 @@ def get_job_analytics(db: Session, job_id: int) -> JobAnalytics:
         applications_by_status=applications_by_status,
         # Matching metrics
         total_matches=total_matches,
-        matches_by_status=matches_by_status,
         average_match_score=average_match_score,
         top_match_score=top_match_score,
         # Interview metrics

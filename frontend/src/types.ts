@@ -141,6 +141,7 @@ export interface ApplicationBase {
   candidate_id: number;
   job_id: number;
   form_responses: object | null; // JSON object with form field responses
+  status: ApplicationStatus;
   created_at: string; // ISO datetime string
   updated_at: string; // ISO datetime string
 }
@@ -180,7 +181,6 @@ export interface Interview extends InterviewBase {
 export interface MatchBase {
   application_id: number;
   match_result: object | null; // JSON object with matching algorithm results
-  status: string; // default: 'pending'
   created_at: string; // ISO datetime string
   updated_at: string; // ISO datetime string
 }
@@ -253,6 +253,15 @@ export enum FormFieldType {
   SELECT = 'select',
   TEXTAREA = 'textarea',
   CHECKBOX = 'checkbox',
+}
+
+export enum ApplicationStatus {
+  PENDING = "pending",
+  REVIEWING = "reviewing",
+  INTERVIEWING = "interviewing",
+  OFFER_SENT = "offer_sent",
+  HIRED = "hired",
+  REJECTED = "rejected",
 }
 
 // API Response types

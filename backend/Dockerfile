@@ -17,10 +17,12 @@ WORKDIR /app
 COPY app/pyproject.toml .
 
 # Install dependencies and ensure they're in PATH
-RUN uv sync
+RUN uv lock
+RUN uv sync --locked
 
 # Copy the application code
 COPY app/ .
+ENV PATH="/app/.venv/bin:$PATH"
 
 # Make port 8017 available to the world outside this container
 EXPOSE 8017

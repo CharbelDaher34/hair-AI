@@ -78,6 +78,7 @@ def read_jobs_by_employer(
     employer_id: int,
     skip: int = 0,
     limit: int = 100,
+    closed: bool = False,
     request: Request,
 ) -> List[JobRead]:
     user = request.state.user
@@ -86,7 +87,7 @@ def read_jobs_by_employer(
             status_code=403, detail="You are not authorized to access this job"
         )
     return crud_job.get_jobs_by_employer(
-        db=db, employer_id=employer_id, skip=skip, limit=limit
+        db=db, employer_id=employer_id, skip=skip, limit=limit, closed=closed
     )
 
 

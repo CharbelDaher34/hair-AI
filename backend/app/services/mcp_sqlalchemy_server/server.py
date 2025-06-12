@@ -1,37 +1,46 @@
 """
-MCP SQLAlchemy Server - Fixed Version
+MCP SQLAlchemy Server - SQLAlchemy + RLS Version
 
-This server provides tools to interact with the matching_db database through pyodbc.
-Fixed issues from original version:
-- Missing constants (MAX_LONG_DATA, API_KEY)
-- Inconsistent naming conventions
-- Poor error handling
-- Hardcoded values
-- Code organization problems
-- Missing type hints
+This server provides tools to interact with the matching_db database through SQLAlchemy sessions
+with Row Level Security (RLS) enabled for multi-tenant data isolation.
+
+Key Features:
+- Uses SQLAlchemy sessions instead of raw pyodbc connections
+- Automatic data filtering through PostgreSQL Row Level Security (RLS)
+- Multi-tenant support with employer_id-based data isolation
+- Clean error handling and logging
+- Comprehensive table introspection
 
 USAGE GUIDE FOR MODELS:
 1. Start by exploring the database structure using get_tables() to see all tables in matching_db
 2. Use describe_table() to understand table structure before querying
 3. Use filter_table_names() to find relevant tables by name
 4. Execute queries with execute_query() for limited results or query_database() for all results
-5. Use execute_query_md() for markdown-formatted results
-6. Always handle errors gracefully and provide meaningful feedback
+5. Use fuzzy_search_table() for approximate string matching
+6. All queries are automatically filtered by employer_id through RLS policies
 
 EXAMPLE WORKFLOW:
 1. get_tables() -> List all tables in matching_db
-2. describe_table(table="users") -> Get table structure
-3. execute_query("SELECT * FROM users LIMIT 5") -> Query data
+2. describe_table(table="job") -> Get table structure
+3. execute_query("SELECT * FROM job LIMIT 5") -> Query data (automatically filtered by RLS)
 
-NOTE: This server is configured to work specifically with the matching_db database.
+ROW LEVEL SECURITY (RLS):
+- All database queries are automatically filtered based on the employer_id set in the session
+- RLS policies are defined at the database level and enforce data isolation
+- No manual filtering is required in queries - the database handles it automatically
+
+NOTE: This server requires an employer_id to be set for proper RLS functionality.
 """
 
 from collections import defaultdict
 import os
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from core.database import get_session_rls
+from sqlmodel import Session
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 import json
-import pyodbc
 from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 from rapidfuzz import fuzz
@@ -60,58 +69,33 @@ DEFAULT_SCHEMA = "matching_db"
 # Global variable to store the employer_id filter
 EMPLOYER_ID_FILTER: Optional[int] = None
 
-# Database configuration
-DB_UID = "app_user"
-DB_PWD = "a"
-DB_DSN = "matching_db"
 
-# Set custom ODBC configuration file path
-odbc_ini_path = os.path.join(os.path.dirname(__file__), "odbc.ini")
-os.environ["ODBCINI"] = odbc_ini_path
-logger.info(f"ODBCINI set to: {odbc_ini_path}")
-
-logger.info(f"Database configuration - UID: {DB_UID}, DSN: {DB_DSN}")
-
-
-def get_connection() -> pyodbc.Connection:
+def get_connection():
     """
-    Create a database connection using pyodbc.
-
-    Args:
-        readonly: Whether the connection should be read-only
+    Create a database session using SQLAlchemy with RLS (Row Level Security).
+    
+    The session automatically filters data based on the employer_id through RLS policies.
+    This replaces the manual employer filtering logic.
 
     Returns:
-        pyodbc.Connection: Database connection object
+        SQLAlchemy Session: Database session object with RLS enabled
 
     Raises:
         ValueError: If required credentials are missing
-        pyodbc.Error: If connection fails
+        Exception: If session creation fails
     """
-    uid = DB_UID
-    pwd = DB_PWD
-
-    if not uid:
-        raise ValueError("ODBC_USER environment variable is not set.")
-    if not pwd:
-        raise ValueError("ODBC_PASSWORD environment variable is not set.")
-
-    # Use direct connection string instead of DSN to avoid Unix socket issues
-    connection_string = (
-        f"DRIVER={{PostgreSQL Unicode}};"
-        f"SERVER={DEFAULT_HOST};"
-        f"PORT={DEFAULT_PORT};"
-        f"DATABASE={DEFAULT_DATABASE};"
-        f"UID={uid};"
-        f"PWD={pwd}"
-    )
-
-    logger.info(f"Connecting to PostgreSQL with UID: {uid}")
-
+    logger.info(f"Getting connection with EMPLOYER_ID_FILTER: {os.getcwd()}")
+    
+    if EMPLOYER_ID_FILTER is None:
+        raise ValueError("EMPLOYER_ID_FILTER must be set before creating a session")
+    
+    logger.info(f"Creating SQLAlchemy session with RLS for employer_id: {EMPLOYER_ID_FILTER}")
+    
     try:
-        return pyodbc.connect(connection_string, autocommit=True, readonly=True)
-    except pyodbc.Error as e:
-        logger.error(f"Failed to connect to database: {e}")
-        logger.error(f"Connection string used: {connection_string}")
+        # Return the context manager directly - it will be used in a 'with' statement
+        return get_session_rls(EMPLOYER_ID_FILTER)
+    except Exception as e:
+        logger.error(f"Failed to create database session: {e}")
         raise
 
 
@@ -142,145 +126,20 @@ def get_employer_filter_clause(table_alias: str = "") -> str:
 def apply_employer_filter_to_query(query: str) -> str:
     """
     Apply employer_id filtering to a SQL query by analyzing the tables involved.
-    This function attempts to automatically add employer_id filters where appropriate.
+    
+    NOTE: This function is now deprecated since we're using Row Level Security (RLS).
+    RLS automatically filters all queries based on the session's employer_id setting.
+    This function now just returns the original query unchanged.
 
     Args:
         query: The original SQL query
 
     Returns:
-        str: Modified query with employer_id filters applied where possible
+        str: The original query (unchanged, as RLS handles filtering)
     """
-    if EMPLOYER_ID_FILTER is None:
-        return query
-
-    # Convert query to lowercase for analysis
-    query_lower = query.lower().strip()
-
-    # Skip if it's not a SELECT query or already has employer_id filter
-    if not query_lower.startswith("select") or "employer_id" in query_lower:
-        return query
-
-    # Tables that have direct employer_id relationships
-    direct_employer_tables = {
-        "job": "employer_id",
-        "candidate": "employer_id",
-        "company": "id",  # company.id = employer_id
-        "hr": "employer_id",
-        "formkey": "employer_id",
-    }
-
-    # Tables that need JOIN-based filtering (indirect relationships)
-    indirect_employer_tables = {
-        "application": {
-            "joins": [
-                (
-                    "candidate",
-                    "application.candidate_id = candidate.id",
-                    "candidate.employer_id",
-                ),
-                ("job", "application.job_id = job.id", "job.employer_id"),
-            ]
-        },
-        "match": {
-            "joins": [
-                ("application", "match.application_id = application.id"),
-                (
-                    "candidate",
-                    "application.candidate_id = candidate.id",
-                    "candidate.employer_id",
-                ),
-                ("job", "application.job_id = job.id", "job.employer_id"),
-            ]
-        },
-        "interview": {
-            "joins": [
-                ("application", "interview.application_id = application.id"),
-                (
-                    "candidate",
-                    "application.candidate_id = candidate.id",
-                    "candidate.employer_id",
-                ),
-                ("job", "application.job_id = job.id", "job.employer_id"),
-            ]
-        },
-        "jobformkeyconstraint": {
-            "joins": [
-                ("job", "jobformkeyconstraint.job_id = job.id", "job.employer_id")
-            ]
-        },
-        "recruitercompanylink": {
-            "joins": [
-                (
-                    "company",
-                    "recruitercompanylink.recruiter_id = company.id",
-                    "company.id",
-                )
-            ]
-        },
-    }
-
-    # Try to add filters for known tables
-    modified_query = query
-
-    # Check for direct employer_id tables first
-    for table, column in direct_employer_tables.items():
-        if (
-            f" {table} " in query_lower
-            or f" {table}." in query_lower
-            or query_lower.endswith(f" {table}")
-        ):
-            # Add WHERE clause if none exists, or AND if WHERE already exists
-            if " where " not in query_lower:
-                modified_query += f" WHERE {table}.{column} = {EMPLOYER_ID_FILTER}"
-            else:
-                modified_query = modified_query.replace(
-                    " WHERE ", f" WHERE {table}.{column} = {EMPLOYER_ID_FILTER} AND ", 1
-                )
-            break
-
-    # Check for indirect employer_id tables if no direct match found
-    else:
-        for table, join_info in indirect_employer_tables.items():
-            if (
-                f" {table} " in query_lower
-                or f" {table}." in query_lower
-                or query_lower.endswith(f" {table}")
-            ):
-                # For indirect tables, we need to ensure proper JOINs exist
-                # This is a simplified approach - for complex queries, manual JOIN specification is recommended
-                joins = join_info["joins"]
-
-                # Find the first join that provides employer filtering
-                for join_data in joins:
-                    if len(join_data) == 3:  # Has employer filter column
-                        join_table, join_condition, filter_column = join_data
-
-                        # Check if the join table is already in the query
-                        if (
-                            f" {join_table} " in query_lower
-                            or f" {join_table}." in query_lower
-                        ):
-                            # Add filter using existing join
-                            if " where " not in query_lower:
-                                modified_query += (
-                                    f" WHERE {filter_column} = {EMPLOYER_ID_FILTER}"
-                                )
-                            else:
-                                modified_query = modified_query.replace(
-                                    " WHERE ",
-                                    f" WHERE {filter_column} = {EMPLOYER_ID_FILTER} AND ",
-                                    1,
-                                )
-                            break
-                        else:
-                            # Need to add JOIN - this is complex, so we'll add a comment for manual handling
-                            # For now, just add a WHERE clause if possible
-                            if " where " not in query_lower:
-                                modified_query += f" -- Note: Consider adding JOIN with {join_table} for employer filtering"
-                            break
-                break
-
-    return modified_query
+    # With RLS enabled, we don't need manual filtering
+    # The database automatically applies employer_id filters through RLS policies
+    return query
 
 
 # MCP Server initialization
@@ -294,9 +153,6 @@ mcp = FastMCP("mcp-sqlalchemy-server", port=5437, transport="sse")
     USAGE: Use this as the first step to explore the matching_db database structure.
     This will show you all available tables in the matching_db schema.
     
-    PARAMETERS:
-    - user/password/dsn: Optional connection overrides
-    
     EXAMPLE: get_tables() will return all tables in matching_db like ["company", "hr", "job", "candidate", "application", "match", etc.]
     
     NEXT STEPS: Use describe_table(table="table_name") to get detailed table structure.
@@ -306,28 +162,31 @@ def get_tables() -> str:
     """
     Retrieve and return a list containing information about all tables in matching_db.
 
-    Args:
-        user: Optional username override
-        password: Optional password override
-        dsn: Optional DSN name override
-
     Returns:
         str: JSON string containing table information
     """
     try:
-        with get_connection() as conn:
-            cursor = conn.cursor()
-            rs = cursor.tables(
-                table=None, catalog=DEFAULT_SCHEMA, schema="%", tableType="TABLE"
-            )
+        with get_connection() as session:
+            from sqlalchemy import text
+            
+            # Query to get all tables in the public schema
+            query = text("""
+                SELECT table_catalog, table_schema, table_name 
+                FROM information_schema.tables 
+                WHERE table_schema = 'public' 
+                AND table_type = 'BASE TABLE'
+                ORDER BY table_name
+            """)
+            
+            result = session.execute(query)
             results = []
-            for row in rs:
+            for row in result:
                 results.append(
                     {"TABLE_CAT": row[0], "TABLE_SCHEM": row[1], "TABLE_NAME": row[2]}
                 )
 
             return json.dumps(results, indent=2)
-    except pyodbc.Error as e:
+    except Exception as e:
         logger.error(f"Error retrieving tables: {e}")
         raise
 
@@ -359,32 +218,33 @@ def describe_table(table: str) -> str:
 
     Args:
         table: The name of the table to retrieve the definition for
-        user: Optional username override
-        password: Optional password override
-        dsn: Optional DSN name override
 
     Returns:
         str: JSON string containing the table definition
     """
     try:
-        with get_connection() as conn:
-            has_table, table_info = _has_table(
-                conn, catalog=DEFAULT_SCHEMA, table=table
-            )
-            if not has_table:
+        with get_connection() as session:
+            from sqlalchemy import text
+            
+            # Check if table exists
+            table_exists_query = text("""
+                SELECT COUNT(*) 
+                FROM information_schema.tables 
+                WHERE table_schema = 'public' 
+                AND table_name = :table_name
+            """)
+            
+            result = session.execute(table_exists_query, {"table_name": table})
+            if result.scalar() == 0:
                 return json.dumps(
                     {"error": f"Table {table} not found in matching_db"}, indent=2
                 )
 
-            table_definition = _get_table_info(
-                conn,
-                cat=table_info.get("cat"),
-                sch=table_info.get("sch"),
-                table=table_info.get("name"),
-            )
+            # Get table definition using SQLAlchemy inspection
+            table_definition = _get_table_info_sqlalchemy(session, table)
             return json.dumps(table_definition, indent=2)
 
-    except pyodbc.Error as e:
+    except Exception as e:
         logger.error(f"Error retrieving table definition: {e}")
         raise
 
@@ -422,18 +282,25 @@ def filter_table_names(query: str) -> str:
     Args:
         query: The substring to filter table names by
 
-
     Returns:
         str: JSON string containing filtered table information
     """
     try:
-        with get_connection() as conn:
-            cursor = conn.cursor()
-            rs = cursor.tables(
-                table=None, catalog=DEFAULT_SCHEMA, schema="%", tableType="TABLE"
-            )
+        with get_connection() as session:
+            from sqlalchemy import text
+            
+            # Query to get all tables in the public schema
+            table_query = text("""
+                SELECT table_catalog, table_schema, table_name 
+                FROM information_schema.tables 
+                WHERE table_schema = 'public' 
+                AND table_type = 'BASE TABLE'
+                ORDER BY table_name
+            """)
+            
+            result = session.execute(table_query)
             results = []
-            for row in rs:
+            for row in result:
                 if fuzzy_match(query, row[2]):
                     results.append(
                         {
@@ -444,7 +311,7 @@ def filter_table_names(query: str) -> str:
                     )
             logger.info(f"Results of fuzzy_match: {results}")
             return json.dumps(results, indent=2)
-    except pyodbc.Error as e:
+    except Exception as e:
         logger.error(f"Error filtering table names: {e}")
         raise
 
@@ -570,51 +437,50 @@ def execute_query(
         str: Results in Markdown table format
     """
     try:
-        # Apply employer filter to the query
-        filtered_query = apply_employer_filter_to_query(query)
-        logger.info(f"Original query: {query}")
-        if filtered_query != query:
-            logger.info(f"Filtered query: {filtered_query}")
+        # With RLS enabled, we don't need manual employer filtering
+        logger.info(f"Executing query with RLS: {query}")
 
-        with get_connection() as conn:
-            cursor = conn.cursor()
-            rs = (
-                cursor.execute(filtered_query, params)
-                if params
-                else cursor.execute(filtered_query)
-            )
+        with get_connection() as session:
+            from sqlalchemy import text
+            if "company_id" in query:
+                query = query.replace("company_id", "employer_id")
+            # Execute the query using SQLAlchemy
+            if params:
+                result = session.execute(text(query), params)
+            else:
+                result = session.execute(text(query))
 
-            if not rs.description:
-                return (
-                    f"**Query executed successfully**\n\nAffected rows: {rs.rowcount}"
-                )
+            # Check if this is a SELECT query (has results)
+            if result.returns_rows:
+                columns = list(result.keys())
+                results = []
 
-            columns = [column[0] for column in rs.description]
-            results = []
+                for row in result:
+                    row_dict = dict(zip(columns, row))
+                    # Truncate long string values
+                    truncated_row = {
+                        key: (str(value)[:MAX_LONG_DATA] if value is not None else None)
+                        for key, value in row_dict.items()
+                    }
+                    results.append(truncated_row)
 
-            for row in rs:
-                row_dict = dict(zip(columns, row))
-                # Truncate long string values
-                truncated_row = {
-                    key: (str(value)[:MAX_LONG_DATA] if value is not None else None)
-                    for key, value in row_dict.items()
-                }
-                results.append(truncated_row)
+                    if len(results) >= max_rows:
+                        break
 
-                if len(results) >= max_rows:
-                    break
+                # Create the Markdown table header
+                md_table = "| " + " | ".join(columns) + " |\n"
+                md_table += "| " + " | ".join(["---"] * len(columns)) + " |\n"
 
-            # Create the Markdown table header
-            md_table = "| " + " | ".join(columns) + " |\n"
-            md_table += "| " + " | ".join(["---"] * len(columns)) + " |\n"
+                # Add rows to the Markdown table
+                for row in results:
+                    md_table += "| " + " | ".join(str(row[col]) for col in columns) + " |\n"
 
-            # Add rows to the Markdown table
-            for row in results:
-                md_table += "| " + " | ".join(str(row[col]) for col in columns) + " |\n"
+                return md_table
+            else:
+                # For non-SELECT queries (INSERT, UPDATE, DELETE)
+                return f"**Query executed successfully**\n\nQuery: {query}"
 
-            return md_table
-
-    except pyodbc.Error as e:
+    except Exception as e:
         logger.error(f"Error executing query: {e}")
         raise
 
@@ -650,47 +516,48 @@ def query_database(query: str) -> str:
         str: All results in JSONL format
     """
     try:
-        # Apply employer filter to the query
-        filtered_query = apply_employer_filter_to_query(query)
-        logger.info(f"Original query: {query}")
-        if filtered_query != query:
-            logger.info(f"Filtered query: {filtered_query}")
+        # With RLS enabled, we don't need manual employer filtering
+        logger.info(f"Executing query with RLS (no row limit): {query}")
 
-        with get_connection() as conn:
-            cursor = conn.cursor()
-            rs = cursor.execute(filtered_query)
+        with get_connection() as session:
+            from sqlalchemy import text
+            
+            # Execute the query using SQLAlchemy
+            result = session.execute(text(query))
 
-            if not rs.description:
+            # Check if this is a SELECT query (has results)
+            if result.returns_rows:
+                columns = list(result.keys())
+                results = []
+
+                for row in result:
+                    row_dict = dict(zip(columns, row))
+                    # Truncate long string values
+                    truncated_row = {
+                        key: (str(value)[:MAX_LONG_DATA] if value is not None else None)
+                        for key, value in row_dict.items()
+                    }
+                    results.append(truncated_row)
+
+                # Create the Markdown table header
+                md_table = "| " + " | ".join(columns) + " |\n"
+                md_table += "| " + " | ".join(["---"] * len(columns)) + " |\n"
+
+                # Add rows to the Markdown table
+                for row in results:
+                    md_table += "| " + " | ".join(str(row[col]) for col in columns) + " |\n"
+
+                return md_table
+            else:
+                # For non-SELECT queries (INSERT, UPDATE, DELETE)
                 return json.dumps(
                     {
                         "message": "Query executed successfully",
-                        "affected_rows": rs.rowcount,
+                        "query": query,
                     }
                 )
 
-            columns = [column[0] for column in rs.description]
-            results = []
-
-            for row in rs:
-                row_dict = dict(zip(columns, row))
-                # Truncate long string values
-                truncated_row = {
-                    key: (str(value)[:MAX_LONG_DATA] if value is not None else None)
-                    for key, value in row_dict.items()
-                }
-                results.append(truncated_row)
-
-            # Create the Markdown table header
-            md_table = "| " + " | ".join(columns) + " |\n"
-            md_table += "| " + " | ".join(["---"] * len(columns)) + " |\n"
-
-            # Add rows to the Markdown table
-            for row in results:
-                md_table += "| " + " | ".join(str(row[col]) for col in columns) + " |\n"
-
-            return md_table
-
-    except pyodbc.Error as e:
+    except Exception as e:
         logger.error(f"Error executing query: {e}")
         raise
 
@@ -724,78 +591,72 @@ def fuzzy_search_table(
     """
 
     # We use f-strings for table and column names, but validate them against the schema first to prevent injection.
-    base_sql_query = f"""
-        SELECT *, similarity("{column}", ?) AS similarity
+    # Note: RLS will automatically filter results based on employer_id
+    sql_query = f"""
+        SELECT *, similarity("{column}", :query_param) AS similarity
         FROM "{table}"
-        WHERE similarity("{column}", ?) > ?
-    """
-
-    # Add employer filter if applicable
-    employer_filter_tables = {
-        "job": "employer_id",
-        "candidate": "employer_id",
-        "hr": "employer_id",
-        "formkey": "employer_id",
-    }
-    if EMPLOYER_ID_FILTER is not None and table in employer_filter_tables:
-        base_sql_query += f" AND {employer_filter_tables[table]} = {EMPLOYER_ID_FILTER}"
-    elif EMPLOYER_ID_FILTER is not None and table == "company":
-        base_sql_query += f" AND id = {EMPLOYER_ID_FILTER}"
-
-    sql_query = (
-        base_sql_query
-        + """
+        WHERE similarity("{column}", :query_param) > :min_similarity
         ORDER BY similarity DESC
-        LIMIT ?
+        LIMIT :limit_param
     """
-    )
-    params = (query, query, min_similarity, limit)
+    params = {
+        "query_param": query,
+        "min_similarity": min_similarity,
+        "limit_param": limit
+    }
 
     try:
-        with get_connection() as conn:
-            cursor = conn.cursor()
-
-            # Validate table and column to prevent SQL injection
-            has_table, table_info = _has_table(
-                conn, catalog=DEFAULT_SCHEMA, table=table
-            )
-            if not has_table:
+        with get_connection() as session:
+            from sqlalchemy import text
+            
+            # Validate table exists
+            table_exists_query = text("""
+                SELECT COUNT(*) 
+                FROM information_schema.tables 
+                WHERE table_schema = 'public' 
+                AND table_name = :table_name
+            """)
+            
+            result = session.execute(table_exists_query, {"table_name": table})
+            if result.scalar() == 0:
                 return json.dumps({"error": f"Table '{table}' not found in database."})
 
-            table_columns = [
-                c["name"]
-                for c in _get_columns(
-                    conn,
-                    cat=table_info.get("cat"),
-                    sch=table_info.get("sch"),
-                    table=table_info.get("name"),
-                )
-            ]
-            if column not in table_columns:
+            # Validate column exists
+            column_exists_query = text("""
+                SELECT COUNT(*) 
+                FROM information_schema.columns 
+                WHERE table_schema = 'public' 
+                AND table_name = :table_name 
+                AND column_name = :column_name
+            """)
+            
+            result = session.execute(column_exists_query, {"table_name": table, "column_name": column})
+            if result.scalar() == 0:
                 return json.dumps(
                     {"error": f"Column '{column}' not found in table '{table}'."}
                 )
 
             # Check if pg_trgm is enabled by trying a simple query
             try:
-                cursor.execute("SELECT similarity('test', 'test')")
-                cursor.fetchone()
-            except pyodbc.ProgrammingError:
+                session.execute(text("SELECT similarity('test', 'test')"))
+            except Exception:
                 return json.dumps(
                     {
                         "error": "The 'pg_trgm' extension is not enabled in the database. Fuzzy search is not available."
                     }
                 )
 
-            rs = cursor.execute(sql_query, params)
+            # Execute the fuzzy search query
+            # Note: RLS will automatically filter results based on employer_id
+            result = session.execute(text(sql_query), params)
 
-            if not rs.description:
+            if not result.returns_rows:
                 return json.dumps({"message": "No fuzzy matches found.", "results": []})
 
-            columns = [col[0] for col in rs.description]
+            columns = list(result.keys())
             results = []
 
-            for row in rs:
+            for row in result:
                 row_dict = dict(zip(columns, row))
                 # Truncate long string values
                 truncated_row = {
@@ -807,7 +668,7 @@ def fuzzy_search_table(
             jsonl_results = "\n".join(json.dumps(row) for row in results)
             return jsonl_results
 
-    except pyodbc.Error as e:
+    except Exception as e:
         logger.error(f"Error executing fuzzy search query: {e}")
         raise
 
@@ -824,9 +685,10 @@ def model_prompt(text: str) -> str:
     employer_filter_info = ""
     if EMPLOYER_ID_FILTER is not None:
         employer_filter_info = f"""
-**IMPORTANT: EMPLOYER FILTERING ACTIVE**
+**IMPORTANT: ROW LEVEL SECURITY (RLS) ACTIVE**
 All database queries are automatically filtered to show only data for employer ID: {EMPLOYER_ID_FILTER}
-This means you will only see jobs, candidates, applications, and other data related to this specific employer.
+This filtering is handled by PostgreSQL Row Level Security policies at the database level.
+You will only see jobs, candidates, applications, and other data related to this specific employer.
 """
 
     return f"""You are an expert database assistant for a job matching platform. Your goal is to use the provided tools to answer questions about jobs, candidates, companies, and applications from the 'matching_db' database.
@@ -892,115 +754,93 @@ You have the tools. Begin by analyzing the user's request and planning your firs
 
 
 # Helper functions
-def _has_table(
-    conn: pyodbc.Connection, catalog: str, table: str
-) -> Tuple[bool, Dict[str, str]]:
-    """Check if a table exists and return its metadata."""
-    with conn.cursor() as cursor:
-        row = cursor.tables(
-            table=table, catalog=catalog, schema=None, tableType=None
-        ).fetchone()
-        if row:
-            return True, {"cat": row[0], "sch": row[1], "name": row[2]}
-        else:
-            return False, {}
+def _get_table_info_sqlalchemy(session, table: str) -> Dict[str, Any]:
+    """Get comprehensive table information using SQLAlchemy."""
+    from sqlalchemy import text
+    
+    # Get column information
+    columns_query = text("""
+        SELECT 
+            column_name,
+            data_type,
+            character_maximum_length,
+            is_nullable,
+            column_default
+        FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = :table_name
+        ORDER BY ordinal_position
+    """)
+    
+    result = session.execute(columns_query, {"table_name": table})
+    columns = []
+    for row in result:
+        columns.append({
+            "name": row[0],
+            "type": row[1],
+            "column_size": row[2],
+            "nullable": row[3] == "YES",
+            "default": row[4],
+            "primary_key": False  # Will be updated below
+        })
+    
+    # Get primary key information
+    pk_query = text("""
+        SELECT column_name
+        FROM information_schema.table_constraints tc
+        JOIN information_schema.key_column_usage kcu 
+            ON tc.constraint_name = kcu.constraint_name
+        WHERE tc.table_schema = 'public'
+        AND tc.table_name = :table_name
+        AND tc.constraint_type = 'PRIMARY KEY'
+    """)
+    
+    result = session.execute(pk_query, {"table_name": table})
+    primary_keys = [row[0] for row in result]
+    
+    # Update primary key flags in columns
+    for column in columns:
+        if column["name"] in primary_keys:
+            column["primary_key"] = True
+    
+    # Get foreign key information
+    fk_query = text("""
+        SELECT 
+            kcu.column_name,
+            ccu.table_name AS foreign_table_name,
+            ccu.column_name AS foreign_column_name,
+            tc.constraint_name
+        FROM information_schema.table_constraints AS tc 
+        JOIN information_schema.key_column_usage AS kcu
+            ON tc.constraint_name = kcu.constraint_name
+        JOIN information_schema.constraint_column_usage AS ccu
+            ON ccu.constraint_name = tc.constraint_name
+        WHERE tc.constraint_type = 'FOREIGN KEY' 
+        AND tc.table_schema = 'public'
+        AND tc.table_name = :table_name
+    """)
+    
+    result = session.execute(fk_query, {"table_name": table})
+    foreign_keys = []
+    for row in result:
+        foreign_keys.append({
+            "name": row[3],
+            "constrained_columns": [row[0]],
+            "referred_table": row[1],
+            "referred_columns": [row[2]]
+        })
+    
+    return {
+        "TABLE_CAT": "matching_db",
+        "TABLE_SCHEM": "public", 
+        "TABLE_NAME": table,
+        "columns": columns,
+        "primary_keys": primary_keys,
+        "foreign_keys": foreign_keys
+    }
 
 
-def _get_columns(
-    conn: pyodbc.Connection, cat: str, sch: str, table: str
-) -> List[Dict[str, Any]]:
-    """Get column information for a table."""
-    with conn.cursor() as cursor:
-        columns = []
-        for row in cursor.columns(table=table, catalog=cat, schema=sch):
-            columns.append(
-                {
-                    "name": row[3],
-                    "type": row[5],
-                    "column_size": row[6],
-                    "num_prec_radix": row[9],
-                    "nullable": row[10] != 0,
-                    "default": row[12],
-                }
-            )
-        return columns
-
-
-def _get_pk_constraint(
-    conn: pyodbc.Connection, cat: str, sch: str, table: str
-) -> Optional[Dict[str, Any]]:
-    """Get primary key constraint information for a table."""
-    with conn.cursor() as cursor:
-        rs = cursor.primaryKeys(table=table, catalog=cat, schema=sch).fetchall()
-        if rs:
-            return {"constrained_columns": [row[3] for row in rs], "name": rs[0][5]}
-        return None
-
-
-def _get_foreign_keys(
-    conn: pyodbc.Connection, cat: str, sch: str, table: str
-) -> List[Dict[str, Any]]:
-    """Get foreign key constraint information for a table."""
-
-    def create_fkey_record() -> Dict[str, Any]:
-        return {
-            "name": None,
-            "constrained_columns": [],
-            "referred_cat": None,
-            "referred_schem": None,
-            "referred_table": None,
-            "referred_columns": [],
-            "options": {},
-        }
-
-    fkeys = defaultdict(create_fkey_record)
-
-    with conn.cursor() as cursor:
-        rs = cursor.foreignKeys(
-            foreignTable=table, foreignCatalog=cat, foreignSchema=sch
-        )
-        for row in rs:
-            rec = fkeys[row[11]]  # FK_NAME
-            rec["name"] = row[11]
-            rec["constrained_columns"].append(row[7])  # FKCOLUMN_NAME
-            rec["referred_columns"].append(row[3])  # PKCOLUMN_NAME
-
-            if not rec["referred_table"]:
-                rec["referred_table"] = row[2]  # PKTABLE_NAME
-                rec["referred_schem"] = row[1]  # PKTABLE_OWNER
-                rec["referred_cat"] = row[0]  # PKTABLE_CAT
-
-    return list(fkeys.values())
-
-
-def _get_table_info(
-    conn: pyodbc.Connection, cat: str, sch: str, table: str
-) -> Dict[str, Any]:
-    """Get comprehensive table information including columns, primary keys, and foreign keys."""
-    try:
-        columns = _get_columns(conn, cat=cat, sch=sch, table=table)
-        pk_constraint = _get_pk_constraint(conn, cat=cat, sch=sch, table=table)
-        primary_keys = pk_constraint["constrained_columns"] if pk_constraint else []
-        foreign_keys = _get_foreign_keys(conn, cat=cat, sch=sch, table=table)
-
-        table_info = {
-            "TABLE_CAT": cat,
-            "TABLE_SCHEM": sch,
-            "TABLE_NAME": table,
-            "columns": columns,
-            "primary_keys": primary_keys,
-            "foreign_keys": foreign_keys,
-        }
-
-        # Mark primary key columns
-        for column in columns:
-            column["primary_key"] = column["name"] in primary_keys
-
-        return table_info
-
-    except pyodbc.Error as e:
-        logger.error(f"Error retrieving table info: {e}")
-        raise
+# Old pyodbc helper functions removed - replaced with SQLAlchemy equivalents
 
 
 def initialize_server_with_args():

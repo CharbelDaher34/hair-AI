@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { FileText, Mail, Phone, User, Calendar, Star, ExternalLink, X, Loader2, XCircle } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
 import apiService from "@/services/api";
+import { ApplicationStatus } from "@/types";
 
 const ViewApplication = () => {
   const { id } = useParams();
@@ -67,6 +68,23 @@ const ViewApplication = () => {
       }
     };
   }, [resume_pdf_url]);
+
+  const get_status_variant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
+    switch (status?.toLowerCase()) {
+      case "hired":
+        return "default";
+      case "interviewing":
+        return "secondary";
+      case "rejected":
+        return "destructive";
+      case "offer_sent":
+        return "secondary";
+      case "reviewing":
+      case "pending":
+      default:
+        return "outline";
+    }
+  };
 
   if (loading) {
     return (
@@ -412,9 +430,15 @@ const ViewApplication = () => {
                 <p className="text-gray-800 font-medium">{application_data.job?.title || "N/A"}</p>
               </div>
               <div className="space-y-1">
-                <Label className="text-sm font-semibold text-gray-700">Status</Label>
+                <Label className="text-sm font-semibold text-gray-700">Job Status</Label>
                 <Badge variant={application_data.job?.status === 'active' ? 'default' : 'secondary'} className="font-medium">
                     {application_data.job?.status || "N/A"}
+                </Badge>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-sm font-semibold text-gray-700">Application Status</Label>
+                <Badge variant={get_status_variant(application_data.status)} className="font-medium capitalize">
+                  {application_data.status || "N/A"}
                 </Badge>
               </div>
               <div className="space-y-1">
@@ -439,7 +463,6 @@ const ViewApplication = () => {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="font-semibold text-gray-700">Score</TableHead>
-                      <TableHead className="font-semibold text-gray-700">Status</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -448,11 +471,6 @@ const ViewApplication = () => {
                         <TableCell>
                           <Badge variant="outline" className="font-bold text-lg text-green-600 border-green-300 bg-green-50">
                             {(match.score * 100).toFixed(1)}%
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={match.status === 'completed' ? 'default' : 'secondary'} className="font-medium">
-                            {match.status}
                           </Badge>
                         </TableCell>
                       </TableRow>

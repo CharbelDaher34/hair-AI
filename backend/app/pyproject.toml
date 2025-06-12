@@ -42,4 +42,5 @@ dependencies = [
     "pyodbc>=5.2.0",
     "python-dotenv>=1.0.1",
     "rapidfuzz>=3.13.0",
+    "faker>=37.4.0",
 ]

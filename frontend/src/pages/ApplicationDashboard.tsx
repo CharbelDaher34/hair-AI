@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Eye, Edit, Trash2, Plus, Search, MoreHorizontal, Filter, Loader2, Calendar, Clock, Users } from "lucide-react";
+import { Eye, Edit, Trash2, Plus, Search, MoreHorizontal, Filter, Loader2, Calendar, Clock, Users, ChevronDown } from "lucide-react";
 import { Link } from "react-router-dom";
 import apiService from "@/services/api";
 import { Application, ApplicationDashboardResponse } from "@/types";
@@ -52,6 +52,21 @@ const ApplicationDashboard = () => {
   const [interviews, set_interviews] = useState<Interview[]>([]);
   const [interviews_loading, set_interviews_loading] = useState(false);
   const [interviews_dialog_open, set_interviews_dialog_open] = useState(false);
+
+  const handle_status_update = async (application_id: number, status: string) => {
+    try {
+      await apiService.updateApplicationStatus(application_id, status);
+      set_applications((prev_applications) =>
+        prev_applications.map((app) =>
+          app.id === application_id ? { ...app, status: status as Application['status'] } : app
+        )
+      );
+      toast.success("Application status updated successfully.");
+    } catch (error) {
+      console.error("Failed to update application status:", error);
+      toast.error("Failed to update application status.");
+    }
+  };
 
   const fetch_applications = async (reset = false) => {
     try {
@@ -120,38 +135,18 @@ const ApplicationDashboard = () => {
     return matches_search && matches_job;
   });
 
-  const get_status_from_application = (application: Application): string => {
-    // Since we don't have a status field, we'll derive it from other data
-    if (application.matches && application.matches.length > 0) {
-      const latest_match = application.matches[application.matches.length - 1];
-      return latest_match.status || "review";
-    }
-    return "review";
-  };
-
-  const get_status_color = (status: string) => {
-    switch (status) {
-      case "review":
-        return "default";
-      case "interview":
-        return "secondary";
-      case "hired":
-        return "default";
-      case "rejected":
-        return "destructive";
-      default:
-        return "secondary";
-    }
-  };
-
   const get_status_variant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
-    switch (status) {
+    switch (status?.toLowerCase()) {
       case "hired":
         return "default";
-      case "interview":
+      case "interviewing":
         return "secondary";
       case "rejected":
         return "destructive";
+      case "offer_sent":
+        return "secondary"; // Or another color
+      case "reviewing":
+      case "pending":
       default:
         return "outline";
     }
@@ -281,9 +276,28 @@ const ApplicationDashboard = () => {
                       <TableCell className="font-medium text-gray-800">{application.job?.title}</TableCell>
                       <TableCell className="text-gray-600">{format_date(application.created_at)}</TableCell>
                       <TableCell>
-                        <Badge variant={get_status_variant(get_status_from_application(application))} className="font-medium">
-                          {get_status_from_application(application)}
-                        </Badge>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" className="flex items-center gap-2 capitalize">
+                               <Badge variant={get_status_variant(application.status)} className="font-medium capitalize">
+                                {application.status || "N/A"}
+                               </Badge>
+                               <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent>
+                            {(["pending", "reviewing", "interviewing", "offer_sent", "hired", "rejected"] as const).map(status => (
+                              <DropdownMenuItem 
+                                key={status} 
+                                onSelect={() => handle_status_update(application.id, status)}
+                                disabled={application.status === status}
+                                className="capitalize"
+                              >
+                                {status}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                       <TableCell>
                         <DropdownMenu>
@@ -305,12 +319,6 @@ const ApplicationDashboard = () => {
                             >
                               <Calendar className="mr-2 h-4 w-4" />
                               Interviews
-                            </DropdownMenuItem>
-                            <DropdownMenuItem asChild>
-                              <Link to={`/applications/${application.id}/edit`}>
-                                <Edit className="mr-2 h-4 w-4" />
-                                Edit
-                              </Link>
                             </DropdownMenuItem>
                             <DropdownMenuItem className="text-destructive">
                               <Trash2 className="mr-2 h-4 w-4" />

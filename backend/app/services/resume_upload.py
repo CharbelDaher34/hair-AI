@@ -1,3 +1,4 @@
+import os
 import requests
 import json
 from pathlib import Path
@@ -42,13 +43,38 @@ def get_content_type(file_extension):
     return content_types.get(file_extension)
 
 
+def _get_matcher_url():
+    """
+    Determines the correct matcher URL by checking health endpoints of potential hosts.
+    """
+    hosts = [os.getenv("AI_HOST", "ai"), "localhost"]
+    port = os.getenv("AI_PORT", "8011")
+
+    for host in hosts:
+        base_url = f"http://{host}:{port}"
+        health_url = f"{base_url}/health"
+        try:
+            print(f"Trying to connect to {health_url}")
+            response = requests.get(health_url, timeout=5)
+            response.raise_for_status()
+            print(f"✅ AI service is running at {base_url}")
+            return f"{base_url}/parser/parse"
+        except requests.exceptions.RequestException as e:
+            print(f"❌ Could not connect to {health_url}: {e}")
+
+    print("❌ AI service is not running or not accessible.")
+    return ""
+
+
+PARSER_URL = _get_matcher_url()
+
 class AgentClient:
     def __init__(
         self,
         system_prompt: str,
         schema: Any,
         inputs: List[Any],
-        url: str = "http://ai:8011/parser/parse",
+        url: str = PARSER_URL,
     ):
         """
         :param system_prompt: The system prompt string for the LLM
