@@ -247,17 +247,28 @@ const AddApplication = () => {
             <CardContent className="space-y-6 pt-4">
               <div className="space-y-2">
                 <Label htmlFor="candidateId" className="text-sm font-semibold text-gray-700">Candidate *</Label>
-                <Select value={show_new_candidate_form ? "new" : selected_candidate_id} onValueChange={handleCandidateChange}>
-                  <SelectTrigger className="h-12 shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500">
-                    <SelectValue placeholder="Select a candidate or add new" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {candidates.map((c) => (
-                      <SelectItem key={c.id} value={c.id.toString()}>{c.full_name} ({c.email})</SelectItem>
-                    ))}
-                    <SelectItem value="new">+ Add New Candidate</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="flex gap-4">
+                  <Select value={"new"} onValueChange={handleCandidateChange}>
+                    <SelectTrigger className="h-12 shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500">
+                      <SelectValue placeholder="Select a candidate or add new" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {candidates.map((c) => (
+                        <SelectItem key={c.id} value={c.id.toString()}>{c.full_name} ({c.email})</SelectItem>
+                      ))}
+                      <SelectItem value="new" className="text-blue-600 font-semibold bg-blue-50 hover:bg-blue-100 transition-colors duration-200">
+                        + Add New Candidate
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => handleCandidateChange("new")} 
+                    className="button-outline shadow-md hover:shadow-lg transition-all duration-300 w-full md:w-auto"
+                  >
+                    + Add New Candidate
+                  </Button>
+                </div>
               </div>
               {show_new_candidate_form && (
                 <div className="space-y-4 border border-blue-200 rounded-lg p-6 bg-gradient-to-r from-blue-50 to-purple-50 shadow-sm">

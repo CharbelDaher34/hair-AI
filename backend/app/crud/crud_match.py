@@ -58,10 +58,7 @@ def create_match(db: Session, *, match_in: MatchCreate) -> Match:
 
     candidates = [candidate_text]
 
-    print(f"\n=== JOB DESCRIPTION ===\n{job_description}")
-    print(f"\n=== CANDIDATE TEXT ===\n{candidate_text}")
     candidate_resume = CandidateResume.model_validate(candidate.parsed_resume)
-    print(f"\n=== CANDIDATE SKILLS ===\n{candidate_resume.skills}")
 
     # Call the AI matcher
     ai_response = match_candidates_client(

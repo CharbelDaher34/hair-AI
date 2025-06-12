@@ -10,9 +10,11 @@ from models.models import (
     Candidate,
     FormKey,
     JobFormKeyConstraint,
+    Status,
+    ApplicationStatus,
 )
 from schemas import ApplicationCreate, ApplicationUpdate
-from .crud_job import get_job
+from . import crud_job
 
 
 def get_application(db: Session, application_id: int) -> Optional[Application]:
@@ -51,6 +53,7 @@ def get_random_applications_by_employer(
         select(Application)
         .join(Job, Application.job_id == Job.id)
         .where(Job.employer_id == employer_id)
+        .where(Job.status != Status.CLOSED)
         .order_by(Application.id.desc())
         .offset(skip)
         .limit(limit)
@@ -69,6 +72,7 @@ def get_application_with_details(
     statement = (
         select(Application)
         .where(Application.id == application_id)
+        .where(Job.status != Status.CLOSED)
         .options(
             selectinload(Application.candidate),
             selectinload(Application.job)
@@ -142,6 +146,12 @@ def update_application(
     db.add(db_application)
     db.commit()
     db.refresh(db_application)
+    
+    if db_application.status == ApplicationStatus.HIRED:
+        job = crud_job.get_job(db, job_id=db_application.job_id)
+        if job:
+            crud_job.update_job(db, db_job=job, job_in={"status": Status.CLOSED})
+    
     return db_application
 
 

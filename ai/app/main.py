@@ -7,6 +7,10 @@ app.include_router(parser_router, prefix="/parser", tags=["parser"])
 app.include_router(matcher_router, prefix="/matcher", tags=["matcher"])
 # app.include_router(skills_router, prefix="/skills", tags=["skills"])
 
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
 if __name__ == "__main__":
     import uvicorn
 

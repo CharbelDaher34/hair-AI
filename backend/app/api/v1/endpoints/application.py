@@ -50,7 +50,7 @@ def get_application_with_details(
     return application
 
 
-@router.get("/employer-applications", response_model=ApplicationDashboardResponse)
+@router.get("/employer-applications", response_model=ApplicationDashboardResponse | None)
 def get_employer_applications(
     *,
     db: Session = Depends(get_session),
@@ -77,6 +77,8 @@ def get_employer_applications(
     applications = crud_application.get_random_applications_by_employer(
         db=db, employer_id=employer_id, skip=skip, limit=10
     )
+    if applications is None or len(applications) == 0:
+        return ApplicationDashboardResponse(applications=[], total=0)
 
     # Convert to ApplicationWithDetails format
     applications_with_details = []
@@ -139,6 +141,33 @@ def update_application(
 
     updated_application = crud_application.update_application(
         db=db, db_application=db_application, application_in=application_in
+    )
+    return updated_application
+
+
+class ApplicationStatusUpdate(BaseModel):
+    status: str
+
+
+@router.patch("/{application_id}/status", response_model=ApplicationRead)
+def update_application_status(
+    *,
+    db: Session = Depends(get_session),
+    application_id: int,
+    status_update: ApplicationStatusUpdate,
+) -> ApplicationRead:
+    """Update only the status of an application"""
+    db_application = crud_application.get_application(
+        db=db, application_id=application_id
+    )
+    if not db_application:
+        raise HTTPException(status_code=404, detail="Application not found")
+
+    # Create an ApplicationUpdate with only the status field
+    application_update = ApplicationUpdate(status=status_update.status)
+    
+    updated_application = crud_application.update_application(
+        db=db, db_application=db_application, application_in=application_update
     )
     return updated_application
 

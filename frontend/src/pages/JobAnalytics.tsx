@@ -17,7 +17,6 @@ interface JobAnalyticsData {
   total_applications: number;
   applications_by_status: Record<string, number>;
   total_matches: number;
-  matches_by_status: Record<string, number>;
   average_match_score: number | null;
   top_match_score: number | null;
   total_interviews: number;
@@ -49,7 +48,6 @@ interface MatchCandidate {
   extra_skills_count: number;
   skill_weight: number;
   embedding_weight: number;
-  status: string;
   created_at: string;
   updated_at: string;
   // Candidate fields
@@ -59,6 +57,8 @@ interface MatchCandidate {
   resume_url?: string;
   parsed_resume?: any;
   employer_id?: number;
+  // Application status (moved from match to application)
+  application_status?: string;
 }
 
 interface JobMatchesResponse {
@@ -227,10 +227,10 @@ const JobAnalytics = () => {
     color: status === 'done' ? '#10b981' : status === 'scheduled' ? '#f59e0b' : '#ef4444'
   }));
 
-  const matchStatusData: ChartData[] = Object.entries(analytics.matches_by_status || {}).map(([status, count]) => ({
+  const applicationStatusData: ChartData[] = Object.entries(analytics.applications_by_status || {}).map(([status, count]) => ({
     name: status.charAt(0).toUpperCase() + status.slice(1),
     value: count,
-    color: status === 'completed' ? '#10b981' : status === 'pending' ? '#f59e0b' : '#ef4444'
+    color: status === 'hired' ? '#10b981' : status === 'pending' ? '#f59e0b' : status === 'rejected' ? '#ef4444' : '#3b82f6'
   }));
 
   const getStatusVariant = (status: string): "default" | "secondary" | "destructive" => {
@@ -415,8 +415,8 @@ const JobAnalytics = () => {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={getStatusVariant(match.status)} className="font-medium">
-                          {match.status}
+                        <Badge variant={getStatusVariant(match.application_status || 'pending')} className="font-medium">
+                          {match.application_status || 'pending'}
                         </Badge>
                       </TableCell>
                     </TableRow>
@@ -457,18 +457,18 @@ const JobAnalytics = () => {
           </Card>
         )}
 
-        {/* Match Status */}
-        {matchStatusData.length > 0 && (
+        {/* Application Status */}
+        {applicationStatusData.length > 0 && (
           <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
             <CardHeader className="pb-4">
-              <CardTitle className="text-xl font-bold text-gray-800">Match Status</CardTitle>
-              <CardDescription className="text-base text-gray-600">Current status of all matches</CardDescription>
+              <CardTitle className="text-xl font-bold text-gray-800">Application Status</CardTitle>
+              <CardDescription className="text-base text-gray-600">Current status of all applications</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
                 <PieChart>
                   <Pie
-                    data={matchStatusData}
+                    data={applicationStatusData}
                     cx="50%"
                     cy="50%"
                     labelLine={false}
@@ -477,7 +477,7 @@ const JobAnalytics = () => {
                     fill="#8884d8"
                     dataKey="value"
                   >
-                    {matchStatusData.map((entry, index) => (
+                    {applicationStatusData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>

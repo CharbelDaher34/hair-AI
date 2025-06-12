@@ -16,38 +16,58 @@ import { toast } from "@/components/ui/sonner";
 // Interfaces based on your existing structure and potential API responses
 interface Candidate {
   id: number;
-  name: string;
+  full_name: string;
   email: string;
-  score: number;
-  // Assuming these details might come from a match object or directly
-  satisfied_constraints?: number; 
-  total_constraints?: number;
-  skill_match?: string[];
-  missing_skills?: string[];
-  experience?: string;
-  // Status specific to this job matching context
-  match_status: "pending" | "accepted" | "rejected" | "contacted"; 
-  application_id?: number; // Link to view full application
+  phone?: string;
+  resume_url?: string;
+  parsed_resume?: any;
+  employer_id?: number;
 }
 
 interface Job {
   id: number;
   title: string;
-  total_candidates_matched?: number; // Or calculated from candidates list
+  description: string;
+  status: string;
 }
 
 interface MatchedCandidateData {
-  id: number; // Match ID
+  // Match fields
+  id: number;
+  application_id: number;
   score: number;
-  status: "pending" | "accepted" | "rejected" | "contacted"; // Match status
+  embedding_similarity: number;
+  match_percentage: number;
+  matching_skills: string[];
+  missing_skills: string[];
+  extra_skills: string[];
+  total_required_skills: number;
+  matching_skills_count: number;
+  missing_skills_count: number;
+  extra_skills_count: number;
+  skill_weight: number;
+  embedding_weight: number;
+  created_at: string;
+  updated_at: string;
+  // Candidate fields
+  full_name: string;
+  email: string;
+  phone?: string;
+  resume_url?: string;
+  parsed_resume?: any;
+  employer_id?: number;
+}
+
+interface JobMatchesResponse {
+  matches: MatchedCandidateData[];
   job: Job;
-  candidate: Candidate; // Simplified candidate, full details on candidate page
-  // Add other match-specific fields if necessary, like match_details_url or explanation
 }
 
 const MatchedCandidatesPage = () => {
-  const { job_id } = useParams<{ job_id: string }>();
+  const { id: job_id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+
+  console.log("MatchedCandidatesPage mounted, job_id:", job_id);
 
   const [job, set_job] = useState<Job | null>(null);
   const [candidates, set_candidates] = useState<MatchedCandidateData[]>([]);
@@ -55,31 +75,38 @@ const MatchedCandidatesPage = () => {
   const [error, set_error] = useState<string | null>(null);
 
   const [score_threshold, set_score_threshold] = useState([70]);
-  const [status_filter, set_status_filter] = useState("all");
   const [search_term, set_search_term] = useState("");
 
   useEffect(() => {
+    console.log("useEffect triggered, job_id:", job_id);
     const fetch_matched_candidates = async () => {
-      if (!job_id) return;
+      if (!job_id) {
+        console.log("No job_id, returning early");
+        return;
+      }
+      console.log("Starting API call for job_id:", job_id);
       set_is_loading(true);
       set_error(null);
       try {
-        const data = await apiService.getMatchedCandidatesForJob(job_id);
-        // Assuming data is an array of MatchedCandidateData
-        // If the API returns job details separately, fetch that too or expect it nested.
-        // For this example, let's assume the first candidate's job is the main job.
-        if (data && data.length > 0) {
-          set_job(data[0].job);
-          set_candidates(data);
+        console.log("Calling apiService.getJobMatches with job_id:", job_id);
+        const data: JobMatchesResponse = await apiService.getJobMatches(job_id);
+        console.log("API response:", data);
+        
+        if (data && data.job) {
+          set_job(data.job);
+          set_candidates(data.matches || []);
+          console.log("Set job and candidates:", data.job, data.matches);
         } else {
-          // If no candidates, try to fetch job details separately to show job title at least
+          console.log("No data.job, trying to fetch job details separately");
+          // If no data, try to fetch job details separately
           try {
-            const job_details = await apiService.getJobById(job_id);
+            const job_details = await apiService.getJob(job_id);
+            console.log("Job details:", job_details);
             set_job(job_details);
             set_candidates([]);
           } catch (job_error) {
-            console.error("Failed to fetch job details after no candidates:", job_error);
-            set_job(null); // Or a default job object
+            console.error("Failed to fetch job details:", job_error);
+            set_job(null);
             set_candidates([]);
             toast.error("Job details not found.");
           }
@@ -90,28 +117,18 @@ const MatchedCandidatesPage = () => {
         toast.error("Failed to load matched candidates", { description: err.message });
       } finally {
         set_is_loading(false);
+        console.log("Loading finished");
       }
     };
     fetch_matched_candidates();
   }, [job_id]);
 
   const filtered_candidates = candidates
-    .filter(mc => mc.score * 100 >= score_threshold[0])
-    .filter(mc => status_filter === "all" || mc.status === status_filter)
+    .filter(mc => (mc.score * 100) >= score_threshold[0])
     .filter(mc => 
-      mc.candidate.name.toLowerCase().includes(search_term.toLowerCase()) ||
-      mc.candidate.email.toLowerCase().includes(search_term.toLowerCase())
+      mc.full_name.toLowerCase().includes(search_term.toLowerCase()) ||
+      mc.email.toLowerCase().includes(search_term.toLowerCase())
     );
-
-  const get_status_badge_variant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
-    switch (status) {
-      case "accepted": return "default"; // Greenish in custom theme?
-      case "rejected": return "destructive";
-      case "contacted": return "outline"; // Bluish?
-      case "pending":
-      default: return "secondary";
-    }
-  };
 
   const get_score_color_class = (score: number) => {
     const actual_score = score * 100;
@@ -121,18 +138,6 @@ const MatchedCandidatesPage = () => {
     return "text-red-600";
   };
   
-  const handle_update_match_status = async (match_id: number, new_status: "accepted" | "rejected" | "contacted") => {
-    try {
-      await apiService.updateMatchStatus(match_id.toString(), new_status);
-      set_candidates(prev => 
-        prev.map(mc => mc.id === match_id ? { ...mc, status: new_status } : mc)
-      );
-      toast.success(`Candidate status updated to ${new_status}.`);
-    } catch (err: any) {
-      toast.error("Failed to update status", { description: err.message });
-    }
-  };
-
   if (is_loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50 p-8">
@@ -192,10 +197,10 @@ const MatchedCandidatesPage = () => {
             Filter Candidates
           </CardTitle>
            <CardDescription className="text-base text-gray-600">
-            Refine the list of candidates based on match score and status.
+            Refine the list of candidates based on match score.
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
+        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
           <div className="space-y-2">
             <Label htmlFor="search_term" className="text-sm font-semibold text-gray-700">Search by Name/Email</Label>
             <div className="relative">
@@ -221,21 +226,6 @@ const MatchedCandidatesPage = () => {
               className="[&>.slider-track]:bg-blue-200 [&>.slider-range]:bg-gradient-to-r from-blue-500 to-purple-500 [&>.slider-thumb]:bg-white [&>.slider-thumb]:border-purple-600"
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="status_filter" className="text-sm font-semibold text-gray-700">Filter by Status</Label>
-            <Select value={status_filter} onValueChange={set_status_filter}>
-              <SelectTrigger id="status_filter" className="h-12 bg-white shadow-sm focus:ring-purple-500 focus:border-purple-500">
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="contacted">Contacted</SelectItem>
-                <SelectItem value="accepted">Accepted</SelectItem>
-                <SelectItem value="rejected">Rejected</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
         </CardContent>
       </Card>
 
@@ -257,7 +247,6 @@ const MatchedCandidatesPage = () => {
                 <TableRow className="bg-slate-50">
                   <TableHead className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Candidate</TableHead>
                   <TableHead className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Match Score</TableHead>
-                  <TableHead className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</TableHead>
                   <TableHead className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -267,11 +256,11 @@ const MatchedCandidatesPage = () => {
                     <TableCell className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="h-10 w-10 flex-shrink-0 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold">
-                          {mc.candidate.name.charAt(0).toUpperCase()}
+                          {mc.full_name.charAt(0).toUpperCase()}
                         </div>
                         <div className="ml-4">
-                          <div className="text-sm font-semibold text-gray-900">{mc.candidate.name}</div>
-                          <div className="text-xs text-gray-500">{mc.candidate.email}</div>
+                          <div className="text-sm font-semibold text-gray-900">{mc.full_name}</div>
+                          <div className="text-xs text-gray-500">{mc.email}</div>
                         </div>
                       </div>
                     </TableCell>
@@ -279,66 +268,43 @@ const MatchedCandidatesPage = () => {
                       <div className={`text-lg ${get_score_color_class(mc.score)}`}>
                         {(mc.score * 100).toFixed(1)}%
                       </div>
-                      {mc.candidate.satisfied_constraints !== undefined && mc.candidate.total_constraints !== undefined && (
+                      {mc.matching_skills_count !== undefined && mc.total_required_skills !== undefined && (
                         <Popover>
                           <PopoverTrigger asChild>
                             <Button variant="link" size="sm" className="p-0 h-auto text-xs text-gray-500 hover:text-blue-600">
-                              ({mc.candidate.satisfied_constraints}/{mc.candidate.total_constraints} constraints met)
+                              ({mc.matching_skills_count}/{mc.total_required_skills} skills matched)
                               <Info className="ml-1 h-3 w-3" />
                             </Button>
                           </PopoverTrigger>
                           <PopoverContent className="w-64 text-sm p-3 space-y-2 bg-white shadow-xl rounded-lg border border-gray-200">
-                            {mc.candidate.skill_match && mc.candidate.skill_match.length > 0 && 
-                              <div><strong className="font-semibold text-green-600">Matched Skills:</strong> {mc.candidate.skill_match.join(", ")}</div>
+                            {mc.matching_skills && mc.matching_skills.length > 0 && 
+                              <div><strong className="font-semibold text-green-600">Matched Skills:</strong> {mc.matching_skills.join(", ")}</div>
                             }
-                            {mc.candidate.missing_skills && mc.candidate.missing_skills.length > 0 && 
-                              <div><strong className="font-semibold text-red-600">Missing Skills:</strong> {mc.candidate.missing_skills.join(", ")}</div>
+                            {mc.missing_skills && mc.missing_skills.length > 0 && 
+                              <div><strong className="font-semibold text-red-600">Missing Skills:</strong> {mc.missing_skills.join(", ")}</div>
                             }
-                             {mc.candidate.experience && <div><strong className="font-semibold text-gray-700">Experience:</strong> {mc.candidate.experience}</div>}
-                             {(!mc.candidate.skill_match || mc.candidate.skill_match.length === 0) && 
-                              (!mc.candidate.missing_skills || mc.candidate.missing_skills.length === 0) &&
-                              !mc.candidate.experience &&
-                               <p className="text-gray-500 italic">No detailed constraint info available.</p> }
+                            {mc.extra_skills && mc.extra_skills.length > 0 && 
+                              <div><strong className="font-semibold text-blue-600">Extra Skills:</strong> {mc.extra_skills.join(", ")}</div>
+                            }
+                            {(!mc.matching_skills || mc.matching_skills.length === 0) && 
+                             (!mc.missing_skills || mc.missing_skills.length === 0) &&
+                             (!mc.extra_skills || mc.extra_skills.length === 0) &&
+                              <p className="text-gray-500 italic">No detailed skill info available.</p> }
                           </PopoverContent>
                         </Popover>
                       )}
-                    </TableCell>
-                    <TableCell className="px-6 py-4 whitespace-nowrap">
-                      <Badge variant={get_status_badge_variant(mc.status)} className="capitalize text-xs font-medium px-2.5 py-1 rounded-full shadow-sm">
-                        {mc.status}
-                      </Badge>
                     </TableCell>
                     <TableCell className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
                       <Button 
                         variant="ghost" 
                         size="icon" 
                         className="text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded-full p-2 transition-all duration-150"
-                        onClick={() => navigate(`/applications/${mc.candidate.application_id}`)} // Assuming application_id is available
-                        disabled={!mc.candidate.application_id} // Disable if no application ID
+                        onClick={() => navigate(`/applications/${mc.application_id}`)}
+                        disabled={!mc.application_id}
                         title="View Application"
                       >
                         <Eye className="h-5 w-5" />
                       </Button>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button variant="ghost" size="icon" className="text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full p-2 transition-all duration-150" title="Change Status">
-                            <ChevronDown className="h-5 w-5" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-48 p-1 bg-white shadow-xl rounded-lg border border-gray-200">
-                          {(["pending", "contacted", "accepted", "rejected"] as const).map((new_status) => (
-                            <Button 
-                              key={new_status} 
-                              variant="ghost" 
-                              className="w-full justify-start px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 disabled:opacity-50 transition-colors duration-150 capitalize"
-                              onClick={() => handle_update_match_status(mc.id, new_status)}
-                              disabled={mc.status === new_status}
-                            >
-                              {new_status.charAt(0).toUpperCase() + new_status.slice(1)}
-                            </Button>
-                          ))}
-                        </PopoverContent>
-                      </Popover>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -365,7 +331,6 @@ const MatchedCandidatesPage = () => {
               onClick={() => {
                 set_search_term("");
                 set_score_threshold([0]);
-                set_status_filter("all");
               }}
               className="button-outline shadow-md hover:shadow-lg transition-all duration-300"
             >

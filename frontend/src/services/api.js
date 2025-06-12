@@ -7,6 +7,7 @@ class ApiService {
 
   async request(endpoint, options = {}) {
     const url = `${this.baseURL}${endpoint}`;
+    console.log('API Request:', url, options);
     
     // Get token from localStorage and include it in headers if it exists
     const token = localStorage.getItem('token');
@@ -33,7 +34,9 @@ class ApiService {
     };
 
     try {
+      console.log('Making fetch request to:', url, 'with config:', config);
       const response = await fetch(url, config);
+      console.log('Response received:', response.status, response.statusText);
       
       if (!response.ok) {
         // Handle 401 Unauthorized - token might be expired
@@ -47,7 +50,9 @@ class ApiService {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
-      return await response.json();
+      const data = await response.json();
+      console.log('Response data:', data);
+      return data;
     } catch (error) {
       console.error('API request failed:', error);
       throw error;
@@ -180,6 +185,13 @@ class ApiService {
 
   async getEmployerApplications(skip = 0, limit = 100) {
     return this.request(`/applications/employer-applications?skip=${skip}&limit=${limit}`);
+  }
+
+  async updateApplicationStatus(applicationId, status) {
+    return this.request(`/applications/${applicationId}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    });
   }
 
   // Candidate endpoints
@@ -444,6 +456,7 @@ class ApiService {
   }
 
   async getJobMatches(jobId) {
+    console.log('getJobMatches called with jobId:', jobId);
     return this.request(`/jobs/matches/${jobId}`);
   }
 

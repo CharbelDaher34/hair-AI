@@ -42,13 +42,7 @@ swagger_ui_bearer_scheme = HTTPBearer(
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup logic
-    # create_db_and_tables()
-    all_exist, missing_tables = check_db_tables()
-    if not all_exist:
-        print("Creating database tables...")
-        create_db_and_tables()
-    else:
-        print(f"Database already exists. Missing tables: {missing_tables}")
+    create_db_and_tables()
 
     yield  # Control passes to the application here
 
