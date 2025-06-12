@@ -14,12 +14,14 @@ def get_job(db: Session, job_id: int) -> Optional[Job]:
 
 
 def get_jobs(
-    db: Session, skip: int = 0, limit: int = 100, closed: bool = False
+    db: Session, skip: int = 0, limit: int = 100, employer_id: int = None, closed: bool = False
 ) -> List[Job]:
     if closed:
-        statement = select(Job).offset(skip).limit(limit)
+        statement = select(Job).where(Job.employer_id == employer_id).offset(skip).limit(limit)
     else:
-        statement = select(Job).where(Job.status != Status.CLOSED).offset(skip).limit(limit)
+        statement = (
+            select(Job).where(Job.employer_id == employer_id, Job.status != Status.CLOSED).offset(skip).limit(limit)
+        )
     return db.exec(statement).all()
 
 
@@ -32,7 +34,10 @@ def get_jobs_by_employer(
         )
     else:
         statement = (
-            select(Job).where(Job.employer_id == employer_id,Job.status != Status.CLOSED).offset(skip).limit(limit)
+            select(Job)
+            .where(Job.employer_id == employer_id, Job.status != Status.CLOSED)
+            .offset(skip)
+            .limit(limit)
         )
     return db.exec(statement).all()
 

@@ -13,8 +13,9 @@ from models.models import (
     Status,
     ApplicationStatus,
 )
-from schemas import ApplicationCreate, ApplicationUpdate
+from schemas import ApplicationCreate, ApplicationUpdate, MatchCreate
 from . import crud_job
+from . import crud_match
 
 
 def get_application(db: Session, application_id: int) -> Optional[Application]:
@@ -126,6 +127,45 @@ def create_application(
     db.add(db_application)
     db.commit()
     db.refresh(db_application)
+    
+    # Create match for the application automatically
+    try:
+        # Get candidate and job data for validation
+        candidate = db.get(Candidate, db_application.candidate_id)
+        job = db.get(Job, db_application.job_id)
+        
+        # Check if we have the necessary data for matching
+        if candidate and job and candidate.parsed_resume and job.description and job.description.strip():
+            print(f"[CreateApplication] Creating match for application {db_application.id}")
+            print(f"[CreateApplication] Job: {job.title}")
+            print(f"[CreateApplication] Candidate: {candidate.full_name}")
+            
+            # Create match using CRUD (which will call the AI service)
+            match_create = MatchCreate(application_id=db_application.id)
+            new_match = crud_match.create_match(db=db, match_in=match_create)
+            
+            if new_match:
+                print(f"[CreateApplication] Successfully created match {new_match.id} for application {db_application.id}")
+            else:
+                print(f"[CreateApplication] Failed to create match for application {db_application.id}")
+        else:
+            # Log why matching was skipped
+            if not candidate:
+                print(f"[CreateApplication] Candidate not found for application {db_application.id}")
+            elif not job:
+                print(f"[CreateApplication] Job not found for application {db_application.id}")
+            elif not candidate.parsed_resume:
+                print(f"[CreateApplication] Candidate {candidate.id} has no parsed resume data - skipping match creation")
+            elif not job.description or not job.description.strip():
+                print(f"[CreateApplication] Job {job.id} has no description - skipping match creation")
+                
+    except Exception as match_err:
+        print(f"[CreateApplication] Error creating match for application {db_application.id}: {str(match_err)}")
+        print(f"[CreateApplication] Error type: {type(match_err)}")
+        # Don't fail the application creation if matching fails
+        import traceback
+        print(f"[CreateApplication] Full traceback: {traceback.format_exc()}")
+    
     return db_application
 
 
@@ -146,12 +186,12 @@ def update_application(
     db.add(db_application)
     db.commit()
     db.refresh(db_application)
-    
+
     if db_application.status == ApplicationStatus.HIRED:
         job = crud_job.get_job(db, job_id=db_application.job_id)
         if job:
             crud_job.update_job(db, db_job=job, job_in={"status": Status.CLOSED})
-    
+
     return db_application
 
 

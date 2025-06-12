@@ -43,4 +43,5 @@ dependencies = [
     "python-dotenv>=1.0.1",
     "rapidfuzz>=3.13.0",
     "faker>=37.4.0",
+    "apscheduler>=3.11.0",
 ]

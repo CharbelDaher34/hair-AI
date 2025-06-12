@@ -79,11 +79,11 @@ export function AppSidebar() {
       <SidebarHeader className="border-b p-6">
         <div className="flex items-center gap-2">
           <img 
-            src="/eurisko.jpeg" 
+            src="/hair_logo.png" 
             alt="Eurisko Logo" 
             className="h-8 w-8 rounded-full object-cover"
           />
-          <span className="font-bold text-lg">Daher</span>
+          <span className="font-bold text-lg">AI HR</span>
         </div>
         <SidebarTrigger className="ml-auto" />
       </SidebarHeader>
