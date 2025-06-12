@@ -35,7 +35,10 @@ NOTE: This server requires an employer_id to be set for proper RLS functionality
 from collections import defaultdict
 import os
 import sys
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+sys.path.append(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+)
 from core.database import get_session_rls
 from sqlmodel import Session
 import logging
@@ -73,7 +76,7 @@ EMPLOYER_ID_FILTER: Optional[int] = None
 def get_connection():
     """
     Create a database session using SQLAlchemy with RLS (Row Level Security).
-    
+
     The session automatically filters data based on the employer_id through RLS policies.
     This replaces the manual employer filtering logic.
 
@@ -85,12 +88,14 @@ def get_connection():
         Exception: If session creation fails
     """
     logger.info(f"Getting connection with EMPLOYER_ID_FILTER: {os.getcwd()}")
-    
+
     if EMPLOYER_ID_FILTER is None:
         raise ValueError("EMPLOYER_ID_FILTER must be set before creating a session")
-    
-    logger.info(f"Creating SQLAlchemy session with RLS for employer_id: {EMPLOYER_ID_FILTER}")
-    
+
+    logger.info(
+        f"Creating SQLAlchemy session with RLS for employer_id: {EMPLOYER_ID_FILTER}"
+    )
+
     try:
         # Return the context manager directly - it will be used in a 'with' statement
         return get_session_rls(EMPLOYER_ID_FILTER)
@@ -126,7 +131,7 @@ def get_employer_filter_clause(table_alias: str = "") -> str:
 def apply_employer_filter_to_query(query: str) -> str:
     """
     Apply employer_id filtering to a SQL query by analyzing the tables involved.
-    
+
     NOTE: This function is now deprecated since we're using Row Level Security (RLS).
     RLS automatically filters all queries based on the session's employer_id setting.
     This function now just returns the original query unchanged.
@@ -168,7 +173,7 @@ def get_tables() -> str:
     try:
         with get_connection() as session:
             from sqlalchemy import text
-            
+
             # Query to get all tables in the public schema
             query = text("""
                 SELECT table_catalog, table_schema, table_name 
@@ -177,7 +182,7 @@ def get_tables() -> str:
                 AND table_type = 'BASE TABLE'
                 ORDER BY table_name
             """)
-            
+
             result = session.execute(query)
             results = []
             for row in result:
@@ -225,7 +230,7 @@ def describe_table(table: str) -> str:
     try:
         with get_connection() as session:
             from sqlalchemy import text
-            
+
             # Check if table exists
             table_exists_query = text("""
                 SELECT COUNT(*) 
@@ -233,7 +238,7 @@ def describe_table(table: str) -> str:
                 WHERE table_schema = 'public' 
                 AND table_name = :table_name
             """)
-            
+
             result = session.execute(table_exists_query, {"table_name": table})
             if result.scalar() == 0:
                 return json.dumps(
@@ -288,7 +293,7 @@ def filter_table_names(query: str) -> str:
     try:
         with get_connection() as session:
             from sqlalchemy import text
-            
+
             # Query to get all tables in the public schema
             table_query = text("""
                 SELECT table_catalog, table_schema, table_name 
@@ -297,7 +302,7 @@ def filter_table_names(query: str) -> str:
                 AND table_type = 'BASE TABLE'
                 ORDER BY table_name
             """)
-            
+
             result = session.execute(table_query)
             results = []
             for row in result:
@@ -442,6 +447,7 @@ def execute_query(
 
         with get_connection() as session:
             from sqlalchemy import text
+
             if "company_id" in query:
                 query = query.replace("company_id", "employer_id")
             # Execute the query using SQLAlchemy
@@ -473,7 +479,9 @@ def execute_query(
 
                 # Add rows to the Markdown table
                 for row in results:
-                    md_table += "| " + " | ".join(str(row[col]) for col in columns) + " |\n"
+                    md_table += (
+                        "| " + " | ".join(str(row[col]) for col in columns) + " |\n"
+                    )
 
                 return md_table
             else:
@@ -521,7 +529,7 @@ def query_database(query: str) -> str:
 
         with get_connection() as session:
             from sqlalchemy import text
-            
+
             # Execute the query using SQLAlchemy
             result = session.execute(text(query))
 
@@ -545,7 +553,9 @@ def query_database(query: str) -> str:
 
                 # Add rows to the Markdown table
                 for row in results:
-                    md_table += "| " + " | ".join(str(row[col]) for col in columns) + " |\n"
+                    md_table += (
+                        "| " + " | ".join(str(row[col]) for col in columns) + " |\n"
+                    )
 
                 return md_table
             else:
@@ -602,13 +612,13 @@ def fuzzy_search_table(
     params = {
         "query_param": query,
         "min_similarity": min_similarity,
-        "limit_param": limit
+        "limit_param": limit,
     }
 
     try:
         with get_connection() as session:
             from sqlalchemy import text
-            
+
             # Validate table exists
             table_exists_query = text("""
                 SELECT COUNT(*) 
@@ -616,7 +626,7 @@ def fuzzy_search_table(
                 WHERE table_schema = 'public' 
                 AND table_name = :table_name
             """)
-            
+
             result = session.execute(table_exists_query, {"table_name": table})
             if result.scalar() == 0:
                 return json.dumps({"error": f"Table '{table}' not found in database."})
@@ -629,8 +639,10 @@ def fuzzy_search_table(
                 AND table_name = :table_name 
                 AND column_name = :column_name
             """)
-            
-            result = session.execute(column_exists_query, {"table_name": table, "column_name": column})
+
+            result = session.execute(
+                column_exists_query, {"table_name": table, "column_name": column}
+            )
             if result.scalar() == 0:
                 return json.dumps(
                     {"error": f"Column '{column}' not found in table '{table}'."}
@@ -757,7 +769,7 @@ You have the tools. Begin by analyzing the user's request and planning your firs
 def _get_table_info_sqlalchemy(session, table: str) -> Dict[str, Any]:
     """Get comprehensive table information using SQLAlchemy."""
     from sqlalchemy import text
-    
+
     # Get column information
     columns_query = text("""
         SELECT 
@@ -771,19 +783,21 @@ def _get_table_info_sqlalchemy(session, table: str) -> Dict[str, Any]:
         AND table_name = :table_name
         ORDER BY ordinal_position
     """)
-    
+
     result = session.execute(columns_query, {"table_name": table})
     columns = []
     for row in result:
-        columns.append({
-            "name": row[0],
-            "type": row[1],
-            "column_size": row[2],
-            "nullable": row[3] == "YES",
-            "default": row[4],
-            "primary_key": False  # Will be updated below
-        })
-    
+        columns.append(
+            {
+                "name": row[0],
+                "type": row[1],
+                "column_size": row[2],
+                "nullable": row[3] == "YES",
+                "default": row[4],
+                "primary_key": False,  # Will be updated below
+            }
+        )
+
     # Get primary key information
     pk_query = text("""
         SELECT column_name
@@ -794,15 +808,15 @@ def _get_table_info_sqlalchemy(session, table: str) -> Dict[str, Any]:
         AND tc.table_name = :table_name
         AND tc.constraint_type = 'PRIMARY KEY'
     """)
-    
+
     result = session.execute(pk_query, {"table_name": table})
     primary_keys = [row[0] for row in result]
-    
+
     # Update primary key flags in columns
     for column in columns:
         if column["name"] in primary_keys:
             column["primary_key"] = True
-    
+
     # Get foreign key information
     fk_query = text("""
         SELECT 
@@ -819,24 +833,26 @@ def _get_table_info_sqlalchemy(session, table: str) -> Dict[str, Any]:
         AND tc.table_schema = 'public'
         AND tc.table_name = :table_name
     """)
-    
+
     result = session.execute(fk_query, {"table_name": table})
     foreign_keys = []
     for row in result:
-        foreign_keys.append({
-            "name": row[3],
-            "constrained_columns": [row[0]],
-            "referred_table": row[1],
-            "referred_columns": [row[2]]
-        })
-    
+        foreign_keys.append(
+            {
+                "name": row[3],
+                "constrained_columns": [row[0]],
+                "referred_table": row[1],
+                "referred_columns": [row[2]],
+            }
+        )
+
     return {
         "TABLE_CAT": "matching_db",
-        "TABLE_SCHEM": "public", 
+        "TABLE_SCHEM": "public",
         "TABLE_NAME": table,
         "columns": columns,
         "primary_keys": primary_keys,
-        "foreign_keys": foreign_keys
+        "foreign_keys": foreign_keys,
     }
 
 

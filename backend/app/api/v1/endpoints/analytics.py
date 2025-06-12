@@ -3,7 +3,14 @@ from core.security import TokenData
 from sqlmodel import Session, select, func, case, and_
 from sqlalchemy.orm import joinedload
 from core.database import get_session
-from models.models import Company, Job, Application, Interview, Status, ApplicationStatus
+from models.models import (
+    Company,
+    Job,
+    Application,
+    Interview,
+    Status,
+    ApplicationStatus,
+)
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime, timedelta
@@ -53,21 +60,21 @@ def get_company_analytics(request: Request, db: Session = Depends(get_session)):
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Could not validate credentials",
             )
-    
+
         employer_id = current_user.employer_id
-    
+
         # 1. Total Jobs
         total_jobs = db.exec(
             select(func.count(Job.id)).where(Job.employer_id == employer_id)
         ).one()
-    
+
         # 2. Total Applications
         total_applications = db.exec(
             select(func.count(Application.id))
             .join(Job)
             .where(Job.employer_id == employer_id)
         ).one()
-    
+
         # 3. Total Interviews
         total_interviews = db.exec(
             select(func.count(Interview.id))
@@ -75,7 +82,7 @@ def get_company_analytics(request: Request, db: Session = Depends(get_session)):
             .join(Job)
             .where(Job.employer_id == employer_id)
         ).one()
-    
+
         # 4. Calculate real hire rate based on interviews marked as "done" vs total applications
         completed_interviews = db.exec(
             select(func.count(Interview.id))
@@ -84,17 +91,17 @@ def get_company_analytics(request: Request, db: Session = Depends(get_session)):
             .where(Job.employer_id == employer_id)
             .where(Interview.status == "done")
         ).one()
-    
+
         hire_rate = (
             round((completed_interviews / max(total_applications, 1)) * 100, 1)
             if total_applications > 0
             else 0.0
         )
-    
+
         # 5. Applications Over Time (last 6 months)
         applications_over_time_data = []
         today = datetime.utcnow()
-    
+
         for i in range(6):
             # Calculate month boundaries
             if i == 0:
@@ -117,13 +124,13 @@ def get_company_analytics(request: Request, db: Session = Depends(get_session)):
                     month += 12
                     year -= 1
                 month_start = datetime(year, month, 1)
-    
+
                 # Calculate month end
                 if month == 12:
                     month_end = datetime(year + 1, 1, 1) - timedelta(days=1)
                 else:
                     month_end = datetime(year, month + 1, 1) - timedelta(days=1)
-    
+
             count = db.exec(
                 select(func.count(Application.id))
                 .join(Job)
@@ -131,15 +138,15 @@ def get_company_analytics(request: Request, db: Session = Depends(get_session)):
                 .where(Application.created_at >= month_start)
                 .where(Application.created_at <= month_end)
             ).one()
-    
+
             applications_over_time_data.append(
                 ApplicationsOverTimeData(
                     month=month_start.strftime("%b"), applications=count
                 )
             )
-    
+
         applications_over_time_data.reverse()
-    
+
         # 6. Job Performance (top 5 jobs by application count)
         job_performance_query = (
             select(Job.title, func.count(Application.id).label("application_count"))
@@ -154,7 +161,7 @@ def get_company_analytics(request: Request, db: Session = Depends(get_session)):
             JobPerformanceData(job=title, applications=count)
             for title, count in job_performance_results
         ]
-    
+
         # 7. Recent Jobs (last 5 jobs with application counts)
         recent_jobs_query = (
             select(
@@ -190,8 +197,7 @@ def get_company_analytics(request: Request, db: Session = Depends(get_session)):
         applications_by_status_results = db.exec(applications_by_status_query).all()
         applications_by_status_data = [
             ApplicationStatusData(
-                status=status.value if status else "pending",
-                count=count
+                status=status.value if status else "pending", count=count
             )
             for status, count in applications_by_status_results
         ]

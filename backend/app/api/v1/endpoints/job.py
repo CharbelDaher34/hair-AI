@@ -68,7 +68,7 @@ def read_jobs(
 ) -> List[JobRead]:
     user = request.state.user
     employer_id = user.employer_id
-    return crud_job.get_jobs(db=db, skip=skip, limit=limit, employer_id=employer_id)
+    return crud_job.get_jobs(db=db, skip=skip, limit=limit,employer_id=employer_id)
 
 
 @router.get("/by-employer/{employer_id}", response_model=List[JobRead])
@@ -82,10 +82,8 @@ def read_jobs_by_employer(
     request: Request,
 ) -> List[JobRead]:
     user = request.state.user
-    if employer_id != user.employer_id:
-        raise HTTPException(
-            status_code=403, detail="You are not authorized to access this job"
-        )
+    employer_id = user.employer_id
+    
     return crud_job.get_jobs_by_employer(
         db=db, employer_id=employer_id, skip=skip, limit=limit, closed=closed
     )

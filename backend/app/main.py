@@ -3,6 +3,8 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.security import HTTPBearer
 import traceback
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.interval import IntervalTrigger
 
 from core.database import create_db_and_tables, check_db_tables
 from core.auth_middleware import AuthMiddleware
@@ -31,6 +33,11 @@ from api.v1.endpoints import (
 # Get debug mode from environment variable, default to True
 DEBUG_MODE = os.getenv("DEBUG_MODE", "True").lower() == "true"
 
+# Get scheduler configuration from environment variables
+RESUME_PARSER_INTERVAL_MINUTES = int(os.getenv("RESUME_PARSER_INTERVAL_MINUTES", "10"))  # Default: 30 minutes
+APPLICATION_MATCHER_INTERVAL_MINUTES = int(os.getenv("APPLICATION_MATCHER_INTERVAL_MINUTES", "10"))  # Default: 30 minutes
+ENABLE_BATCH_SCHEDULER = os.getenv("ENABLE_BATCH_SCHEDULER", "True").lower() == "true"
+
 # Define a bearer scheme for Swagger UI.
 # auto_error=False because our AuthMiddleware handles the actual enforcement.
 # This is primarily for documentation and enabling the "Authorize" button.
@@ -38,16 +45,85 @@ swagger_ui_bearer_scheme = HTTPBearer(
     auto_error=False, bearerFormat="JWT", scheme_name="JWTBearerAuth"
 )
 
+# Import batch processing functions
+from scripts.resume_parser_batch import process_all_candidates
+from scripts.application_matcher_batch import process_all_applications
+
+
+# Global scheduler variable
+scheduler = None
+
+def safe_process_all_candidates():
+    """Wrapper function for resume parsing with error handling"""
+    try:
+        print(f"[Scheduler] Starting scheduled resume parsing at {os.getenv('TZ', 'UTC')} time")
+        result = process_all_candidates()
+        print(f"[Scheduler] Resume parsing completed: {result}")
+    except Exception as e:
+        print(f"[Scheduler] Resume parsing failed: {str(e)}")
+        import traceback
+        print(f"[Scheduler] Full traceback: {traceback.format_exc()}")
+
+def safe_process_all_applications():
+    """Wrapper function for application matching with error handling"""
+    try:
+        print(f"[Scheduler] Starting scheduled application matching at {os.getenv('TZ', 'UTC')} time")
+        result = process_all_applications()
+        print(f"[Scheduler] Application matching completed: {result}")
+    except Exception as e:
+        print(f"[Scheduler] Application matching failed: {str(e)}")
+        import traceback
+        print(f"[Scheduler] Full traceback: {traceback.format_exc()}")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    global scheduler
+    
     # Startup logic
     create_db_and_tables()
 
+    # Set up APScheduler if enabled
+    if ENABLE_BATCH_SCHEDULER:
+        print(f"[Scheduler] Setting up batch processing scheduler")
+        print(f"[Scheduler] Resume parser interval: {RESUME_PARSER_INTERVAL_MINUTES} minutes")
+        print(f"[Scheduler] Application matcher interval: {APPLICATION_MATCHER_INTERVAL_MINUTES} minutes")
+        
+        scheduler = BackgroundScheduler()
+        
+        # Add resume parsing job
+        scheduler.add_job(
+            safe_process_all_candidates,
+            IntervalTrigger(minutes=RESUME_PARSER_INTERVAL_MINUTES),
+            id='resume_parser_job',
+            name='Resume Parser Batch Job',
+            max_instances=1,  # Prevent overlapping executions
+            coalesce=True,    # Combine multiple pending executions into one
+            misfire_grace_time=300  # Allow 5 minutes grace time for missed executions
+        )
+        
+        # Add application matching job
+        scheduler.add_job(
+            safe_process_all_applications,
+            IntervalTrigger(minutes=APPLICATION_MATCHER_INTERVAL_MINUTES),
+            id='application_matcher_job',
+            name='Application Matcher Batch Job',
+            max_instances=1,  # Prevent overlapping executions
+            coalesce=True,    # Combine multiple pending executions into one
+            misfire_grace_time=300  # Allow 5 minutes grace time for missed executions
+        )
+        
+        scheduler.start()
+        print(f"[Scheduler] Batch processing scheduler started successfully")
+    else:
+        print(f"[Scheduler] Batch processing scheduler is disabled")
+
     yield  # Control passes to the application here
 
-    # Shutdown logic (optional)
-    # e.g., cleanup, close DB connections
+    # Shutdown logic
+    if scheduler and scheduler.running:
+        print(f"[Scheduler] Shutting down batch processing scheduler")
+        scheduler.shutdown(wait=True)
+        print(f"[Scheduler] Scheduler shutdown complete")
 
 
 app = FastAPI(
@@ -142,11 +218,18 @@ app.include_router(chatbot.router, prefix="/api/v1", tags=["chatbot"])
 
 @app.get("/", summary="Root endpoint for API health and info")
 async def root():
+    scheduler_info = {
+        "enabled": ENABLE_BATCH_SCHEDULER,
+        "resume_parser_interval_minutes": RESUME_PARSER_INTERVAL_MINUTES,
+        "application_matcher_interval_minutes": APPLICATION_MATCHER_INTERVAL_MINUTES,
+    }
+    
     return {
         "message": "Welcome to the Matching API",
         "docs_url": "/docs",
         "redoc_url": "/redoc",
         "debug_mode": DEBUG_MODE,
+        "batch_scheduler": scheduler_info,
     }
 
 
