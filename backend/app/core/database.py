@@ -27,7 +27,7 @@ engine = get_admin_engine()
 
 
 def create_db_and_tables(admin=False):
-    target_metadata.drop_all(get_admin_engine())
+    # target_metadata.drop_all(get_admin_engine())
     all_exist, missing_tables = check_db_tables()
     if not all_exist:
         target_metadata.create_all(get_admin_engine())

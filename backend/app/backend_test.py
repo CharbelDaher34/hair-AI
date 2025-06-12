@@ -19,6 +19,8 @@ client = httpx.Client(base_url=API_V1_PREFIX)
 fake = Faker()
 
 create_db_and_tables(admin=True)
+
+
 def run_api_tests():
     print("=== Starting API Endpoint Tests ===")
 
@@ -40,7 +42,9 @@ def run_api_tests():
     company_data = {
         "name": fake.company(),
         "description": fake.catch_phrase(),
-        "industry": fake.word(ext_word_list=["Tech", "Finance", "Healthcare", "Education", "Retail"]),
+        "industry": fake.word(
+            ext_word_list=["Tech", "Finance", "Healthcare", "Education", "Retail"]
+        ),
         "is_owner": True,
         "bio": fake.paragraph(nb_sentences=3),
         "website": fake.url(),
@@ -49,20 +53,30 @@ def run_api_tests():
     hr_data_me = {
         "email": "charbeldaher34@gmail.com",
         "password": "a",
-        "full_name": "Charbel Daher",
+        "full_name": "Charbel AI HR",
         "role": "hr_manager",
         # employer_id will be added dynamically
     }
     hr_data = {
-            "email": fake.unique.email(),
-            "password": fake.password(),
-            "full_name": fake.name(),
-            "role": fake.random_element(elements=("hr_manager", "recruiter", "admin")),
-            # employer_id will be added dynamically
-        }
+        "email": fake.unique.email(),
+        "password": fake.password(),
+        "full_name": fake.name(),
+        "role": fake.random_element(elements=("hr_manager", "recruiter", "admin")),
+        # employer_id will be added dynamically
+    }
     form_key_data = {
         "name": fake.word().capitalize() + "Years",
-        "field_type": fake.random_element(elements=("text", "number", "email", "date", "select", "textarea", "checkbox")),
+        "field_type": fake.random_element(
+            elements=(
+                "text",
+                "number",
+                "email",
+                "date",
+                "select",
+                "textarea",
+                "checkbox",
+            )
+        ),
         "required": fake.boolean(),
         "enum_values": [fake.word(), fake.word(), fake.word()],
         # employer_id will be added dynamically
@@ -74,13 +88,42 @@ def run_api_tests():
         "department": fake.word().capitalize() + " Department",
         "compensation": {
             "base_salary": fake.random_int(min=50000, max=200000, step=10000),
-            "benefits": fake.random_elements(elements=("Health Insurance", "401(k) Matching", "Remote Work", "Paid Time Off", "Stock Options"), length=fake.random_int(min=1, max=5)),
+            "benefits": fake.random_elements(
+                elements=(
+                    "Health Insurance",
+                    "401(k) Matching",
+                    "Remote Work",
+                    "Paid Time Off",
+                    "Stock Options",
+                ),
+                length=fake.random_int(min=1, max=5),
+            ),
         },
-        "experience_level": fake.random_element(elements=("no_experience", "1-3_years", "3-5_years", "5-7_years", "7-10_years", "10_plus_years")),
+        "experience_level": fake.random_element(
+            elements=(
+                "no_experience",
+                "1-3_years",
+                "3-5_years",
+                "5-7_years",
+                "7-10_years",
+                "10_plus_years",
+            )
+        ),
         "seniority_level": fake.random_element(elements=("entry", "mid", "senior")),
         "status": fake.random_element(elements=("published", "draft")),
-        "job_type": fake.random_element(elements=("full_time", "part_time", "contract", "internship")),
-        "job_category": fake.random_element(elements=("software_engineering", "data_science", "product_management", "ux_design", "sales", "marketing")),
+        "job_type": fake.random_element(
+            elements=("full_time", "part_time", "contract", "internship")
+        ),
+        "job_category": fake.random_element(
+            elements=(
+                "software_engineering",
+                "data_science",
+                "product_management",
+                "ux_design",
+                "sales",
+                "marketing",
+            )
+        ),
         "responsibilities": [fake.sentence() for _ in range(3)],
         "skills": {
             "hard_skills": [fake.word() for _ in range(3)],
@@ -97,33 +140,53 @@ def run_api_tests():
                 "job_title": fake.job(),
                 "employer": fake.company(),
                 "location": fake.city(),
-                "employment_type": fake.random_element(elements=("Full-time", "Part-time", "Contract")),
-                "start_date": fake.date_between(start_date="-5y", end_date="-2y").isoformat(),
+                "employment_type": fake.random_element(
+                    elements=("Full-time", "Part-time", "Contract")
+                ),
+                "start_date": fake.date_between(
+                    start_date="-5y", end_date="-2y"
+                ).isoformat(),
                 "end_date": None,
                 "summary": fake.paragraph(nb_sentences=2),
             }
         ],
         "education": [
             {
-                "level": fake.random_element(elements=("Bachelor's", "Master's", "PhD")),
-                "degree_type": fake.random_element(elements=("Bachelor's", "Master's", "PhD")),
+                "level": fake.random_element(
+                    elements=("Bachelor's", "Master's", "PhD")
+                ),
+                "degree_type": fake.random_element(
+                    elements=("Bachelor's", "Master's", "PhD")
+                ),
                 "subject": fake.word().capitalize() + " Science",
-                "start_date": fake.date_between(start_date="-10y", end_date="-6y").isoformat(),
-                "end_date": fake.date_between(start_date="-5y", end_date="-2y").isoformat(),
+                "start_date": fake.date_between(
+                    start_date="-10y", end_date="-6y"
+                ).isoformat(),
+                "end_date": fake.date_between(
+                    start_date="-5y", end_date="-2y"
+                ).isoformat(),
                 "institution": f"{fake.company()} University",
                 "gpa": round(random.uniform(2.0, 4.0), 1),
                 "summary": fake.paragraph(nb_sentences=2),
             }
         ],
         "skills": [
-            {"name": fake.word(), "category": fake.word(), "level": fake.random_element(elements=("Beginner", "Intermediate", "Expert"))}
+            {
+                "name": fake.word(),
+                "category": fake.word(),
+                "level": fake.random_element(
+                    elements=("Beginner", "Intermediate", "Expert")
+                ),
+            }
         ],
         "certifications": [
             {
                 "certification": fake.catch_phrase(),
                 "certification_group": fake.word().capitalize(),
                 "issued_by": fake.company(),
-                "issue_date": fake.date_between(start_date="-3y", end_date="-1y").isoformat(),
+                "issue_date": fake.date_between(
+                    start_date="-3y", end_date="-1y"
+                ).isoformat(),
             }
         ],
     }
@@ -135,11 +198,24 @@ def run_api_tests():
     }
     application_data_payload = {
         "form_responses": {
-            "experience_api": fake.random_element(elements=["1-2 years", "3-5 years", "6-10 years", "10+ years"]),
-            "status": fake.random_element(elements=("applied", "interviewing", "rejected", "hired", "offered", "on_hold")),
+            "experience_api": fake.random_element(
+                elements=["1-2 years", "3-5 years", "6-10 years", "10+ years"]
+            ),
+            "status": fake.random_element(
+                elements=(
+                    "applied",
+                    "interviewing",
+                    "rejected",
+                    "hired",
+                    "offered",
+                    "on_hold",
+                )
+            ),
             "extra_field": fake.word(),
         },
-        "status": fake.random_element(elements=("pending", "reviewing", "interviewing", "offer_sent",  "rejected")),
+        "status": fake.random_element(
+            elements=("pending", "reviewing", "interviewing", "offer_sent", "rejected")
+        ),
         # candidate_id, job_id will be added dynamically
     }
     match_data_payload = {
@@ -212,8 +288,7 @@ def run_api_tests():
     try:
         response = client.post(f"{API_V1_PREFIX}/auth/register", json=hr_create_data)
         assert response.status_code == 201, f"Failed to create HR: {response.text}"
-        
-        
+
     except Exception as e:
         print("Failed to create HR", e)
         hr_create_data = {**hr_data, "employer_id": employer_id}
@@ -229,7 +304,9 @@ def run_api_tests():
     hr_id = retrieved_hr["id"]
     print(f"READ HR: {retrieved_hr['full_name']}")
 
-    hr_update_data = {"role": fake.random_element(elements=("ceo", "recruiter", "admin"))}
+    hr_update_data = {
+        "role": fake.random_element(elements=("ceo", "recruiter", "admin"))
+    }
     response = client.patch(f"{API_V1_PREFIX}/hrs/{hr_id}", json=hr_update_data)
     assert response.status_code == 200, response.text
     updated_hr_res = response.json()
@@ -256,7 +333,9 @@ def run_api_tests():
     assert retrieved_form_key["id"] == form_key_id
     print(f"READ FormKey: {retrieved_form_key['name']}")
 
-    form_key_update_data = {"field_type": fake.random_element(elements=("text", "number", "date"))}
+    form_key_update_data = {
+        "field_type": fake.random_element(elements=("text", "number", "date"))
+    }
     response = client.patch(
         f"{API_V1_PREFIX}/form_keys/{form_key_id}", json=form_key_update_data
     )
@@ -297,7 +376,9 @@ def run_api_tests():
     assert retrieved_job["id"] == job_id
     print(f"READ Job: '{retrieved_job['title']}'")
 
-    job_update_data = {"status": fake.random_element(elements=("closed", "draft", "published"))}
+    job_update_data = {
+        "status": fake.random_element(elements=("closed", "draft", "published"))
+    }
     response = client.patch(f"{API_V1_PREFIX}/jobs/{job_id}", json=job_update_data)
     assert response.status_code == 200, response.text
     updated_job_res = response.json()
@@ -320,7 +401,10 @@ def run_api_tests():
         f"Failed to create JobFormKeyConstraint: {response.text}"
     )
     created_constraint = response.json()
-    assert created_constraint["constraints"]["min_value"] == constraint_create_data["constraints"]["min_value"]
+    assert (
+        created_constraint["constraints"]["min_value"]
+        == constraint_create_data["constraints"]["min_value"]
+    )
     constraint_id = created_constraint["id"]
     print(
         f"CREATE JobFormKeyConstraint (ID: {constraint_id}) for Job ID: {job_id}, FormKey ID: {form_key_id}"
@@ -332,14 +416,22 @@ def run_api_tests():
     assert retrieved_constraint["id"] == constraint_id
     print(f"READ JobFormKeyConstraint: ID {retrieved_constraint['id']}")
 
-    constraint_update_data = {"constraints": {"min_value": fake.random_int(min=0, max=5), "max_value": fake.random_int(min=6, max=10)}}
+    constraint_update_data = {
+        "constraints": {
+            "min_value": fake.random_int(min=0, max=5),
+            "max_value": fake.random_int(min=6, max=10),
+        }
+    }
     response = client.patch(
         f"{API_V1_PREFIX}/job_form_key_constraints/{constraint_id}",
         json=constraint_update_data,
     )
     assert response.status_code == 200, response.text
     updated_constraint_res = response.json()
-    assert updated_constraint_res["constraints"]["max_value"] == constraint_update_data["constraints"]["max_value"]
+    assert (
+        updated_constraint_res["constraints"]["max_value"]
+        == constraint_update_data["constraints"]["max_value"]
+    )
     print(
         f"UPDATE JobFormKeyConstraint: ID {updated_constraint_res['id']}, New Constraints: {updated_constraint_res['constraints']}"
     )
@@ -406,14 +498,31 @@ def run_api_tests():
     print(f"READ Application: ID {retrieved_application['id']}")
 
     application_update_data = {
-        "form_responses": {"experience_api": fake.random_element(elements=["1-2 years", "3-5 years", "6-10 years", "10+ years"]), "status": fake.random_element(elements=("applied", "interviewing", "rejected", "hired", "offered", "on_hold"))}
+        "form_responses": {
+            "experience_api": fake.random_element(
+                elements=["1-2 years", "3-5 years", "6-10 years", "10+ years"]
+            ),
+            "status": fake.random_element(
+                elements=(
+                    "applied",
+                    "interviewing",
+                    "rejected",
+                    "hired",
+                    "offered",
+                    "on_hold",
+                )
+            ),
+        }
     }
     response = client.patch(
         f"{API_V1_PREFIX}/applications/{application_id}", json=application_update_data
     )
     assert response.status_code == 200, response.text
     updated_application_res = response.json()
-    assert updated_application_res["form_responses"]["status"] == application_update_data["form_responses"]["status"]
+    assert (
+        updated_application_res["form_responses"]["status"]
+        == application_update_data["form_responses"]["status"]
+    )
     print(
         f"UPDATE Application: ID {updated_application_res['id']}, New Form Responses: {updated_application_res['form_responses']}"
     )
@@ -515,13 +624,32 @@ def run_api_tests():
         "department": fake.word().capitalize() + " Department",
         "compensation": {
             "base_salary": fake.random_int(min=70000, max=250000, step=10000),
-            "benefits": fake.random_elements(elements=("Health Insurance", "401(k) Matching", "Remote Work", "Paid Time Off", "Stock Options", "Gym Membership"), length=fake.random_int(min=1, max=6)),
+            "benefits": fake.random_elements(
+                elements=(
+                    "Health Insurance",
+                    "401(k) Matching",
+                    "Remote Work",
+                    "Paid Time Off",
+                    "Stock Options",
+                    "Gym Membership",
+                ),
+                length=fake.random_int(min=1, max=6),
+            ),
         },
-        "experience_level": fake.random_element(elements=("3-5_years", "5-7_years", "7-10_years", "10_plus_years")),
+        "experience_level": fake.random_element(
+            elements=("3-5_years", "5-7_years", "7-10_years", "10_plus_years")
+        ),
         "seniority_level": fake.random_element(elements=("mid", "senior", "entry")),
         "status": fake.random_element(elements=("published", "draft", "closed")),
         "job_type": fake.random_element(elements=("full_time", "contract")),
-        "job_category": fake.random_element(elements=("software_engineering", "data_science", "product_management", "sales")),
+        "job_category": fake.random_element(
+            elements=(
+                "software_engineering",
+                "data_science",
+                "product_management",
+                "sales",
+            )
+        ),
         "responsibilities": [fake.sentence() for _ in range(4)],
         "skills": {
             "hard_skills": [fake.word() for _ in range(4)],

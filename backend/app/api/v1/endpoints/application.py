@@ -50,7 +50,9 @@ def get_application_with_details(
     return application
 
 
-@router.get("/employer-applications", response_model=ApplicationDashboardResponse | None)
+@router.get(
+    "/employer-applications", response_model=ApplicationDashboardResponse | None
+)
 def get_employer_applications(
     *,
     db: Session = Depends(get_session),
@@ -165,7 +167,7 @@ def update_application_status(
 
     # Create an ApplicationUpdate with only the status field
     application_update = ApplicationUpdate(status=status_update.status)
-    
+
     updated_application = crud_application.update_application(
         db=db, db_application=db_application, application_in=application_update
     )

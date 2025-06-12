@@ -504,7 +504,7 @@ const CreateEditJob = () => {
         title: "Success",
         description: `Job ${is_editing ? 'updated' : 'created'} successfully.`,
       });
-      navigate(`/job/${new_job_id}`);
+      navigate(`/jobs/${new_job_id}`);
     } catch (err) {
       console.error("Failed to save job:", err);
       const error_message = err.response?.data?.detail || err.message || "An unexpected error occurred";
