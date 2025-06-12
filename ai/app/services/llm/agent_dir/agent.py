@@ -8,17 +8,18 @@ import traceback
 import time
 import asyncio
 
-class agent():
+
+class agent:
     def __init__(
-        self, 
-        model: str, 
-        result_type: BaseModel, 
-        system_prompt: str, 
+        self,
+        model: str,
+        result_type: BaseModel,
+        system_prompt: str,
         api_key: str,
         name: Optional[str] = None,
         model_settings: Optional[Dict[str, Any]] = None,
         retries: int = 3,
-        tools: Optional[List[Any]] = None
+        tools: Optional[List[Any]] = None,
     ):
         self.model = model
         self.result_type = result_type
@@ -27,33 +28,37 @@ class agent():
         self.model_settings = model_settings or {}
         self.retries = retries
         self.tools = tools or []
-        
+
         # Handle API keys based on model provider prefix
         if model.startswith(("gpt", "openai")):
-            os.environ['OPENAI_API_KEY'] = api_key
+            os.environ["OPENAI_API_KEY"] = api_key
         elif model.startswith(("anthropic", "claude")):
-            os.environ['ANTHROPIC_API_KEY'] = api_key
-        elif model.startswith(("google","gemini")):
-            os.environ['GEMINI_API_KEY'] = api_key
+            os.environ["ANTHROPIC_API_KEY"] = api_key
+        elif model.startswith(("google", "gemini")):
+            os.environ["GEMINI_API_KEY"] = api_key
         elif model.startswith("cohere:"):
-            os.environ['COHERE_API_KEY'] = api_key
+            os.environ["COHERE_API_KEY"] = api_key
         elif model.startswith("groq:"):
-            os.environ['GROQ_API_KEY'] = api_key
+            os.environ["GROQ_API_KEY"] = api_key
         elif model.startswith("deepseek:"):
-            os.environ['DEEPSEEK_API_KEY'] = api_key
+            os.environ["DEEPSEEK_API_KEY"] = api_key
         elif model.startswith("mistral:"):
-            os.environ['MISTRAL_API_KEY'] = api_key
+            os.environ["MISTRAL_API_KEY"] = api_key
         elif model.startswith("bedrock:"):
             # AWS Bedrock requires different credentials setup
-            os.environ['AWS_ACCESS_KEY_ID'] = api_key.split(':')[0] if ':' in api_key else api_key
-            os.environ['AWS_SECRET_ACCESS_KEY'] = api_key.split(':')[1] if ':' in api_key else ''
+            os.environ["AWS_ACCESS_KEY_ID"] = (
+                api_key.split(":")[0] if ":" in api_key else api_key
+            )
+            os.environ["AWS_SECRET_ACCESS_KEY"] = (
+                api_key.split(":")[1] if ":" in api_key else ""
+            )
         else:
-            os.environ['OPENAI_API_KEY'] = api_key
-            
+            os.environ["OPENAI_API_KEY"] = api_key
+
     async def run(self, payload, result_type: Optional[BaseModel] = None):
         agent = Agent(
-            model=self.model, 
-            result_type=result_type or self.result_type, 
+            model=self.model,
+            result_type=result_type or self.result_type,
             system_prompt=self.system_prompt,
             name=self.name,
             model_settings=self.model_settings,
@@ -68,19 +73,23 @@ class agent():
         for i, load in enumerate(payload):
             if isinstance(load, Image.Image):
                 img_byte_arr = io.BytesIO()
-                load.save(img_byte_arr, format='PNG')
+                load.save(img_byte_arr, format="PNG")
                 payload[i] = BinaryContent(
-                    data=img_byte_arr.getvalue(), media_type='image/png'
+                    data=img_byte_arr.getvalue(), media_type="image/png"
                 )
-        
+
         attempts = 0
         while attempts < 3:
             try:
                 result = await agent.run(payload)
-                return result.data.model_dump() if hasattr(result.data, 'model_dump') else result.data
+                return (
+                    result.data.model_dump()
+                    if hasattr(result.data, "model_dump")
+                    else result.data
+                )
             except Exception as e:
                 attempts += 1
-                if hasattr(e, 'status_code'):
+                if hasattr(e, "status_code"):
                     if e.status_code == 503:
                         print("503 error, retrying...")
                         time.sleep(10)
@@ -89,12 +98,14 @@ class agent():
                         time.sleep(10)
                 print(e)
                 print(traceback.format_exc())
-                
+
                 if attempts >= 3:
-                    raise Exception(f"Failed to run agent after {attempts} attempts: {str(e)}")
-        
+                    raise Exception(
+                        f"Failed to run agent after {attempts} attempts: {str(e)}"
+                    )
+
         raise Exception("Failed to run agent")
-    
+
     # async def run_stream(self, payload):
     #     """Run the agent with streaming response"""
     #     agent = Agent(
@@ -128,31 +139,34 @@ class agent():
         try:
             """Run the agent synchronously"""
             agent = Agent(
-                model=self.model, 
-                result_type=self.result_type, 
+                model=self.model,
+                result_type=self.result_type,
                 system_prompt=self.system_prompt,
                 name=self.name,
                 model_settings=self.model_settings,
                 retries=self.retries,
             )
-            
+
             # Add tools if provided
             if self.tools:
                 for tool in self.tools:
                     agent.tool(tool)
-    
+
             for i, load in enumerate(payload):
                 if isinstance(load, Image.Image):
                     img_byte_arr = io.BytesIO()
-                    load.save(img_byte_arr, format='PNG')
+                    load.save(img_byte_arr, format="PNG")
                     payload[i] = BinaryContent(
-                        data=img_byte_arr.getvalue(), media_type='image/png'
+                        data=img_byte_arr.getvalue(), media_type="image/png"
                     )
-    
+
             result = agent.run_sync(payload)
-            
-    
-            return result.data.model_dump() if hasattr(result.data, 'model_dump') else result.data
+
+            return (
+                result.data.model_dump()
+                if hasattr(result.data, "model_dump")
+                else result.data
+            )
         except Exception as e:
             if "429" in str(e):
                 # wait for 10 seconds
@@ -161,13 +175,15 @@ class agent():
             print(e)
             print(traceback.format_exc())
             return None
-    
+
     async def batch(self, batch_inputs: list[tuple[list[Any], BaseModel]]):
         agent_instance = self
+
         async def run_single(payload, result_type):
             return await agent_instance.run(payload, result_type)
-        tasks = [run_single(payload, result_type) for payload, result_type in batch_inputs]
+
+        tasks = [
+            run_single(payload, result_type) for payload, result_type in batch_inputs
+        ]
         results = await asyncio.gather(*tasks)
         return results
-    
-   

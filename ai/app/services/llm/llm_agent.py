@@ -7,6 +7,7 @@ import traceback
 
 from pydantic import BaseModel
 from PIL import Image
+
 # import fitz  # PyMuPDF for PDF handling
 import pymupdf as fitz
 import asyncio
@@ -15,6 +16,7 @@ from services.llm.agent_dir.agent import agent
 import dotenv
 
 dotenv.load_dotenv()
+
 
 class LLM:
     def __init__(
@@ -27,7 +29,7 @@ class LLM:
     ):
         """
         Initialize the LLM with the specified AI model.
-        
+
         Args:
             model: Name of the LLM model to use
             api_key: API key for the model provider (if not provided, will use environment variable)
@@ -35,14 +37,13 @@ class LLM:
         """
         self.api_key = api_key or os.environ.get("API_KEY")
         if not self.api_key:
-            raise ValueError("API key must be provided either in constructor or as API_KEY environment variable")
-        
+            raise ValueError(
+                "API key must be provided either in constructor or as API_KEY environment variable"
+            )
+
         # Default model settings if none provided
-        self.model_settings = model_settings or {
-            "temperature": 0.2,
-            "top_p": 0.95
-        }
-        
+        self.model_settings = model_settings or {"temperature": 0.2, "top_p": 0.95}
+
         self.result_type = result_type
         # Initialize the agent with Candidate as the result type
         self.llm_agent = agent(
@@ -52,7 +53,7 @@ class LLM:
             api_key=self.api_key,
             model_settings=self.model_settings,
         )
-    
+
     def _extract_text_from_pdf(self, pdf_path: str) -> str:
         """Extract text content from a PDF file."""
         text = ""
@@ -65,7 +66,7 @@ class LLM:
         except Exception as e:
             print(f"Error extracting text from PDF: {e}")
             return ""
-    
+
     def _extract_images_from_pdf(self, pdf_path: str) -> List[Image.Image]:
         """Extract images from a PDF file."""
         images = []
@@ -74,22 +75,22 @@ class LLM:
             for page_num in range(len(doc)):
                 page = doc.load_page(page_num)
                 image_list = page.get_images(full=True)
-                
+
                 for img_index, img in enumerate(image_list):
                     xref = img[0]
                     base_image = doc.extract_image(xref)
                     image_bytes = base_image["image"]
-                    
+
                     # Convert to PIL Image
                     pil_image = Image.open(io.BytesIO(image_bytes))
                     images.append(pil_image)
-            
+
             doc.close()
             return images
         except Exception as e:
             print(f"Error extracting images from PDF: {e}")
             return []
-    
+
     def _render_pdf_pages_as_images(self, pdf_path: str) -> List[Image.Image]:
         """Render each page of the PDF as an image."""
         images = []
@@ -97,36 +98,38 @@ class LLM:
             doc = fitz.open(pdf_path)
             for page_num in range(len(doc)):
                 page = doc.load_page(page_num)
-                pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))  # 2x scaling for better resolution
+                pix = page.get_pixmap(
+                    matrix=fitz.Matrix(2, 2)
+                )  # 2x scaling for better resolution
                 img_bytes = pix.tobytes("png")
                 pil_image = Image.open(io.BytesIO(img_bytes))
                 images.append(pil_image)
-            
+
             doc.close()
             return images
         except Exception as e:
             print(f"Error rendering PDF pages as images: {e}")
             return []
-    
+
     # def parse(self, input_data: list[Union[str, Image.Image, List[Any]]]) -> BaseModel:
     #     """
     #     Parse resume data synchronously from various input types.
-        
+
     #     Args:
     #         input_data: Can be one of:
     #             - Path to a PDF file
     #             - Raw text string
     #             - PIL Image object
     #             - List containing text and/or images
-                
+
     #     Returns:
     #         BaseModel: Parsed data as a Pydantic model
     #     """
     #     if not isinstance(input_data, list):
     #         input_data = [input_data]
-            
+
     #     payload = []
-        
+
     #     for item in input_data:
     #         # Handle different input types
     #         if isinstance(item, str):
@@ -138,22 +141,22 @@ class LLM:
     #             else:
     #                 # For raw text, send as is
     #                 payload.append(item)
-            
+
     #         elif isinstance(item, Image.Image):
     #             # Single image input
     #             payload.append(item)
-            
+
     #         elif isinstance(item, list):
     #             # List of mixed inputs
     #             payload.extend(item)
-            
+
     #         else:
     #             continue
     #             # raise ValueError("Unsupported input type. Must be a string, PIL Image, or list.")
-                
+
     #     if len(payload) == 0:
     #         raise ValueError("No valid input data provided.")
-        
+
     #     # Process the payload synchronously
     #     try:
     #         result = self.llm_agent.run_sync(payload)
@@ -162,47 +165,49 @@ class LLM:
     #         print(f"Error parsing resume: {e}")
     #         print(traceback.format_exc())
     #         raise
-    
-    async def parse_async(self, input_data: list[Union[str, Image.Image, List[Any]]]) -> BaseModel:
+
+    async def parse_async(
+        self, input_data: list[Union[str, Image.Image, List[Any]]]
+    ) -> BaseModel:
         """
         Parse resume data asynchronously from various input types.
-        
+
         Args:
             input_data: Can be one of:
                 - Path to a PDF file
                 - Raw text string
                 - PIL Image object
                 - List containing text and/or images
-                
+
         Returns:
             BaseModel: Parsed data as a Pydantic model
         """
         if not isinstance(input_data, list):
             input_data = [input_data]
-            
+
         payload = []
-        
+
         for item in input_data:
             # Handle different input types (same as sync version)
             if isinstance(item, str):
-                if item.lower().endswith('.pdf'):
+                if item.lower().endswith(".pdf"):
                     # For PDFs, convert each page to an image
                     page_images = self._render_pdf_pages_as_images(item)
                     payload.extend(page_images)
                 else:
                     # For raw text, send as is
                     payload.append(item)
-        
+
             elif isinstance(item, Image.Image):
                 payload.append(item)
-        
+
             elif isinstance(item, list):
                 payload.extend(item)
-        
+
             else:
                 continue
                 # raise ValueError("Unsupported input type. Must be a string, PIL Image, or list.")
-        
+
         if len(payload) == 0:
             raise ValueError("No valid input data provided.")
         # Process the payload asynchronously
@@ -228,11 +233,10 @@ class LLM:
                 input_data = [input_data]
             payload = []
             for item in input_data:
-                if isinstance(item, str) and item.lower().endswith('.pdf'):
+                if isinstance(item, str) and item.lower().endswith(".pdf"):
                     payload.extend(self._render_pdf_pages_as_images(item))
                 else:
                     payload.append(item)
             batch_inputs.append((payload, self.result_type))
         results = await self.llm_agent.batch(batch_inputs)
         return results
-

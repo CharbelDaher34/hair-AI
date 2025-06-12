@@ -41,13 +41,13 @@ from .crud_hr import (
     update_hr,
 )
 from .crud_job import (
-    create_job, 
-    delete_job, 
-    get_job, 
-    get_jobs, 
-    get_jobs_by_employer, 
-    get_jobs_by_status, 
-    update_job
+    create_job,
+    delete_job,
+    get_job,
+    get_jobs,
+    get_jobs_by_employer,
+    get_jobs_by_status,
+    update_job,
 )
 from .crud_job_form_key_constraint import (
     create_job_form_key_constraint,
@@ -57,11 +57,11 @@ from .crud_job_form_key_constraint import (
     update_job_form_key_constraint,
 )
 from .crud_match import (
-    create_match, 
-    delete_match, 
-    get_match, 
-    get_matches_by_application, 
-    update_match
+    create_match,
+    delete_match,
+    get_match,
+    get_matches_by_application,
+    update_match,
 )
 from .crud_recruiter_company_link import (
     create_recruiter_company_link,

@@ -3,6 +3,7 @@ from sqlmodel import SQLModel
 from models.models import JobFormKeyConstraintBase, JobFormKeyConstraint
 from utils.pydantic_utils import make_optional
 
+
 class JobFormKeyConstraintCreate(JobFormKeyConstraintBase):
     pass
 
@@ -13,4 +14,4 @@ class JobFormKeyConstraintUpdate(JobFormKeyConstraintBase):
 
 
 class JobFormKeyConstraintRead(JobFormKeyConstraintBase):
-    id: int 
+    id: int

@@ -42,15 +42,17 @@ class CompanyAnalyticsData(BaseModel):
 def get_company_analytics(request: Request, db: Session = Depends(get_session)):
     current_user: Optional[TokenData] = request.state.user
     if not current_user:
-         raise HTTPException(
-             status_code=status.HTTP_401_UNAUTHORIZED,
-             detail="Could not validate credentials"
-         )
-    
-    employer_id = current_user.employer_id   
-    
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+        )
+
+    employer_id = current_user.employer_id
+
     # 1. Total Jobs
-    total_jobs = db.exec(select(func.count(Job.id)).where(Job.employer_id == employer_id)).one()
+    total_jobs = db.exec(
+        select(func.count(Job.id)).where(Job.employer_id == employer_id)
+    ).one()
 
     # 2. Total Applications
     total_applications = db.exec(
@@ -75,21 +77,31 @@ def get_company_analytics(request: Request, db: Session = Depends(get_session)):
         .where(Job.employer_id == employer_id)
         .where(Interview.status == "done")
     ).one()
-    
-    hire_rate = round((completed_interviews / max(total_applications, 1)) * 100, 1) if total_applications > 0 else 0.0
+
+    hire_rate = (
+        round((completed_interviews / max(total_applications, 1)) * 100, 1)
+        if total_applications > 0
+        else 0.0
+    )
 
     # 5. Applications Over Time (last 6 months)
     applications_over_time_data = []
     today = datetime.utcnow()
-    
+
     for i in range(6):
         # Calculate month boundaries
         if i == 0:
-            month_start = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            month_start = today.replace(
+                day=1, hour=0, minute=0, second=0, microsecond=0
+            )
             if today.month == 12:
-                month_end = today.replace(year=today.year + 1, month=1, day=1) - timedelta(days=1)
+                month_end = today.replace(
+                    year=today.year + 1, month=1, day=1
+                ) - timedelta(days=1)
             else:
-                month_end = today.replace(month=today.month + 1, day=1) - timedelta(days=1)
+                month_end = today.replace(month=today.month + 1, day=1) - timedelta(
+                    days=1
+                )
         else:
             # Go back i months
             year = today.year
@@ -98,7 +110,7 @@ def get_company_analytics(request: Request, db: Session = Depends(get_session)):
                 month += 12
                 year -= 1
             month_start = datetime(year, month, 1)
-            
+
             # Calculate month end
             if month == 12:
                 month_end = datetime(year + 1, 1, 1) - timedelta(days=1)
@@ -112,11 +124,13 @@ def get_company_analytics(request: Request, db: Session = Depends(get_session)):
             .where(Application.created_at >= month_start)
             .where(Application.created_at <= month_end)
         ).one()
-        
+
         applications_over_time_data.append(
-            ApplicationsOverTimeData(month=month_start.strftime("%b"), applications=count)
+            ApplicationsOverTimeData(
+                month=month_start.strftime("%b"), applications=count
+            )
         )
-    
+
     applications_over_time_data.reverse()
 
     # 6. Job Performance (top 5 jobs by application count)
@@ -136,7 +150,12 @@ def get_company_analytics(request: Request, db: Session = Depends(get_session)):
 
     # 7. Recent Jobs (last 5 jobs with application counts)
     recent_jobs_query = (
-        select(Job.title, func.count(Application.id).label("application_count"), Job.status, Job.created_at)
+        select(
+            Job.title,
+            func.count(Application.id).label("application_count"),
+            Job.status,
+            Job.created_at,
+        )
         .outerjoin(Application, Job.id == Application.job_id)
         .where(Job.employer_id == employer_id)
         .group_by(Job.id, Job.title, Job.status, Job.created_at)
@@ -146,10 +165,10 @@ def get_company_analytics(request: Request, db: Session = Depends(get_session)):
     recent_jobs_results = db.exec(recent_jobs_query).all()
     recent_jobs_data = [
         RecentJobData(
-            title=title, 
-            applications=count, 
+            title=title,
+            applications=count,
             status=status.value if status else "draft",
-            created_at=created_at
+            created_at=created_at,
         )
         for title, count, status, created_at in recent_jobs_results
     ]

@@ -4,11 +4,11 @@ from typing import Optional, Any
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel, EmailStr
-from sqlmodel import Session # Kept for potential use with CRUD, though not directly in this file now
+from sqlmodel import (
+    Session,
+)  # Kept for potential use with CRUD, though not directly in this file now
 
-from core.config import (
-    SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
-)
+from core.config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
 # Removed HR model import, assuming it's handled by CRUD
 # Removed HR CRUD imports, assuming they are used in the router directly
 
@@ -19,13 +19,16 @@ class Token(BaseModel):
     access_token: str
     token_type: str
 
+
 class TokenData(BaseModel):
     email: Optional[EmailStr] = None
-    user_type: Optional[str] = None # Should be 'hr'
+    user_type: Optional[str] = None  # Should be 'hr'
     id: Optional[int] = None
     employer_id: Optional[int] = None
 
+
 # Removed GoogleUserInfo class
+
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
@@ -40,7 +43,9 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
     else:
-        expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = datetime.now(timezone.utc) + timedelta(
+            minutes=ACCESS_TOKEN_EXPIRE_MINUTES
+        )
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
@@ -56,9 +61,12 @@ def decode_access_token(token: str) -> Optional[TokenData]:
         if email is None or user_type != "hr" or user_id is None or employer_id is None:
             # Consider if employer_id is strictly required for all token types or just HR
             return None
-        return TokenData(email=email, user_type=user_type, id=user_id, employer_id=employer_id)
+        return TokenData(
+            email=email, user_type=user_type, id=user_id, employer_id=employer_id
+        )
     except JWTError:
         return None
+
 
 # Removed get_google_user_info
 # Removed exchange_google_code_for_token

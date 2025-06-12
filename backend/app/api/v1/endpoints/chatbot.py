@@ -5,7 +5,9 @@ from typing import Optional
 from core.security import decode_access_token, TokenData
 from services.mcp_sqlalchemy_server.client import Chat
 from core.database import get_session
+
 router = APIRouter()
+
 
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_session)):
@@ -22,6 +24,7 @@ async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_ses
 
         employer_id = token_data.employer_id
         from crud.crud_company import get_company
+
         company = get_company(db=next(get_session()), employer_id=employer_id)
         print(f"company: {company}")
         # Initialize chat client with employer_id
@@ -36,10 +39,10 @@ async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_ses
             while True:
                 # Receive message from frontend
                 prompt = await websocket.receive_text()
-                
+
                 # Get response from agent
                 response = await chat.run_interaction(prompt)
-                
+
                 # Send response back to frontend
                 await websocket.send_text(response)
 

@@ -47,6 +47,7 @@ services:
     restart: always
     ports: 
       - "8011:8011"
+
 volumes:
   local_pgdata:
   pgadmin-data:

@@ -3,6 +3,7 @@ from sqlmodel import SQLModel
 from models.models import RecruiterCompanyLinkBase, RecruiterCompanyLink
 from utils.pydantic_utils import make_optional
 
+
 class RecruiterCompanyLinkCreate(RecruiterCompanyLinkBase):
     pass
 

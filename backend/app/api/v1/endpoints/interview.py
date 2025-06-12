@@ -5,7 +5,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from crud import crud_interview
-from schemas import InterviewCreate, InterviewUpdate, InterviewRead, InterviewReadWithApplication
+from schemas import (
+    InterviewCreate,
+    InterviewUpdate,
+    InterviewRead,
+    InterviewReadWithApplication,
+)
 
 router = APIRouter()
 
@@ -26,7 +31,10 @@ def create_interview(
     return interview
 
 
-@router.get("/by-application/{application_id}", response_model=List[InterviewReadWithApplication])
+@router.get(
+    "/by-application/{application_id}",
+    response_model=List[InterviewReadWithApplication],
+)
 def read_interviews_by_application(
     *,
     db: Session = Depends(get_session),
@@ -36,7 +44,9 @@ def read_interviews_by_application(
     """
     Get interviews by application ID with application details.
     """
-    interviews = crud_interview.get_interviews_by_application_id_with_details(db=db, application_id=application_id)
+    interviews = crud_interview.get_interviews_by_application_id_with_details(
+        db=db, application_id=application_id
+    )
     return interviews
 
 
@@ -50,7 +60,9 @@ def read_interview(
     """
     Get interview by ID with application details.
     """
-    interview = crud_interview.get_interview_with_application(db=db, interview_id=interview_id)
+    interview = crud_interview.get_interview_with_application(
+        db=db, interview_id=interview_id
+    )
     if not interview:
         raise HTTPException(status_code=404, detail="Interview not found")
     # if not crud.user.is_superuser(current_user) and (interview.application_id not in [app.id for app in current_user.applications]):
@@ -68,8 +80,10 @@ def read_interviews(
     """
     Retrieve interviews with application details.
     """
-    interviews = crud_interview.get_interviews_with_application(db, skip=skip, limit=limit)
-    
+    interviews = crud_interview.get_interviews_with_application(
+        db, skip=skip, limit=limit
+    )
+
     return interviews
 
 
@@ -89,7 +103,9 @@ def update_interview(
         raise HTTPException(status_code=404, detail="Interview not found")
     # if not crud.user.is_superuser(current_user) and (interview.application.candidate_id != current_user.id): # type: ignore
     #     raise HTTPException(status_code=400, detail="Not enough permissions")
-    interview = crud_interview.update_interview(db=db, db_obj=interview, obj_in=interview_in)
+    interview = crud_interview.update_interview(
+        db=db, db_obj=interview, obj_in=interview_in
+    )
     return interview
 
 
@@ -109,4 +125,4 @@ def delete_interview(
     # if not crud.user.is_superuser(current_user) and (interview.application.candidate_id != current_user.id): # type: ignore
     #     raise HTTPException(status_code=400, detail="Not enough permissions")
     interview = crud_interview.delete_interview(db=db, interview_id=interview_id)
-    return interview 
+    return interview

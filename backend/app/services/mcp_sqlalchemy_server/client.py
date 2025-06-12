@@ -23,7 +23,7 @@ class Chat:
         server = MCPServerStdio(
             command="uv",
             args=["run", "server.py", str(employer_id)],
-            cwd=os.path.dirname(__file__)
+            cwd=os.path.dirname(__file__),
         )
 
         if "GEMINI_API_KEY" not in os.environ:
@@ -34,14 +34,14 @@ class Chat:
         self.agent = Agent(
             model,
             mcp_servers=[server],
-            system_prompt=f'''You are a helpful assistant that can query the database for the company with id {employer_id}.
+            system_prompt=f"""You are a helpful assistant that can query the database for the company with id {employer_id}.
 Use tools to get information about the database to answer the user's question.
 Always get the tables info first before writing the query to get the needed information.
 
 You are working for the company {company["name"]} with id {employer_id} only, you can only access the data of this company.
-'''
+""",
         )
-        
+
         self.message_history: List[ModelMessage] = []
         self.employer_id = employer_id
 
@@ -51,7 +51,7 @@ You are working for the company {company["name"]} with id {employer_id} only, yo
 
         Args:
             prompt: The user's input prompt.
-        
+
         Returns:
             The agent's response.
         """

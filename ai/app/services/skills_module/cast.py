@@ -12,15 +12,13 @@ access_token = response.json()["access_token"]
 
 url = "https://emsiservices.com/skills/versions/latest/skills"
 
-querystring = {"fields":"name,type"}
+querystring = {"fields": "name,type"}
 
 headers = {"Authorization": f"Bearer {access_token}"}
 
 response = requests.request("GET", url, headers=headers, params=querystring)
 
 import json
+
 with open("skills.json", "w") as f:
     json.dump(response.json(), f, indent=4)
-
-
-

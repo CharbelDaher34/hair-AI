@@ -9,7 +9,7 @@ from schemas.job import JobRead
 # New schema for individual form response items
 class FormResponseItem(BaseModel):
     name: str  # The name/key of the form field
-    value: Any # The value submitted for this form field
+    value: Any  # The value submitted for this form field
 
 
 class ApplicationCreate(ApplicationBase):
@@ -32,7 +32,7 @@ class ApplicationWithDetails(ApplicationRead):
     # Override form_responses to use the new structure
     form_responses: Optional[List[FormResponseItem]] = None
 
-    @field_validator("form_responses",mode="before")
+    @field_validator("form_responses", mode="before")
     def transform_form_responses_dict_to_list(cls, v):
         if isinstance(v, dict):
             return [{"name": str(key), "value": value} for key, value in v.items()]
