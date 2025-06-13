@@ -248,7 +248,7 @@ const AddApplication = () => {
               <div className="space-y-2">
                 <Label htmlFor="candidateId" className="text-sm font-semibold text-gray-700">Candidate *</Label>
                 <div className="flex gap-4">
-                  <Select value={"new"} onValueChange={handleCandidateChange}>
+                  <Select value={show_new_candidate_form ? "new" : selected_candidate_id} onValueChange={handleCandidateChange}>
                     <SelectTrigger className="h-12 shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500">
                       <SelectValue placeholder="Select a candidate or add new" />
                     </SelectTrigger>

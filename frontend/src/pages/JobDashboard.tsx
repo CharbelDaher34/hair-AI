@@ -196,6 +196,7 @@ const JobDashboard = () => {
                     <TableHead className="font-semibold text-gray-700">Created Date</TableHead>
                     <TableHead className="font-semibold text-gray-700">Status</TableHead>
                     <TableHead className="font-semibold text-gray-700">Applications</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Recruited To</TableHead>
                     <TableHead className="font-semibold text-gray-700">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -211,9 +212,10 @@ const JobDashboard = () => {
                     </TableCell>
                       <TableCell>
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                          {getApplicationCount(job)}
+                          {job.application_count}
                         </span>
                       </TableCell>
+                      <TableCell className="text-gray-600">{job.recruited_to_name || 'N/A'}</TableCell>
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>

@@ -51,7 +51,7 @@ def test_query_filtering():
     ]
 
     print("Testing query filtering functionality...")
-    print(f"Employer ID filter set to: 123")
+    print("Employer ID filter set to: 123")
     print("-" * 80)
 
     for i, (original, expected) in enumerate(test_cases, 1):

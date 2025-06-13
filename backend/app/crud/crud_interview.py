@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.sql.expression import true
 from sqlmodel import select
 
-from models.models import Interview, Application
+from models.models import Interview, Application, Job, Status
 from schemas.interview import InterviewCreate, InterviewUpdate
 
 
@@ -42,7 +42,14 @@ def get_interviews_with_application(
     db: Session, skip: int = 0, limit: int = 100
 ) -> List[Interview]:
     """Get interviews with application details (candidate and job) loaded"""
-    statement = select(Interview).offset(skip).limit(limit)
+    statement = (
+        select(Interview)
+        .join(Application)
+        .join(Job)
+        .where(Job.status != Status.CLOSED)
+        .offset(skip)
+        .limit(limit)
+    )
     interviews = db.exec(statement).all()
 
     # Load relationships for each interview

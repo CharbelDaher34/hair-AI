@@ -26,6 +26,8 @@ class JobUpdate(JobBase):
 
 class JobRead(JobBase):
     id: int
+    recruited_to_name: Optional[str] = None
+    application_count: Optional[int] = None
 
 
 class JobAnalytics(SQLModel):
