@@ -56,9 +56,6 @@ def match_candidates_client(
         "candidate_skills": candidate_skills,
     }
     with httpx.Client() as client:
-        print(f"Sending payload to {matcher_url}")
-        print(payload)
-        time.sleep(10)
         response = client.post(matcher_url, json=payload, timeout=None)
         response.raise_for_status()
         return response.json()
