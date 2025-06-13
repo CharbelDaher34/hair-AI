@@ -2,12 +2,16 @@ import httpx
 from typing import List, Optional
 import requests
 import os
+import time
 
 
 def _get_matcher_url():
     """
     Determines the correct matcher URL by checking health endpoints of potential hosts.
     """
+    matcher_url = os.getenv("ai_url")
+    if matcher_url:
+        return f"{matcher_url}/matcher/match_candidates"
     hosts = [os.getenv("AI_HOST", "ai"), "localhost"]
     port = os.getenv("AI_PORT", "8011")
 
@@ -27,7 +31,13 @@ def _get_matcher_url():
     return ""
 
 
-MATCHER_URL = _get_matcher_url()
+try:
+    MATCHER_URL = _get_matcher_url()
+    print(f"✅ Matcher URL: {MATCHER_URL}")
+    time.sleep(10)
+except Exception as e:
+    print(f"❌ Could not get matcher URL: {e}")
+    MATCHER_URL = ""
 
 
 def match_candidates_client(
@@ -46,6 +56,9 @@ def match_candidates_client(
         "candidate_skills": candidate_skills,
     }
     with httpx.Client() as client:
+        print(f"Sending payload to {matcher_url}")
+        print(payload)
+        time.sleep(10)
         response = client.post(matcher_url, json=payload, timeout=None)
         response.raise_for_status()
         return response.json()

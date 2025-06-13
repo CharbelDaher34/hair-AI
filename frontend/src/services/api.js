@@ -1,4 +1,18 @@
-const API_V1_PREFIX = "http://84.16.230.94:8017/api/v1";
+// Determine the API base URL based on environment
+const get_api_base_url = () => {
+  // Check if we're running in Docker (set via environment variable)
+  const is_docker = import.meta.env.VITE_DOCKER === 'true';
+  
+  if (is_docker) {
+    // In Docker, use the server IP since the browser runs on the host
+    return "http://84.16.230.94:8017/api/v1";
+  } else {
+    // For local development, use localhost
+    return "http://localhost:8017/api/v1";
+  }
+};
+
+const API_V1_PREFIX = get_api_base_url();
 
 class ApiService {
   constructor() {

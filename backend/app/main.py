@@ -34,8 +34,12 @@ from api.v1.endpoints import (
 DEBUG_MODE = os.getenv("DEBUG_MODE", "True").lower() == "true"
 
 # Get scheduler configuration from environment variables
-RESUME_PARSER_INTERVAL_MINUTES = int(os.getenv("RESUME_PARSER_INTERVAL_MINUTES", "10"))  # Default: 30 minutes
-APPLICATION_MATCHER_INTERVAL_MINUTES = int(os.getenv("APPLICATION_MATCHER_INTERVAL_MINUTES", "10"))  # Default: 30 minutes
+RESUME_PARSER_INTERVAL_MINUTES = int(
+    os.getenv("RESUME_PARSER_INTERVAL_MINUTES", "10")
+)  # Default: 30 minutes
+APPLICATION_MATCHER_INTERVAL_MINUTES = int(
+    os.getenv("APPLICATION_MATCHER_INTERVAL_MINUTES", "10")
+)  # Default: 30 minutes
 ENABLE_BATCH_SCHEDULER = os.getenv("ENABLE_BATCH_SCHEDULER", "True").lower() == "true"
 
 # Define a bearer scheme for Swagger UI.
@@ -53,65 +57,78 @@ from scripts.application_matcher_batch import process_all_applications
 # Global scheduler variable
 scheduler = None
 
+
 def safe_process_all_candidates():
     """Wrapper function for resume parsing with error handling"""
     try:
-        print(f"[Scheduler] Starting scheduled resume parsing at {os.getenv('TZ', 'UTC')} time")
+        print(
+            f"[Scheduler] Starting scheduled resume parsing at {os.getenv('TZ', 'UTC')} time"
+        )
         result = process_all_candidates()
         print(f"[Scheduler] Resume parsing completed: {result}")
     except Exception as e:
         print(f"[Scheduler] Resume parsing failed: {str(e)}")
         import traceback
+
         print(f"[Scheduler] Full traceback: {traceback.format_exc()}")
+
 
 def safe_process_all_applications():
     """Wrapper function for application matching with error handling"""
     try:
-        print(f"[Scheduler] Starting scheduled application matching at {os.getenv('TZ', 'UTC')} time")
+        print(
+            f"[Scheduler] Starting scheduled application matching at {os.getenv('TZ', 'UTC')} time"
+        )
         result = process_all_applications()
         print(f"[Scheduler] Application matching completed: {result}")
     except Exception as e:
         print(f"[Scheduler] Application matching failed: {str(e)}")
         import traceback
+
         print(f"[Scheduler] Full traceback: {traceback.format_exc()}")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global scheduler
-    
+
     # Startup logic
     create_db_and_tables()
 
     # Set up APScheduler if enabled
     if ENABLE_BATCH_SCHEDULER:
         print(f"[Scheduler] Setting up batch processing scheduler")
-        print(f"[Scheduler] Resume parser interval: {RESUME_PARSER_INTERVAL_MINUTES} minutes")
-        print(f"[Scheduler] Application matcher interval: {APPLICATION_MATCHER_INTERVAL_MINUTES} minutes")
-        
+        print(
+            f"[Scheduler] Resume parser interval: {RESUME_PARSER_INTERVAL_MINUTES} minutes"
+        )
+        print(
+            f"[Scheduler] Application matcher interval: {APPLICATION_MATCHER_INTERVAL_MINUTES} minutes"
+        )
+
         scheduler = BackgroundScheduler()
-        
+
         # Add resume parsing job
         scheduler.add_job(
             safe_process_all_candidates,
             IntervalTrigger(minutes=RESUME_PARSER_INTERVAL_MINUTES),
-            id='resume_parser_job',
-            name='Resume Parser Batch Job',
+            id="resume_parser_job",
+            name="Resume Parser Batch Job",
             max_instances=1,  # Prevent overlapping executions
-            coalesce=True,    # Combine multiple pending executions into one
-            misfire_grace_time=300  # Allow 5 minutes grace time for missed executions
+            coalesce=True,  # Combine multiple pending executions into one
+            misfire_grace_time=300,  # Allow 5 minutes grace time for missed executions
         )
-        
+
         # Add application matching job
         scheduler.add_job(
             safe_process_all_applications,
             IntervalTrigger(minutes=APPLICATION_MATCHER_INTERVAL_MINUTES),
-            id='application_matcher_job',
-            name='Application Matcher Batch Job',
+            id="application_matcher_job",
+            name="Application Matcher Batch Job",
             max_instances=1,  # Prevent overlapping executions
-            coalesce=True,    # Combine multiple pending executions into one
-            misfire_grace_time=300  # Allow 5 minutes grace time for missed executions
+            coalesce=True,  # Combine multiple pending executions into one
+            misfire_grace_time=300,  # Allow 5 minutes grace time for missed executions
         )
-        
+
         scheduler.start()
         print(f"[Scheduler] Batch processing scheduler started successfully")
     else:
@@ -216,14 +233,14 @@ app.include_router(api_v1_router, prefix="/api/v1")
 app.include_router(chatbot.router, prefix="/api/v1", tags=["chatbot"])
 
 
-@app.get("/", summary="Root endpoint for API health and info")
+@app.get("/", summary="Root endpoint for API health and info.")
 async def root():
     scheduler_info = {
         "enabled": ENABLE_BATCH_SCHEDULER,
         "resume_parser_interval_minutes": RESUME_PARSER_INTERVAL_MINUTES,
         "application_matcher_interval_minutes": APPLICATION_MATCHER_INTERVAL_MINUTES,
     }
-    
+
     return {
         "message": "Welcome to the Matching API",
         "docs_url": "/docs",

@@ -47,6 +47,9 @@ def _get_matcher_url():
     """
     Determines the correct matcher URL by checking health endpoints of potential hosts.
     """
+    matcher_url = os.getenv("ai_url")
+    if matcher_url:
+        return f"{matcher_url}/parser/parse"
     hosts = [os.getenv("AI_HOST", "ai"), "localhost"]
     port = os.getenv("AI_PORT", "8011")
 
@@ -62,11 +65,15 @@ def _get_matcher_url():
         except requests.exceptions.RequestException as e:
             print(f"❌ Could not connect to {health_url}: {e}")
 
-    print("❌ AI service is not running or not accessible.")
+    print("❌ AI service is ndot running or not accessible.")
     return ""
 
 
-PARSER_URL = _get_matcher_url()
+try:
+    PARSER_URL = _get_matcher_url()
+except Exception as e:
+    print(f"❌ Could not get parser URL: {e}")
+    PARSER_URL = ""
 
 
 class AgentClient:

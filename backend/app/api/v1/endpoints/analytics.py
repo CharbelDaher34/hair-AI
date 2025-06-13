@@ -84,20 +84,18 @@ def get_company_analytics(request: Request, db: Session = Depends(get_session)):
         ).one()
 
         # 4. Calculate real hire rate based on interviews marked as "done" vs total applications
-        completed_interviews = db.exec(
-            select(func.count(Interview.id))
-            .join(Application)
+        hired_applications = db.exec(
+            select(func.count(Application.id))
             .join(Job)
             .where(Job.employer_id == employer_id)
-            .where(Interview.status == "done")
+            .where(Application.status == ApplicationStatus.HIRED)
         ).one()
 
         hire_rate = (
-            round((completed_interviews / max(total_applications, 1)) * 100, 1)
+            round((hired_applications / total_applications) * 100, 1)
             if total_applications > 0
             else 0.0
         )
-
         # 5. Applications Over Time (last 6 months)
         applications_over_time_data = []
         today = datetime.utcnow()

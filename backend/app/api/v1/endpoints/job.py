@@ -9,7 +9,7 @@ from sqlmodel import Session
 from pydantic import BaseModel, Field
 
 from core.database import get_session
-from crud import crud_job, crud_form_key
+from crud import crud_job, crud_form_key, crud_application
 from schemas import JobCreate, JobUpdate, JobRead, CompanyRead, MatchRead
 from schemas.job import JobAnalytics, jobGeneratedData
 from core.security import TokenData
@@ -35,6 +35,8 @@ def create_job(
     # Create job data with employer_id and created_by_hr_id from token
     job_in.employer_id = current_user.employer_id
     job_in.created_by_hr_id = current_user.id
+    if job_in.recruited_to_id:
+        job_in.recruited_to_id = current_user.employer_id
     print(f"job_data: {job_in}")
     try:
         job = crud_job.create_job(db=db, job_in=job_in)
@@ -68,7 +70,13 @@ def read_jobs(
 ) -> List[JobRead]:
     user = request.state.user
     employer_id = user.employer_id
-    return crud_job.get_jobs(db=db, skip=skip, limit=limit,employer_id=employer_id)
+    jobs = crud_job.get_jobs(db=db, skip=skip, limit=limit, employer_id=employer_id)
+    for job in jobs:
+        job.application_count = crud_application.get_application_count_by_job_id(
+            db=db, job_id=job.id
+        )
+
+    return jobs
 
 
 @router.get("/by-employer/{employer_id}", response_model=List[JobRead])
@@ -83,10 +91,14 @@ def read_jobs_by_employer(
 ) -> List[JobRead]:
     user = request.state.user
     employer_id = user.employer_id
-    
-    return crud_job.get_jobs_by_employer(
+    jobs = crud_job.get_jobs_by_employer(
         db=db, employer_id=employer_id, skip=skip, limit=limit, closed=closed
     )
+    for job in jobs:
+        job.application_count = crud_application.get_application_count_by_job_id(
+            db=db, job_id=job.id
+        )
+    return jobs
 
 
 @router.get("/by-status/{status}", response_model=List[JobRead])
