@@ -39,6 +39,9 @@ services:
       - POSTGRES_PORT=5437
       - POSTGRES_HOST=db
       - POSTGRES_HOST_AUTH_METHOD=trust
+      - ai_url=http://ai:8011
+      - GEMINI_API_KEY=AIzaSyDp8n_AmYsspADJBaNpkJvBdlch1-9vkhw
+      - LOGFIRE_TOKEN=pylf_v1_us_659r32Hx0CWSbpJFLL6R0xhwm3N1Xjxq99DqYSJBpQWN
   ai:
     build:
       context: ./ai
@@ -47,7 +50,22 @@ services:
     restart: always
     ports: 
       - "8011:8011"
-
+    environment:
+      - API_KEY=AIzaSyDp8n_AmYsspADJBaNpkJvBdlch1-9vkhw
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: frontend
+    restart: always
+    ports: 
+      - "8080:8080"
+    depends_on:
+      - backend
+      - db
+    environment:
+      - VITE_DOCKER=true
+    
 volumes:
   local_pgdata:
   pgadmin-data:

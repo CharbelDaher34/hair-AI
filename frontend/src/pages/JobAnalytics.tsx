@@ -603,12 +603,6 @@ const JobAnalytics = () => {
               </div>
               <p className="text-sm text-gray-700 font-medium">Application → Interview</p>
             </div>
-            <div className="text-center p-6 bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg border border-blue-200">
-              <div className="text-4xl font-bold text-indigo-600 mb-2">
-                {analytics.match_to_interview_rate}%
-              </div>
-              <p className="text-sm text-gray-700 font-medium">Match → Interview</p>
-            </div>
           </div>
         </CardContent>
       </Card>

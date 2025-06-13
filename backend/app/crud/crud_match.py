@@ -61,6 +61,7 @@ def create_match(db: Session, *, match_in: MatchCreate) -> Match:
     candidate_resume = CandidateResume.model_validate(candidate.parsed_resume)
 
     # Call the AI matcher
+
     ai_response = match_candidates_client(
         job_description=job_description,
         candidates=candidates,

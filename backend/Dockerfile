@@ -15,10 +15,11 @@ WORKDIR /app
 
 # Copy requirements first for better caching
 COPY app/pyproject.toml .
+COPY app/uv.lock .
 
-# Install dependencies and ensure they're in PATH
-RUN uv lock
-RUN uv sync --locked
+# Install dependencies and sync the virtual environment
+RUN uv lock && \
+    uv sync --locked
 
 # Copy the application code
 COPY app/ .

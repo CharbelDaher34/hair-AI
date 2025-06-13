@@ -1,5 +1,5 @@
 from typing import Any, Dict, Optional, Union, List
-
+import time
 from sqlmodel import Session, select, func
 from sqlalchemy.orm import selectinload
 
@@ -127,45 +127,69 @@ def create_application(
     db.add(db_application)
     db.commit()
     db.refresh(db_application)
-    
+
     # Create match for the application automatically
     try:
         # Get candidate and job data for validation
         candidate = db.get(Candidate, db_application.candidate_id)
         job = db.get(Job, db_application.job_id)
-        
+
         # Check if we have the necessary data for matching
-        if candidate and job and candidate.parsed_resume and job.description and job.description.strip():
-            print(f"[CreateApplication] Creating match for application {db_application.id}")
+        if (
+            candidate
+            and job
+            and candidate.parsed_resume
+            and job.description
+            and job.description.strip()
+        ):
+            print(
+                f"[CreateApplication] Creating match for application {db_application.id}"
+            )
             print(f"[CreateApplication] Job: {job.title}")
             print(f"[CreateApplication] Candidate: {candidate.full_name}")
-            
+
             # Create match using CRUD (which will call the AI service)
             match_create = MatchCreate(application_id=db_application.id)
             new_match = crud_match.create_match(db=db, match_in=match_create)
-            
+
             if new_match:
-                print(f"[CreateApplication] Successfully created match {new_match.id} for application {db_application.id}")
+                print(
+                    f"[CreateApplication] Successfully created match {new_match.id} for application {db_application.id}"
+                )
             else:
-                print(f"[CreateApplication] Failed to create match for application {db_application.id}")
+                print(
+                    f"[CreateApplication] Failed to create match for application {db_application.id}"
+                )
         else:
+            time.sleep(10)
             # Log why matching was skipped
             if not candidate:
-                print(f"[CreateApplication] Candidate not found for application {db_application.id}")
+                print(
+                    f"[CreateApplication] Candidate not found for application {db_application.id}"
+                )
             elif not job:
-                print(f"[CreateApplication] Job not found for application {db_application.id}")
+                print(
+                    f"[CreateApplication] Job not found for application {db_application.id}"
+                )
             elif not candidate.parsed_resume:
-                print(f"[CreateApplication] Candidate {candidate.id} has no parsed resume data - skipping match creation")
+                print(
+                    f"[CreateApplication] Candidate {candidate.id} has no parsed resume data - skipping match creation"
+                )
             elif not job.description or not job.description.strip():
-                print(f"[CreateApplication] Job {job.id} has no description - skipping match creation")
-                
+                print(
+                    f"[CreateApplication] Job {job.id} has no description - skipping match creation"
+                )
+
     except Exception as match_err:
-        print(f"[CreateApplication] Error creating match for application {db_application.id}: {str(match_err)}")
+        print(
+            f"[CreateApplication] Error creating match for application {db_application.id}: {str(match_err)}"
+        )
         print(f"[CreateApplication] Error type: {type(match_err)}")
         # Don't fail the application creation if matching fails
         import traceback
+
         print(f"[CreateApplication] Full traceback: {traceback.format_exc()}")
-    
+
     return db_application
 
 
@@ -214,6 +238,15 @@ def get_applications_count_by_employer(db: Session, employer_id: int) -> int:
     result = db.exec(statement)
     total = result.one()
     print(f"Total applications: {total}")
+    if isinstance(total, tuple):
+        total = total[0]
+    return total
+
+
+def get_application_count_by_job_id(db: Session, job_id: int) -> int:
+    statement = select(func.count(Application.id)).where(Application.job_id == job_id)
+    result = db.exec(statement)
+    total = result.one()
     if isinstance(total, tuple):
         total = total[0]
     return total

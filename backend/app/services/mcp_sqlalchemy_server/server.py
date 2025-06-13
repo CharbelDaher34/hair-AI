@@ -1,38 +1,3 @@
-"""
-MCP SQLAlchemy Server - SQLAlchemy + RLS Version
-
-This server provides tools to interact with the matching_db database through SQLAlchemy sessions
-with Row Level Security (RLS) enabled for multi-tenant data isolation.
-
-Key Features:
-- Uses SQLAlchemy sessions instead of raw pyodbc connections
-- Automatic data filtering through PostgreSQL Row Level Security (RLS)
-- Multi-tenant support with employer_id-based data isolation
-- Clean error handling and logging
-- Comprehensive table introspection
-
-USAGE GUIDE FOR MODELS:
-1. Start by exploring the database structure using get_tables() to see all tables in matching_db
-2. Use describe_table() to understand table structure before querying
-3. Use filter_table_names() to find relevant tables by name
-4. Execute queries with execute_query() for limited results or query_database() for all results
-5. Use fuzzy_search_table() for approximate string matching
-6. All queries are automatically filtered by employer_id through RLS policies
-
-EXAMPLE WORKFLOW:
-1. get_tables() -> List all tables in matching_db
-2. describe_table(table="job") -> Get table structure
-3. execute_query("SELECT * FROM job LIMIT 5") -> Query data (automatically filtered by RLS)
-
-ROW LEVEL SECURITY (RLS):
-- All database queries are automatically filtered based on the employer_id set in the session
-- RLS policies are defined at the database level and enforce data isolation
-- No manual filtering is required in queries - the database handles it automatically
-
-NOTE: This server requires an employer_id to be set for proper RLS functionality.
-"""
-
-from collections import defaultdict
 import os
 import sys
 
@@ -40,9 +5,8 @@ sys.path.append(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 )
 from core.database import get_session_rls
-from sqlmodel import Session
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional
 import json
 from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
@@ -63,11 +27,7 @@ logger = logging.getLogger(__name__)
 # Constants
 MAX_LONG_DATA = 1000
 DEFAULT_MAX_ROWS = 100
-DEFAULT_TIMEOUT = 300000
-DEFAULT_PORT = 5437
-DEFAULT_DATABASE = "matching_db"
-DEFAULT_HOST = "localhost"
-DEFAULT_SCHEMA = "matching_db"
+
 
 # Global variable to store the employer_id filter
 EMPLOYER_ID_FILTER: Optional[int] = None
@@ -111,56 +71,37 @@ def set_employer_id_filter(employer_id: int) -> None:
     logger.info(f"Employer ID filter set to: {employer_id}")
 
 
-def get_employer_filter_clause(table_alias: str = "") -> str:
-    """
-    Get the WHERE clause to filter by employer_id based on table relationships.
-
-    Args:
-        table_alias: Optional table alias to use in the query
-
-    Returns:
-        str: WHERE clause string to filter by employer_id
-    """
-    if EMPLOYER_ID_FILTER is None:
-        return ""
-
-    prefix = f"{table_alias}." if table_alias else ""
-    return f" AND {prefix}employer_id = {EMPLOYER_ID_FILTER}"
-
-
-def apply_employer_filter_to_query(query: str) -> str:
-    """
-    Apply employer_id filtering to a SQL query by analyzing the tables involved.
-
-    NOTE: This function is now deprecated since we're using Row Level Security (RLS).
-    RLS automatically filters all queries based on the session's employer_id setting.
-    This function now just returns the original query unchanged.
-
-    Args:
-        query: The original SQL query
-
-    Returns:
-        str: The original query (unchanged, as RLS handles filtering)
-    """
-    # With RLS enabled, we don't need manual filtering
-    # The database automatically applies employer_id filters through RLS policies
-    return query
-
-
 # MCP Server initialization
-mcp = FastMCP("mcp-sqlalchemy-server", port=5437, transport="sse")
+mcp = FastMCP("mcp-sqlalchemy-server")
 
 
 @mcp.tool(
     name="get_tables",
-    description="""Retrieve and return a list containing information about all tables in the matching_db database.
-    
-    USAGE: Use this as the first step to explore the matching_db database structure.
-    This will show you all available tables in the matching_db schema.
-    
-    EXAMPLE: get_tables() will return all tables in matching_db like ["company", "hr", "job", "candidate", "application", "match", etc.]
-    
-    NEXT STEPS: Use describe_table(table="table_name") to get detailed table structure.
+    description="""🔍 DISCOVERY TOOL: Explore Database Schema
+
+PURPOSE: Get a complete overview of all available tables in the job matching database.
+This is your starting point for database exploration and should be used first.
+
+WHEN TO USE:
+- Beginning any database exploration session
+- User asks "what data is available?" or "show me the database structure"
+- Need to understand the overall schema before diving into specific queries
+
+USAGE PATTERN:
+1. Call this tool first to see all available tables
+2. Identify relevant tables for the user's question
+3. Use describe_table() on specific tables for detailed structure
+
+RETURNS: JSON list of all tables with catalog, schema, and table names
+
+EXAMPLE OUTPUT:
+[
+  {"TABLE_CAT": "matching_db", "TABLE_SCHEM": "public", "TABLE_NAME": "company"},
+  {"TABLE_CAT": "matching_db", "TABLE_SCHEM": "public", "TABLE_NAME": "job"},
+  {"TABLE_CAT": "matching_db", "TABLE_SCHEM": "public", "TABLE_NAME": "candidate"}
+]
+
+NEXT STEPS: Use describe_table(table="table_name") for detailed table structure
     """,
 )
 def get_tables() -> str:
@@ -198,23 +139,38 @@ def get_tables() -> str:
 
 @mcp.tool(
     name="describe_table",
-    description="""Retrieve and return a dictionary containing the definition of a table in matching_db, including column names, data types, nullable, primary key, and foreign keys.
-    
-    USAGE: Use this to understand the structure of a specific table before querying it.
-    This is essential for writing correct SQL queries.
+    description="""📋 SCHEMA ANALYSIS TOOL: Get Detailed Table Structure
+
+PURPOSE: Understand the complete structure of a specific table including columns, data types, 
+relationships, and constraints. Essential for writing correct SQL queries.
+
+WHEN TO USE:
+- After identifying relevant tables with get_tables()
+- Before writing any SQL queries involving a table
+- User asks about specific table structure or column details
+- Need to understand relationships between tables
     
     PARAMETERS:
-    - table: The table name in matching_db (REQUIRED)
-    
-    EXAMPLE: describe_table(table="job")
-    
-    RETURNS: Detailed table structure including:
-    - Column names, types, sizes, nullable status
-    - Primary key columns
-    - Foreign key relationships
-    - Default values
-    
-    NEXT STEPS: Use this information to write proper SQL queries with execute_query() or query_database().
+- table (REQUIRED): Exact table name from the database (case-sensitive)
+
+USAGE PATTERN:
+1. Get table name from get_tables() or filter_table_names()
+2. Call describe_table() to understand structure
+3. Use the column and relationship info to write proper SQL queries
+
+RETURNS: Comprehensive table definition including:
+- Column names, data types, sizes, nullable status
+- Primary key columns (marked with primary_key: true)
+- Foreign key relationships with referenced tables
+- Default values and constraints
+
+EXAMPLE USAGE:
+- describe_table(table="job") → Get job table structure
+- describe_table(table="candidate") → Get candidate table structure
+
+CRITICAL: Use exact table names. If unsure, use filter_table_names() first.
+
+NEXT STEPS: Use the structure info to write SQL queries with execute_query()
     """,
 )
 def describe_table(table: str) -> str:
@@ -263,21 +219,37 @@ def fuzzy_match(query: str, table_name: str) -> bool:
 
 @mcp.tool(
     name="filter_table_names",
-    description="""Retrieve and return a list containing information about tables in matching_db whose names contain the specified substring.
-    
-    USAGE: Use this to find tables by name when you know part of the table name.
-    This is helpful for discovering relevant tables in the matching_db database.
+    description="""🔎 TABLE DISCOVERY TOOL: Find Tables by Name Pattern
+
+PURPOSE: Locate tables when you know part of the table name or need to find related tables.
+Uses fuzzy matching to handle partial names and typos.
+
+WHEN TO USE:
+- User mentions a concept but you're unsure of exact table names
+- Looking for related tables (e.g., all tables related to "job")
+- User has typos in table names
+- Exploring domain-specific tables
     
     PARAMETERS:
-    - query: The substring to search for in table names (REQUIRED)
-    
-    EXAMPLES:
-    - filter_table_names(query="candidate") - Find all tables with "candidate" in the name
-    - filter_table_names(query="job") - Find all tables with "job" in the name
-    - filter_table_names(query="application") - Find all tables with "application" in the name
-    - filter_table_names(query="company") - Find all tables with "company" in the name
-    
-    NEXT STEPS: Use describe_table(table="found_table_name") to understand the structure of found tables.
+- query (REQUIRED): Substring or partial name to search for in table names
+
+USAGE PATTERN:
+1. Extract key concepts from user's question
+2. Search for tables related to those concepts
+3. Use describe_table() on found tables for detailed structure
+
+SEARCH EXAMPLES:
+- filter_table_names(query="candidate") → Find: candidate, candidate_skills, etc.
+- filter_table_names(query="job") → Find: job, job_application, job_match, etc.
+- filter_table_names(query="application") → Find: application, job_application, etc.
+- filter_table_names(query="company") → Find: company, company_profile, etc.
+- filter_table_names(query="match") → Find: match, job_match, skill_match, etc.
+
+FUZZY MATCHING: Uses 80% similarity threshold, so "aplications" will find "applications"
+
+RETURNS: JSON list of matching tables with catalog, schema, and table names
+
+NEXT STEPS: Use describe_table() on found tables to understand their structure
     """,
 )
 def filter_table_names(query: str) -> str:
@@ -321,107 +293,50 @@ def filter_table_names(query: str) -> str:
         raise
 
 
-# @mcp.tool(
-#     name="execute_query",
-#     description="""Execute a SQL query on the matching_db database and return results in JSONL format with row limit.
-
-#     USAGE: Use this for exploratory queries or when you want to limit the number of results.
-#     This is the primary tool for running SELECT queries and getting data from matching_db.
-
-#     PARAMETERS:
-#     - query: The SQL query to execute (REQUIRED)
-#     - max_rows: Maximum number of rows to return (default: 100)
-#     - params: Optional dictionary of parameters for parameterized queries
-#     - user/password/dsn: Optional connection overrides
-
-#     EXAMPLES:
-#     - execute_query("SELECT * FROM candidate LIMIT 5") - Get first 5 candidates
-#     - execute_query("SELECT * FROM job WHERE status = 'published' LIMIT 10") - Filter for published jobs
-#     - execute_query("SELECT title, location FROM job WHERE experience_level = '5-7_years'") - Find jobs for a specific experience level
-#     - execute_query("SELECT c.full_name, j.title FROM application a JOIN candidate c ON a.candidate_id = c.id JOIN job j ON a.job_id = j.id LIMIT 10") - Get candidates and the jobs they applied for
-
-#     BEST PRACTICES:
-#     - Always use LIMIT in your queries for large tables
-#     - Use parameterized queries to prevent SQL injection
-#     - Check table structure with describe_table() first
-#     - Use appropriate WHERE clauses to filter data
-#     - All queries run against the matching_db database
-
-#     NEXT STEPS: Use query_database() if you need all results without row limit.
-#     """
-# )
-# def execute_query(query: str, max_rows: int = DEFAULT_MAX_ROWS,
-#                   params: Optional[Dict[str, Any]] = None) -> str:
-#     """
-#     Execute a SQL query and return results in JSONL format.
-
-#     Args:
-#         query: The SQL query to execute
-#         max_rows: Maximum number of rows to return
-#         params: Optional dictionary of parameters to pass to the query
-
-
-#     Returns:
-#         str: Results in JSONL format
-#     """
-#     try:
-#         # Apply employer filter to the query
-#         filtered_query = apply_employer_filter_to_query(query)
-#         logger.info(f"Original query: {query}")
-#         if filtered_query != query:
-#             logger.info(f"Filtered query: {filtered_query}")
-
-#         with get_connection() as conn:
-#             cursor = conn.cursor()
-#             rs = cursor.execute(filtered_query, params) if params else cursor.execute(filtered_query)
-
-#             if not rs.description:
-#                 return json.dumps({"message": "Query executed successfully", "affected_rows": rs.rowcount})
-
-#             columns = [column[0] for column in rs.description]
-#             results = []
-
-#             for row in rs:
-#                 row_dict = dict(zip(columns, row))
-#                 # Truncate long string values
-#                 truncated_row = {
-#                     key: (str(value)[:MAX_LONG_DATA] if value is not None else None)
-#                     for key, value in row_dict.items()
-#                 }
-#                 results.append(truncated_row)
-
-#                 if len(results) >= max_rows:
-#                     break
-
-#             # Convert the results to JSONL format
-#             jsonl_results = "\n".join(json.dumps(row) for row in results)
-#             return jsonl_results
-
-#     except pyodbc.Error as e:
-#         logger.error(f"Error executing query: {e}")
-#         raise
-
-
 @mcp.tool(
     name="execute_query",
-    description="""Execute a SQL query and return results in Markdown table format.
-    
-    USAGE: Use this when you want results formatted as a nice markdown table for display.
-    This is great for reports, documentation, or when you want to show results in a readable format.
+    description="""📊 PRIMARY QUERY TOOL: Execute SQL and Get Formatted Results
+
+PURPOSE: Execute SQL queries and return results in a beautiful, readable Markdown table format.
+This is your main tool for answering user questions with data.
+
+WHEN TO USE:
+- Answering user questions that require data from the database
+- Creating reports, summaries, or analysis
+- When you want nicely formatted output for presentation
+- Exploring data with limited result sets
     
     PARAMETERS:
-    - query: The SQL query to execute (REQUIRED)
-    - max_rows: Maximum number of rows to return (default: 100)
-    - params: Optional dictionary of parameters for parameterized queries
-    
-    EXAMPLES:
-    - execute_query("SELECT title, location, job_type FROM job WHERE status = 'published' LIMIT 10") - Nicely formatted table of published jobs
-    - execute_query("SELECT status, COUNT(*) as count FROM job GROUP BY status") - Summary table of jobs by status
-    - execute_query("SELECT c.full_name, j.title FROM application a JOIN candidate c ON a.candidate_id = c.id JOIN job j ON a.job_id = j.id LIMIT 5") - Show which candidates applied to which jobs
-    
-    RETURNS: Markdown-formatted table that can be directly displayed or included in documents.
-    
-    NEXT STEPS: Use execute_query() if you need JSONL format for further processing.
+- query (REQUIRED): Valid SQL SELECT statement
+- max_rows (OPTIONAL): Maximum rows to return (default: 100, prevents overwhelming output)
+- params (OPTIONAL): Dictionary of parameters for parameterized queries (security best practice)
+
+SQL BEST PRACTICES:
+- Always use LIMIT for exploration queries
+- Use meaningful column aliases for better readability
+- Join tables properly using foreign key relationships
+- Use WHERE clauses to filter relevant data
+- Use ORDER BY for consistent, meaningful sorting
+
+COMMON QUERY PATTERNS:
+
+📈 SUMMARY QUERIES:
+- execute_query("SELECT status, COUNT(*) as count FROM job GROUP BY status ORDER BY count DESC")
+- execute_query("SELECT location, COUNT(*) as job_count FROM job WHERE status = 'published' GROUP BY location ORDER BY job_count DESC LIMIT 10")
+
+👥 RELATIONSHIP QUERIES:
+- execute_query("SELECT c.full_name, j.title, a.status FROM application a JOIN candidate c ON a.candidate_id = c.id JOIN job j ON a.job_id = j.id LIMIT 10")
+- execute_query("SELECT co.name as company, COUNT(j.id) as active_jobs FROM company co JOIN job j ON co.id = j.employer_id WHERE j.status = 'published' GROUP BY co.name ORDER BY active_jobs DESC")
+
+🔍 FILTERED SEARCHES:
+- execute_query("SELECT title, location, job_type, experience_level FROM job WHERE status = 'published' AND location ILIKE '%london%' ORDER BY created_at DESC LIMIT 20")
+- execute_query("SELECT full_name, email FROM candidate WHERE parsed_resume->>'skills' ILIKE '%python%' LIMIT 15")
+
+RETURNS: Markdown table with column headers and formatted data rows
+
+SECURITY: Always use parameterized queries for user input to prevent SQL injection
+
+NEXT STEPS: Use query_database() if you need all results without row limits
     """,
 )
 def execute_query(
@@ -495,23 +410,43 @@ def execute_query(
 
 @mcp.tool(
     name="query_database",
-    description="""Execute a SQL query on the matching_db database and return all results in JSONL format (no row limit).
-    
-    USAGE: Use this when you need all results from a query without any row limit.
-    Be careful with large tables - this can return a lot of data!
+    description="""⚡ BULK DATA TOOL: Execute SQL and Get All Results
+
+PURPOSE: Execute SQL queries and return ALL results without row limits. 
+Use with caution as this can return large amounts of data.
+
+WHEN TO USE:
+- Need complete datasets for analysis
+- Exporting data or creating comprehensive reports
+- User specifically asks for "all" results
+- Working with known small result sets
+
+⚠️ IMPORTANT WARNINGS:
+- NO ROW LIMIT: This returns ALL matching rows
+- Can be slow and memory-intensive for large tables
+- Use execute_query() with LIMIT for exploration first
+- Consider the impact on system performance
     
     PARAMETERS:
-    - query: The SQL query to execute (REQUIRED)
-    
-    EXAMPLES:
-    - query_database("SELECT * FROM company") - Get all companies
-    - query_database("SELECT email FROM hr") - Get all HR emails
-    - query_database("SELECT DISTINCT location FROM job") - Get all unique job locations
-    - query_database("SELECT * FROM application WHERE job_id = 1") - Get all applications for a specific job
-    
-    WARNING: Use with caution on large tables. Consider using execute_query() with LIMIT for exploration.
-    
-    NEXT STEPS: Use execute_query() for limited results or execute_query() for formatted output.
+- query (REQUIRED): Valid SQL SELECT statement
+
+RECOMMENDED USAGE PATTERN:
+1. First explore with execute_query() using LIMIT
+2. Confirm the result size is reasonable
+3. Use query_database() only when you need all results
+
+SAFE QUERY EXAMPLES:
+- query_database("SELECT DISTINCT location FROM job") → Get all unique locations
+- query_database("SELECT * FROM company") → Get all companies (usually small table)
+- query_database("SELECT status, COUNT(*) FROM application GROUP BY status") → Aggregated data
+
+AVOID FOR LARGE TABLES:
+- query_database("SELECT * FROM candidate") → Could return thousands of rows
+- query_database("SELECT * FROM application") → Could return millions of rows
+
+RETURNS: Markdown table with ALL matching results
+
+ALTERNATIVE: Use execute_query() with appropriate LIMIT for safer exploration
     """,
 )
 def query_database(query: str) -> str:
@@ -574,23 +509,47 @@ def query_database(query: str) -> str:
 
 @mcp.tool(
     name="fuzzy_search_table",
-    description="""Search for a value in a table's column using fuzzy matching. 
-    This is useful when the user's input might have typos or is not an exact match.
-    NOTE: This feature relies on the pg_trgm extension in PostgreSQL. It must be enabled on your database.
-    
-    USAGE: Use this to find records when you are not sure about the exact spelling. 
-    For example, finding a candidate named 'Jon Doe' when the user asks for 'John Doe'.
+    description="""🔍 SMART SEARCH TOOL: Find Records with Fuzzy Matching
+
+PURPOSE: Search for records when exact spelling is uncertain. Handles typos, variations,
+and partial matches using PostgreSQL's trigram similarity.
+
+WHEN TO USE:
+- User provides names with potential typos ("Jon Doe" instead of "John Doe")
+- Searching for partial company names or job titles
+- User remembers only part of a name or title
+- Need to find similar entries when exact match fails
+
+⚠️ REQUIREMENT: Requires pg_trgm extension in PostgreSQL database
     
     PARAMETERS:
-    - table: The table name to search in (e.g., 'candidate', 'job'). (REQUIRED)
-    - column: The column name to search on (e.g., 'full_name', 'title'). (REQUIRED)
-    - query: The value to search for. (REQUIRED)
-    - limit: Maximum number of rows to return (default: 5)
-    - min_similarity: The minimum similarity threshold (0.0 to 1.0) for a match (default: 0.3)
-    
-    EXAMPLE: fuzzy_search_table(table="candidate", column="full_name", query="Jonh Doe")
-    
-    RETURNS: A list of matching rows from the table in JSONL format, ordered by similarity.
+- table (REQUIRED): Table name to search in (e.g., 'candidate', 'job', 'company')
+- column (REQUIRED): Column name to search (e.g., 'full_name', 'title', 'name')
+- query (REQUIRED): Search term (can have typos or be partial)
+- limit (OPTIONAL): Max results to return (default: 5, keeps results manageable)
+- min_similarity (OPTIONAL): Similarity threshold 0.0-1.0 (default: 0.3, lower = more permissive)
+
+SEARCH EXAMPLES:
+
+👤 CANDIDATE SEARCHES:
+- fuzzy_search_table(table="candidate", column="full_name", query="Jon Doe") → Finds "John Doe"
+- fuzzy_search_table(table="candidate", column="email", query="john.smith") → Finds "john.smith@company.com"
+
+💼 JOB SEARCHES:
+- fuzzy_search_table(table="job", column="title", query="data scientist") → Finds "Data Scientist", "Senior Data Scientist"
+- fuzzy_search_table(table="job", column="location", query="san francisco") → Finds "San Francisco, CA"
+
+🏢 COMPANY SEARCHES:
+- fuzzy_search_table(table="company", column="name", query="google") → Finds "Google Inc.", "Google LLC"
+
+SIMILARITY TUNING:
+- min_similarity=0.1 → Very permissive, finds distant matches
+- min_similarity=0.3 → Balanced (default)
+- min_similarity=0.7 → Strict, only close matches
+
+RETURNS: JSON list of matching records ordered by similarity score (highest first)
+
+NEXT STEPS: Use the found IDs in subsequent queries with execute_query()
     """,
 )
 def fuzzy_search_table(
@@ -683,86 +642,6 @@ def fuzzy_search_table(
     except Exception as e:
         logger.error(f"Error executing fuzzy search query: {e}")
         raise
-
-
-@mcp.prompt(
-    name="mcp_sqlalchemy_server",
-    description="""A specialized prompt to guide the AI in querying a job matching database.
-    This prompt provides context about the database schema, key relationships, and a step-by-step
-    workflow for answering user requests related to jobs, candidates, and applications.
-    """,
-)
-def model_prompt(text: str) -> str:
-    """Generate a comprehensive prompt for job matching database query assistance."""
-    employer_filter_info = ""
-    if EMPLOYER_ID_FILTER is not None:
-        employer_filter_info = f"""
-**IMPORTANT: ROW LEVEL SECURITY (RLS) ACTIVE**
-All database queries are automatically filtered to show only data for employer ID: {EMPLOYER_ID_FILTER}
-This filtering is handled by PostgreSQL Row Level Security policies at the database level.
-You will only see jobs, candidates, applications, and other data related to this specific employer.
-"""
-
-    return f"""You are an expert database assistant for a job matching platform. Your goal is to use the provided tools to answer questions about jobs, candidates, companies, and applications from the 'matching_db' database.
-
-{employer_filter_info}
-
-**DATABASE SCHEMA OVERVIEW:**
-
-The database contains information about the recruitment process. Here are the key tables and their relationships:
-
-- `company`: Stores information about companies (employers and recruiters).
-- `hr`: Human resources personnel associated with a `company`.
-- `job`: Job postings created by an `hr` for a `company`. It includes details like title, description, location, experience level, etc.
-- `candidate`: Job seekers with their personal information and resume data.
-- `application`: Links a `candidate` to a `job`, representing a job application.
-- `match`: Contains match scores and skill analysis between a candidate's resume and a job description for a given `application`.
-- `interview`: Stores details about interviews scheduled for an `application`.
-
-**Key Relationships:**
-- A `company` has many `job`s and `hr`s.
-- An `hr` belongs to one `company` and can create many `job`s.
-- A `candidate` can submit many `application`s.
-- An `application` connects one `candidate` to one `job`.
-- A `match` and `interview` belong to one `application`.
-
-**COMMON USER REQUESTS & HOW TO HANDLE THEM:**
-
-*   **"Find jobs for..."**:
-    *   **Request**: "Find all published software engineer jobs in London."
-    *   **Action**: `execute_query("SELECT title, location, job_type FROM job WHERE status = 'published' AND title ILIKE '%software engineer%' AND location = 'London'")`
-
-*   **"Show me candidates for a job..."**:
-    *   **Request**: "Who applied for the 'Data Scientist' job (ID 123)?"
-    *   **Workflow**:
-        1.  Find all `application` records where `job_id = 123`.
-        2.  Extract the `candidate_id` from those applications.
-        3.  Query the `candidate` table to get details for those `candidate_id`s.
-    *   **Action**: `execute_query("SELECT c.* FROM candidate c JOIN application a ON c.id = a.candidate_id WHERE a.job_id = 123")`
-
-*   **"What is the status of a candidate's application?"**:
-    *   **Request**: "What is the status of John Doe's application for the 'Project Manager' role?"
-    *   **Workflow**:
-        1.  Find the `id` for 'John Doe' in the `candidate` table. If the name is misspelled, use `fuzzy_search_table`.
-        2.  Find the `id` for the 'Project Manager' role in the `job` table.
-        3.  Query the `application` table using `candidate_id` and `job_id`.
-        4.  Check related `match` or `interview` tables for status details.
-    *   **Action**: Start by getting IDs, then construct the final query.
-
-*   **"Finding items with approximate names..."**:
-    *   **Request**: "I'm looking for a candidate, I think their name is 'Jon Do'."
-    *   **Action**: `fuzzy_search_table(table="candidate", column="full_name", query="Jon Do")`
-    *   **Note**: Use `fuzzy_search_table` when the user is unsure about the exact spelling of something. It works best on text-based columns like names and titles.
-
-**YOUR STEP-BY-STEP PROCESS:**
-
-1.  **Understand the Goal**: Carefully analyze the user's request: {text}
-2.  **Explore (If Needed)**: If you're unsure about table names or columns, use `get_tables()` and `describe_table('table_name')`. For example, to see what job statuses are available, you might query `SELECT DISTINCT status FROM job`.
-3.  **Formulate the Query**: Write the SQL query to get the information. Use JOINs to connect tables. Use WHERE clauses to filter. If the user's query is fuzzy (e.g., contains a typo), use the `fuzzy_search_table` tool.
-4.  **Execute and Present**: Use `execute_query()` or `execute_query_md()` to run the query. Present the results clearly to the user. Explain what you did.
-
-You have the tools. Begin by analyzing the user's request and planning your first step.
-"""
 
 
 # Helper functions
@@ -884,3 +763,20 @@ if __name__ == "__main__":
     initialize_server_with_args()
     logger.info("Starting MCP SQLAlchemy server for matching_db...")
     mcp.run()
+# Entry point for running the server locally with Uvicorn.
+# Create a Starlette application that mounts the MCP SSE app.
+# This allows the MCP server to use SSE for streaming responses.
+# from mcp.server.fastmcp import FastMCP
+# from starlette.applications import Starlette
+# from starlette.routing import Mount
+# import os
+
+# app = Starlette(
+#     routes=[
+#         Mount("/", app=mcp.sse_app()),
+#     ]
+# )
+
+# if __name__ == "__main__":
+#     import uvicorn
+#     uvicorn.run(app, host="0.0.0.0", port=8306)

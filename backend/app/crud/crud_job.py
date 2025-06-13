@@ -4,9 +4,9 @@ from collections import Counter
 
 from sqlmodel import Session, select, func
 
-from models.models import Job, Application, Match, Interview, Candidate, Status
+from models.models import Job, Application, Match, Interview, Candidate, Status, Company
 from schemas import JobCreate, JobUpdate
-from schemas.job import JobAnalytics
+from schemas.job import JobAnalytics, JobRead
 
 
 def get_job(db: Session, job_id: int) -> Optional[Job]:
@@ -14,32 +14,61 @@ def get_job(db: Session, job_id: int) -> Optional[Job]:
 
 
 def get_jobs(
-    db: Session, skip: int = 0, limit: int = 100, employer_id: int = None, closed: bool = False
-) -> List[Job]:
-    if closed:
-        statement = select(Job).where(Job.employer_id == employer_id).offset(skip).limit(limit)
-    else:
-        statement = (
-            select(Job).where(Job.employer_id == employer_id, Job.status != Status.CLOSED).offset(skip).limit(limit)
-        )
-    return db.exec(statement).all()
-
-
-def get_jobs_by_employer(
-    db: Session, employer_id: int, skip: int = 0, limit: int = 100, closed: bool = False
-) -> List[Job]:
+    db: Session,
+    skip: int = 0,
+    limit: int = 100,
+    employer_id: int = None,
+    closed: bool = False,
+) -> List[JobRead]:
     if closed:
         statement = (
-            select(Job).where(Job.employer_id == employer_id).offset(skip).limit(limit)
+            select(Job, Company.name.label("recruited_to_name"))
+            .outerjoin(Company, Job.recruited_to_id == Company.id)
+            .where(Job.employer_id == employer_id)
+            .offset(skip)
+            .limit(limit)
         )
     else:
         statement = (
-            select(Job)
+            select(Job, Company.name.label("recruited_to_name"))
+            .outerjoin(Company, Job.recruited_to_id == Company.id)
             .where(Job.employer_id == employer_id, Job.status != Status.CLOSED)
             .offset(skip)
             .limit(limit)
         )
-    return db.exec(statement).all()
+
+    results = db.exec(statement).all()
+    return [
+        JobRead(**job.__dict__, recruited_to_name=recruited_to_name)
+        for job, recruited_to_name in results
+    ]
+
+
+def get_jobs_by_employer(
+    db: Session, employer_id: int, skip: int = 0, limit: int = 100, closed: bool = False
+) -> List[JobRead]:
+    if closed:
+        statement = (
+            select(Job, Company.name.label("recruited_to_name"))
+            .outerjoin(Company, Job.recruited_to_id == Company.id)
+            .where(Job.employer_id == employer_id)
+            .offset(skip)
+            .limit(limit)
+        )
+    else:
+        statement = (
+            select(Job, Company.name.label("recruited_to_name"))
+            .outerjoin(Company, Job.recruited_to_id == Company.id)
+            .where(Job.employer_id == employer_id, Job.status != Status.CLOSED)
+            .offset(skip)
+            .limit(limit)
+        )
+
+    results = db.exec(statement).all()
+    return [
+        JobRead(**job.__dict__, recruited_to_name=recruited_to_name)
+        for job, recruited_to_name in results
+    ]
 
 
 def get_jobs_by_status(

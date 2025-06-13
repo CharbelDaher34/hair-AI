@@ -182,7 +182,7 @@ const MatchedCandidatesPage = () => {
           </p>
         </div>
         <Button variant="outline" asChild className="button-outline shadow-md hover:shadow-lg transition-all duration-300">
-          <Link to={`/jobs/${job_id}/details`}>
+          <Link to={`/jobs/${job_id}`}>
             <Eye className="mr-2 h-4 w-4" />
             View Job Details
           </Link>

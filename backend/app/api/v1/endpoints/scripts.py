@@ -14,11 +14,13 @@ from scripts.application_matcher_batch import (
 
 router = APIRouter()
 
+
 # Import scheduler from main module (will be set during app startup)
 def get_scheduler():
     """Get the scheduler instance from main module"""
     try:
         from main import scheduler
+
         return scheduler
     except ImportError:
         return None
@@ -117,67 +119,71 @@ async def get_scheduler_status():
     """
     try:
         scheduler = get_scheduler()
-        
+
         if not scheduler:
             return {
                 "scheduler_enabled": False,
                 "status": "disabled",
-                "message": "Scheduler is not enabled or not available"
+                "message": "Scheduler is not enabled or not available",
             }
-        
+
         jobs = scheduler.get_jobs()
         job_info = []
-        
+
         for job in jobs:
-            job_info.append({
-                "id": job.id,
-                "name": job.name,
-                "next_run_time": job.next_run_time.isoformat() if job.next_run_time else None,
-                "trigger": str(job.trigger)
-            })
-        
+            job_info.append(
+                {
+                    "id": job.id,
+                    "name": job.name,
+                    "next_run_time": job.next_run_time.isoformat()
+                    if job.next_run_time
+                    else None,
+                    "trigger": str(job.trigger),
+                }
+            )
+
         return {
             "scheduler_enabled": True,
             "status": "running" if scheduler.running else "stopped",
             "jobs": job_info,
-            "total_jobs": len(jobs)
+            "total_jobs": len(jobs),
         }
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Error getting scheduler status: {str(e)}"
         )
 
 
-@router.post("/scheduler/trigger-resume-parsing", summary="Manually trigger resume parsing job")
+@router.post(
+    "/scheduler/trigger-resume-parsing", summary="Manually trigger resume parsing job"
+)
 async def trigger_resume_parsing():
     """
     Manually trigger the resume parsing job immediately.
     """
     try:
         scheduler = get_scheduler()
-        
+
         if not scheduler:
             raise HTTPException(
-                status_code=400, 
-                detail="Scheduler is not enabled or not available"
+                status_code=400, detail="Scheduler is not enabled or not available"
             )
-        
+
         # Trigger the job immediately
-        job = scheduler.get_job('resume_parser_job')
+        job = scheduler.get_job("resume_parser_job")
         if job:
-            scheduler.modify_job('resume_parser_job', next_run_time=None)
+            scheduler.modify_job("resume_parser_job", next_run_time=None)
             return {
                 "message": "Resume parsing job triggered successfully",
                 "job_id": "resume_parser_job",
-                "status": "triggered"
+                "status": "triggered",
             }
         else:
             raise HTTPException(
-                status_code=404,
-                detail="Resume parsing job not found in scheduler"
+                status_code=404, detail="Resume parsing job not found in scheduler"
             )
-            
+
     except HTTPException:
         raise
     except Exception as e:
@@ -186,38 +192,41 @@ async def trigger_resume_parsing():
         )
 
 
-@router.post("/scheduler/trigger-application-matching", summary="Manually trigger application matching job")
+@router.post(
+    "/scheduler/trigger-application-matching",
+    summary="Manually trigger application matching job",
+)
 async def trigger_application_matching():
     """
     Manually trigger the application matching job immediately.
     """
     try:
         scheduler = get_scheduler()
-        
+
         if not scheduler:
             raise HTTPException(
-                status_code=400, 
-                detail="Scheduler is not enabled or not available"
+                status_code=400, detail="Scheduler is not enabled or not available"
             )
-        
+
         # Trigger the job immediately
-        job = scheduler.get_job('application_matcher_job')
+        job = scheduler.get_job("application_matcher_job")
         if job:
-            scheduler.modify_job('application_matcher_job', next_run_time=None)
+            scheduler.modify_job("application_matcher_job", next_run_time=None)
             return {
                 "message": "Application matching job triggered successfully",
-                "job_id": "application_matcher_job", 
-                "status": "triggered"
+                "job_id": "application_matcher_job",
+                "status": "triggered",
             }
         else:
             raise HTTPException(
                 status_code=404,
-                detail="Application matching job not found in scheduler"
+                detail="Application matching job not found in scheduler",
             )
-            
+
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Error triggering application matching job: {str(e)}"
+            status_code=500,
+            detail=f"Error triggering application matching job: {str(e)}",
         )
