@@ -16,7 +16,8 @@ from models.models import (
 from schemas import ApplicationCreate, ApplicationUpdate, MatchCreate
 from . import crud_job
 from . import crud_match
-
+from . import crud_candidate
+from core.database import engine
 
 def get_application(db: Session, application_id: int) -> Optional[Application]:
     return db.get(Application, application_id)
@@ -120,6 +121,103 @@ def get_application_with_details(
     return application
 
 
+def create_match_background(application_id: int, max_retries: int = 3):
+    """
+    Background task to create match for an application.
+
+    Args:
+        application_id: ID of the application
+        max_retries: Maximum number of retry attempts
+    """
+    for attempt in range(max_retries):
+        try:
+            print(
+                f"[Background] Starting match creation for application {application_id} (attempt {attempt + 1}/{max_retries})"
+            )
+
+            with Session(engine) as db:
+                # Get candidate and job data for validation
+                application = db.get(Application, application_id)
+                if not application:
+                    print(f"[Background] Application {application_id} not found")
+                    return
+
+                candidate = db.get(Candidate, application.candidate_id)
+                job = db.get(Job, application.job_id)
+
+                # Check if we have the necessary data for matching
+                if (
+                    candidate
+                    and job
+                    and candidate.parsed_resume
+                    and job.description
+                    and job.description.strip()
+                ):
+                    print(
+                        f"[Background] Creating match for application {application_id}"
+                    )
+                    print(f"[Background] Job: {job.title}")
+                    print(f"[Background] Candidate: {candidate.full_name}")
+
+                    # Create match using CRUD (which will call the AI service)
+                    match_create = MatchCreate(application_id=application_id)
+                    new_match = crud_match.create_match(db=db, match_in=match_create)
+
+                    if new_match:
+                        print(
+                            f"[Background] Successfully created match {new_match.id} for application {application_id}"
+                        )
+                        return  # Success - exit the retry loop
+                    else:
+                        print(
+                            f"[Background] Failed to create match for application {application_id}"
+                        )
+                        if attempt < max_retries - 1:
+                            print(f"[Background] Retrying in 5 seconds...")
+                            time.sleep(5)
+                            continue
+                        else:
+                            print(
+                                f"[Background] Max retries reached for application {application_id}"
+                            )
+                            return
+                else:
+                    # Log why matching was skipped
+                    if not candidate:
+                        print(
+                            f"[Background] Candidate not found for application {application_id}"
+                        )
+                    elif not job:
+                        print(
+                            f"[Background] Job not found for application {application_id}"
+                        )
+                    elif not candidate.parsed_resume:
+                        print(
+                            f"[Background] Candidate {candidate.id} has no parsed resume data - skipping match creation"
+                        )
+                    elif not job.description or not job.description.strip():
+                        print(
+                            f"[Background] Job {job.id} has no description - skipping match creation"
+                        )
+                    return
+
+        except Exception as match_err:
+            print(
+                f"[Background] Error creating match for application {application_id} (attempt {attempt + 1}): {str(match_err)}"
+            )
+            print(f"[Background] Error type: {type(match_err)}")
+
+            if attempt < max_retries - 1:
+                print(f"[Background] Retrying in 5 seconds...")
+                time.sleep(5)
+            else:
+                print(f"[Background] Max retries reached for application {application_id}")
+                import traceback
+
+                print(f"[Background] Full traceback: {traceback.format_exc()}")
+                return
+
+
 def create_application(
     db: Session, *, application_in: ApplicationCreate
 ) -> Application:
@@ -127,68 +225,15 @@ def create_application(
     db.add(db_application)
     db.commit()
     db.refresh(db_application)
-
-    # Create match for the application automatically
-    try:
-        # Get candidate and job data for validation
+    
+    # Add candidate to employer
+    if db_application.candidate_id:
         candidate = db.get(Candidate, db_application.candidate_id)
-        job = db.get(Job, db_application.job_id)
-
-        # Check if we have the necessary data for matching
-        if (
-            candidate
-            and job
-            and candidate.parsed_resume
-            and job.description
-            and job.description.strip()
-        ):
-            print(
-                f"[CreateApplication] Creating match for application {db_application.id}"
-            )
-            print(f"[CreateApplication] Job: {job.title}")
-            print(f"[CreateApplication] Candidate: {candidate.full_name}")
-
-            # Create match using CRUD (which will call the AI service)
-            match_create = MatchCreate(application_id=db_application.id)
-            new_match = crud_match.create_match(db=db, match_in=match_create)
-
-            if new_match:
-                print(
-                    f"[CreateApplication] Successfully created match {new_match.id} for application {db_application.id}"
-                )
-            else:
-                print(
-                    f"[CreateApplication] Failed to create match for application {db_application.id}"
-                )
-        else:
-            time.sleep(10)
-            # Log why matching was skipped
-            if not candidate:
-                print(
-                    f"[CreateApplication] Candidate not found for application {db_application.id}"
-                )
-            elif not job:
-                print(
-                    f"[CreateApplication] Job not found for application {db_application.id}"
-                )
-            elif not candidate.parsed_resume:
-                print(
-                    f"[CreateApplication] Candidate {candidate.id} has no parsed resume data - skipping match creation"
-                )
-            elif not job.description or not job.description.strip():
-                print(
-                    f"[CreateApplication] Job {job.id} has no description - skipping match creation"
-                )
-
-    except Exception as match_err:
-        print(
-            f"[CreateApplication] Error creating match for application {db_application.id}: {str(match_err)}"
-        )
-        print(f"[CreateApplication] Error type: {type(match_err)}")
-        # Don't fail the application creation if matching fails
-        import traceback
-
-        print(f"[CreateApplication] Full traceback: {traceback.format_exc()}")
+        if candidate:
+            crud_candidate.add_candidate_to_employer(db, candidate_id=candidate.id, employer_id=db_application.job.employer_id)
+    
+    print(f"[CreateApplication] Application {db_application.id} created successfully")
+    print(f"[CreateApplication] Match creation will be handled in background")
 
     return db_application
 

@@ -35,7 +35,7 @@ def create_job(
     # Create job data with employer_id and created_by_hr_id from token
     job_in.employer_id = current_user.employer_id
     job_in.created_by_hr_id = current_user.id
-    if job_in.recruited_to_id:
+    if not job_in.recruited_to_id:
         job_in.recruited_to_id = current_user.employer_id
     print(f"job_data: {job_in}")
     try:

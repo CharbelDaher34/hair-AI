@@ -1,3 +1,16 @@
+-- Step 0: Drop all existing RLS policies to avoid dependency issues
+DROP POLICY IF EXISTS hr_rls ON hr;
+DROP POLICY IF EXISTS job_rls ON job;
+DROP POLICY IF EXISTS candidate_rls ON candidate;
+DROP POLICY IF EXISTS application_rls ON application;
+DROP POLICY IF EXISTS interview_rls ON interview;
+DROP POLICY IF EXISTS match_rls ON "match";
+DROP POLICY IF EXISTS recruitercompanylink_rls ON recruitercompanylink;
+DROP POLICY IF EXISTS formkey_rls ON formkey;
+DROP POLICY IF EXISTS jobformkeyconstraint_rls ON jobformkeyconstraint;
+DROP POLICY IF EXISTS candidateemployerlink_rls ON candidateemployerlink;
+DROP POLICY IF EXISTS company_rls ON company;
+
 -- Step 1: Revoke all table privileges from app_user (if exists)
 DO $$
 BEGIN
