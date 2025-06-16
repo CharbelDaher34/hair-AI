@@ -26,10 +26,45 @@ def get_admin_engine():
 engine = get_admin_engine()
 
 
+def drop_rls_policies():
+    """Drop all RLS policies to avoid dependency issues when dropping tables"""
+    policies_to_drop = [
+        "hr_rls ON hr",
+        "job_rls ON job", 
+        "candidate_rls ON candidate",
+        "application_rls ON application",
+        "interview_rls ON interview",
+        'match_rls ON "match"',
+        "recruitercompanylink_rls ON recruitercompanylink",
+        "formkey_rls ON formkey",
+        "jobformkeyconstraint_rls ON jobformkeyconstraint",
+        "candidateemployerlink_rls ON candidateemployerlink",
+        "company_rls ON company"
+    ]
+    
+    admin_engine = get_admin_engine()
+    with Session(admin_engine) as session:
+        for policy in policies_to_drop:
+            try:
+                session.execute(text(f"DROP POLICY IF EXISTS {policy}"))
+                print(f"Dropped policy: {policy}")
+            except Exception as e:
+                print(f"Could not drop policy {policy}: {e}")
+        session.commit()
+
+
 def create_db_and_tables(admin=False):
+    # Drop RLS policies first to avoid dependency issues
+    print("Dropping RLS policies...")
+    drop_rls_policies()
+    
+    # Now drop and recreate tables
+    # print("Dropping tables...")
     # target_metadata.drop_all(get_admin_engine())
+    
     all_exist, missing_tables = check_db_tables()
     if not all_exist:
+        print("Creating tables...")
         target_metadata.create_all(get_admin_engine())
         print(f"Created {len(missing_tables)} missing tables: {missing_tables}")
     else:

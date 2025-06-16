@@ -3,7 +3,7 @@ from typing import List
 from pydantic import BaseModel
 from schemas.candidate import CandidateRead
 from schemas.job import JobRead
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status, BackgroundTasks
 from sqlmodel import Session, select, func
 import traceback
 from core.database import get_session
@@ -19,17 +19,25 @@ from schemas import (
 from crud import crud_match
 from models.models import Candidate, Job, Application, Interview
 from services.matching import match_candidates_client
+from crud.crud_application import create_match_background
 
 router = APIRouter()
 
 
 @router.post("/", response_model=ApplicationRead, status_code=status.HTTP_201_CREATED)
 def create_application(
-    *, db: Session = Depends(get_session), application_in: ApplicationCreate
+    *, 
+    db: Session = Depends(get_session), 
+    application_in: ApplicationCreate,
+    background_tasks: BackgroundTasks
 ) -> ApplicationRead:
     application = crud_application.create_application(
         db=db, application_in=application_in
     )
+
+    # Schedule match creation as background task
+    background_tasks.add_task(create_match_background, application.id)
+    print(f"[Application API] Scheduled background match creation for application {application.id}")
 
     return application
 
