@@ -21,6 +21,11 @@ def get_candidates(db: Session, skip: int = 0, limit: int = 100) -> List[Candida
 
 
 def create_candidate(db: Session, *, candidate_in: CandidateCreate) -> Candidate:
+    # Check if candidate already exists by email
+    existing_candidate = get_candidate_by_email(db, candidate_in.email)
+    if existing_candidate:
+        return existing_candidate
+
     db_candidate = Candidate.model_validate(candidate_in)
     db.add(db_candidate)
     db.commit()
