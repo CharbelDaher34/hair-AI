@@ -107,9 +107,7 @@ def test_rls(company_id: int):
         candidates = session.exec(stmt).all()
         print(f"Found {len(candidates)} Candidate(s):")
         for candidate in candidates:
-            print(
-                f"  - Candidate: {candidate.full_name}, Company ID: {candidate.employer_id}"
-            )
+            print(f"  - Candidate: {candidate.full_name}, ID: {candidate.id}")
 
         stmt = select(Application)
         applications = session.exec(stmt).all()
