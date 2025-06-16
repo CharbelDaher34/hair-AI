@@ -163,14 +163,18 @@ def create_candidate(
 
         candidate_data = candidate_obj.model_dump()
         print(f"[Candidate API] Token data: {token_data}")
-        if token_data:
-            candidate_data["employer_id"] = token_data.employer_id
-            print(f"[Candidate API] Employer ID: {token_data.employer_id}")
 
         # Create candidate first to get the ID
         candidate = crud_candidate.create_candidate(
             db=db, candidate_in=CandidateCreate(**candidate_data)
         )
+        
+        # If user is authenticated, associate candidate with their employer
+        if token_data and token_data.employer_id:
+            crud_candidate.add_candidate_to_employer(
+                db=db, candidate_id=candidate.id, employer_id=token_data.employer_id
+            )
+            print(f"[Candidate API] Associated candidate {candidate.id} with employer {token_data.employer_id}")
         print(f"[Candidate API] Created candidate with ID: {candidate.id}")
 
         # If resume was uploaded, save it permanently with candidate ID as filename
@@ -326,10 +330,13 @@ def get_resume_parsing_status(
         raise HTTPException(status_code=404, detail="Candidate not found")
 
     # Check if user has permission to access this candidate's data
-    if token_data and candidate.employer_id != token_data.employer_id:
-        raise HTTPException(
-            status_code=403, detail="Not authorized to access this candidate"
-        )
+    if token_data:
+        candidate_employers = crud_candidate.get_candidate_employers(db=db, candidate_id=candidate_id)
+        employer_ids = [emp.id for emp in candidate_employers]
+        if token_data.employer_id not in employer_ids:
+            raise HTTPException(
+                status_code=403, detail="Not authorized to access this candidate"
+            )
 
     # Determine parsing status
     has_resume_file = get_resume_file_path(candidate_id) is not None
@@ -355,3 +362,100 @@ def get_resume_parsing_status(
         "has_parsed_data": has_parsed_data,
         "resume_url": candidate.resume_url,
     }
+
+
+@router.post("/{candidate_id}/employers/{employer_id}")
+def add_candidate_to_employer(
+    *,
+    db: Session = Depends(get_session),
+    candidate_id: int,
+    employer_id: int,
+    request: Request,
+) -> dict:
+    """Associate a candidate with an employer."""
+    token_data: Optional[TokenData] = request.state.user
+    
+    # Check if user is authenticated and has permission
+    if not token_data or token_data.employer_id != employer_id:
+        raise HTTPException(
+            status_code=403, detail="Not authorized to add candidates to this employer"
+        )
+    
+    # Check if candidate exists
+    candidate = crud_candidate.get_candidate(db=db, candidate_id=candidate_id)
+    if not candidate:
+        raise HTTPException(status_code=404, detail="Candidate not found")
+    
+    # Add the relationship
+    success = crud_candidate.add_candidate_to_employer(
+        db=db, candidate_id=candidate_id, employer_id=employer_id
+    )
+    
+    if success:
+        return {"message": "Candidate successfully added to employer"}
+    else:
+        return {"message": "Candidate is already associated with this employer"}
+
+
+@router.delete("/{candidate_id}/employers/{employer_id}")
+def remove_candidate_from_employer(
+    *,
+    db: Session = Depends(get_session),
+    candidate_id: int,
+    employer_id: int,
+    request: Request,
+) -> dict:
+    """Remove association between a candidate and an employer."""
+    token_data: Optional[TokenData] = request.state.user
+    
+    # Check if user is authenticated and has permission
+    if not token_data or token_data.employer_id != employer_id:
+        raise HTTPException(
+            status_code=403, detail="Not authorized to remove candidates from this employer"
+        )
+    
+    # Check if candidate exists
+    candidate = crud_candidate.get_candidate(db=db, candidate_id=candidate_id)
+    if not candidate:
+        raise HTTPException(status_code=404, detail="Candidate not found")
+    
+    # Remove the relationship
+    success = crud_candidate.remove_candidate_from_employer(
+        db=db, candidate_id=candidate_id, employer_id=employer_id
+    )
+    
+    if success:
+        return {"message": "Candidate successfully removed from employer"}
+    else:
+        raise HTTPException(
+            status_code=404, detail="Candidate is not associated with this employer"
+        )
+
+
+@router.get("/{candidate_id}/employers", response_model=List[dict])
+def get_candidate_employers(
+    *,
+    db: Session = Depends(get_session),
+    candidate_id: int,
+    request: Request,
+) -> List[dict]:
+    """Get all employers associated with a candidate."""
+    token_data: Optional[TokenData] = request.state.user
+    
+    # Check if candidate exists
+    candidate = crud_candidate.get_candidate(db=db, candidate_id=candidate_id)
+    if not candidate:
+        raise HTTPException(status_code=404, detail="Candidate not found")
+    
+    # Get candidate's employers
+    employers = crud_candidate.get_candidate_employers(db=db, candidate_id=candidate_id)
+    
+    # If user is authenticated, check if they have permission to see this data
+    if token_data:
+        employer_ids = [emp.id for emp in employers]
+        if token_data.employer_id not in employer_ids:
+            raise HTTPException(
+                status_code=403, detail="Not authorized to access this candidate's employer data"
+            )
+    
+    return [{"id": emp.id, "name": emp.name, "domain": emp.domain} for emp in employers]

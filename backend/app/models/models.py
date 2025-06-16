@@ -12,6 +12,11 @@ class TimeBase(SQLModel):
     updated_at: Optional[datetime] = Field(default_factory=datetime.utcnow)
 
 
+class CandidateEmployerLink(SQLModel, table=True):
+    candidate_id: int = Field(foreign_key="candidate.id", primary_key=True)
+    employer_id: int = Field(foreign_key="company.id", primary_key=True)
+
+
 class CompanyBase(TimeBase):
     name: str
     description: Optional[str] = None
@@ -47,6 +52,10 @@ class Company(CompanyBase, table=True):
     recruited_jobs: List["Job"] = Relationship(
         back_populates="recruited_to",
         sa_relationship_kwargs={"foreign_keys": "Job.recruited_to_id"},
+    )
+    candidates: List["Candidate"] = Relationship(
+        back_populates="employers",
+        link_model=CandidateEmployerLink
     )
 
     def get_company_data(self):
@@ -273,13 +282,16 @@ class CandidateBase(TimeBase):
     parsed_resume: Optional[CandidateResume] = Field(
         default=None, sa_column=Column(JSON)
     )
-    employer_id: Optional[int] = Field(default=None, foreign_key="company.id")
 
 
 class Candidate(CandidateBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
 
     applications: List["Application"] = Relationship(back_populates="candidate")
+    employers: List[Company] = Relationship(
+        back_populates="candidates",
+        link_model=CandidateEmployerLink
+    )
 
 
 class ApplicationStatus(str, Enum):

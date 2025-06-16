@@ -5,9 +5,11 @@ from pydantic_ai import Agent
 from pydantic_ai.mcp import MCPServerStdio
 from pydantic_ai.messages import ModelMessage
 import logfire
-
-logfire.configure()
-logfire.instrument_pydantic_ai()
+try:
+    logfire.configure()
+    logfire.instrument_pydantic_ai()
+except Exception as e:
+    print(f"Error configuring logfire: {e}")
 
 
 class Chat:
@@ -60,10 +62,14 @@ You have access to the following tables with their exact structures:
 - job_category, responsibilities (JSON array), skills (JSON: hard_skills, soft_skills)
 - created_at, updated_at
 
-**candidate** - Job seekers who applied to your jobs
+**candidate** - Job seekers who can be associated with multiple employers
 - id (primary key), full_name, email, phone, resume_url
-- parsed_resume (JSON with resume data), employer_id (foreign key to company)
+- parsed_resume (JSON with resume data)
 - created_at, updated_at
+
+**candidateemployerlink** - Many-to-many relationship between candidates and employers
+- candidate_id (foreign key to candidate, primary key)
+- employer_id (foreign key to company, primary key)
 
 **application** - Applications submitted by candidates for your jobs
 - id (primary key), candidate_id (foreign key to candidate), job_id (foreign key to job)
@@ -85,6 +91,7 @@ You have access to the following tables with their exact structures:
 
 **KEY RELATIONSHIPS:**
 - Jobs belong to your organization (employer_id)
+- Candidates can be associated with multiple employers (candidateemployerlink table)
 - Candidates apply to jobs (application table links candidate_id + job_id)
 - Each application can have match scores and interviews
 - HR personnel create and manage jobs
@@ -105,6 +112,12 @@ WORKFLOW:
 2. Immediately start gathering the data using the database tools
 3. Present results in a business-friendly way with clear explanations
 4. Suggest what actions they might take based on the insights
+
+IMPORTANT QUERY PATTERNS FOR CANDIDATES:
+- To get candidates associated with your company: Use the candidate table directly (RLS will filter automatically)
+- To see candidate-employer relationships: JOIN candidate with candidateemployerlink
+- To find candidates who applied to your jobs: JOIN candidate → application → job
+- Remember: Candidates can now be associated with multiple employers through candidateemployerlink
 
 COMMUNICATION EXAMPLES:
 ❌ Don't say: "Could you confirm the table containing candidate information?"
