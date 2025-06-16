@@ -142,9 +142,9 @@ def get_current_company(
 @router.get("/candidates/", response_model=List[CandidateRead])
 def get_candidates_by_company(
     *, db: Session = Depends(get_session), request: Request
-) -> CandidateRead:
+) -> List[CandidateRead]:
     """
-    Get all candidates.
+    Get all candidates for the current company.
     """
     current_user: Optional[TokenData] = request.state.user
     if not current_user:
@@ -154,5 +154,42 @@ def get_candidates_by_company(
         )
     candidates = crud_candidate.get_candidates_by_company(
         db=db, employer_id=current_user.employer_id
+    )
+    return candidates
+
+
+@router.get("/{employer_id}/candidates", response_model=List[CandidateRead])
+def get_candidates_by_company_id(
+    *, 
+    db: Session = Depends(get_session), 
+    employer_id: int,
+    request: Request
+) -> List[CandidateRead]:
+    """
+    Get all candidates for a specific company.
+    """
+    current_user: Optional[TokenData] = request.state.user
+    if not current_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+        )
+    
+    # Check if user has permission to access this company's candidates
+    if current_user.employer_id != employer_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this company's candidates",
+        )
+    
+    # Check if company exists
+    company = crud_company.get_company(db=db, employer_id=employer_id)
+    if not company:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Company not found"
+        )
+    
+    candidates = crud_candidate.get_candidates_by_company(
+        db=db, employer_id=employer_id
     )
     return candidates

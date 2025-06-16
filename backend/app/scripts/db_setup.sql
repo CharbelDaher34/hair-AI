@@ -81,7 +81,14 @@ ALTER TABLE candidate FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS candidate_rls ON candidate;
 CREATE POLICY candidate_rls ON candidate
     FOR ALL TO public
-    USING (employer_id = current_setting('multi_tenancy.current_company_id', true)::int);
+    USING (
+        EXISTS (
+            SELECT 1
+            FROM candidateemployerlink cel
+            WHERE cel.candidate_id = candidate.id
+              AND cel.employer_id = current_setting('multi_tenancy.current_company_id', true)::int
+        )
+    );
 
 /* ------------------------------------------------------------------
    APPLICATION TABLE
@@ -95,8 +102,9 @@ CREATE POLICY application_rls ON application
         EXISTS (
             SELECT 1
             FROM candidate c
+            JOIN candidateemployerlink cel ON cel.candidate_id = c.id
             WHERE c.id = application.candidate_id
-              AND c.employer_id = current_setting('multi_tenancy.current_company_id', true)::int
+              AND cel.employer_id = current_setting('multi_tenancy.current_company_id', true)::int
         )
     );
 
@@ -113,8 +121,9 @@ CREATE POLICY interview_rls ON interview
             SELECT 1
             FROM application a
             JOIN candidate c ON c.id = a.candidate_id
+            JOIN candidateemployerlink cel ON cel.candidate_id = c.id
             WHERE a.id = interview.application_id
-              AND c.employer_id = current_setting('multi_tenancy.current_company_id', true)::int
+              AND cel.employer_id = current_setting('multi_tenancy.current_company_id', true)::int
         )
     );
 
@@ -131,8 +140,9 @@ CREATE POLICY match_rls ON "match"
             SELECT 1
             FROM application a
             JOIN candidate c ON c.id = a.candidate_id
+            JOIN candidateemployerlink cel ON cel.candidate_id = c.id
             WHERE a.id = "match".application_id
-              AND c.employer_id = current_setting('multi_tenancy.current_company_id', true)::int
+              AND cel.employer_id = current_setting('multi_tenancy.current_company_id', true)::int
         )
     ); 
 
@@ -175,6 +185,16 @@ CREATE POLICY jobformkeyconstraint_rls ON jobformkeyconstraint
               AND j.employer_id = current_setting('multi_tenancy.current_company_id', true)::int
         )
     );
+
+/* ------------------------------------------------------------------
+   CANDIDATEEMPLOYERLINK TABLE
+-------------------------------------------------------------------*/
+ALTER TABLE candidateemployerlink ENABLE ROW LEVEL SECURITY;
+ALTER TABLE candidateemployerlink FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS candidateemployerlink_rls ON candidateemployerlink;
+CREATE POLICY candidateemployerlink_rls ON candidateemployerlink
+    FOR ALL TO public
+    USING (employer_id = current_setting('multi_tenancy.current_company_id', true)::int);
 
 -- Company table
 ALTER TABLE company ENABLE ROW LEVEL SECURITY;
