@@ -7,7 +7,8 @@ import {
   Home,
   BrainCircuit,
   LogOut,
-  User
+  User,
+  UserCheck
 } from "lucide-react";
 import {
   Sidebar,
@@ -43,6 +44,11 @@ const menuItems = [
     icon: Users,
   },
   {
+    title: "Candidates",
+    url: "/candidates",
+    icon: UserCheck,
+  },
+  {
     title: "Interviews",
     url: "/interviews",
     icon: Calendar,
@@ -60,7 +66,7 @@ const menuItems = [
   {
     title: "Profile",
     url: "/profile",
-    icon: User,
+    icon: Building2,
   },
 ];
 

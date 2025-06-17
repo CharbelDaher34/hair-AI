@@ -2,8 +2,8 @@ from itertools import count
 from datetime import datetime
 from typing import List
 from pydantic import BaseModel
-from schemas.candidate import CandidateRead
-from schemas.job import JobRead
+from schemas import CandidateRead
+from schemas import JobRead
 from fastapi import APIRouter, Depends, HTTPException, Request, status, BackgroundTasks
 from sqlmodel import Session, select, func
 import traceback

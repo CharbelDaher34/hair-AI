@@ -51,6 +51,8 @@ services:
       # OTP configuration
       - OTP_EXPIRE_MINUTES=10
       - OTP_LENGTH=6
+    volumes:
+      - ./backend/app/static:/app/static
   ai:
     build:
       context: ./ai
@@ -61,6 +63,8 @@ services:
       - "8011:8011"
     environment:
       - API_KEY=AIzaSyDp8n_AmYsspADJBaNpkJvBdlch1-9vkhw
+    volumes:
+      - ./ai/app/static:/app/static
   frontend:
     build:
       context: ./frontend
@@ -74,7 +78,8 @@ services:
       - db
     environment:
       - VITE_DOCKER=true
-    
+    volumes:
+      - ./frontend/public:/app/public
 volumes:
   local_pgdata:
   pgadmin-data:

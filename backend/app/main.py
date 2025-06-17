@@ -97,7 +97,7 @@ async def lifespan(app: FastAPI):
     global scheduler, otp_cleanup_task
 
     # Startup logic
-    create_db_and_tables()
+    create_db_and_tables(drop=False)
 
     # Start OTP cleanup background task
     print("[OTP] Starting OTP cleanup background task")

@@ -136,6 +136,18 @@ export interface Candidate extends CandidateBase {
   applications: Application[];
 }
 
+export interface CandidateTable {
+  candidate: Candidate;
+  applications_count: number;
+  interviews_count: number;
+}
+
+export interface CandidateDetails {
+  candidate: Candidate;
+  applications: Application[];
+  interviews: Interview[];
+}
+
 // Application types
 export interface ApplicationBase {
   candidate_id: number;
