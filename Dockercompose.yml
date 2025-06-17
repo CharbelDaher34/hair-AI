@@ -42,6 +42,15 @@ services:
       - ai_url=http://ai:8011
       - GEMINI_API_KEY=AIzaSyDp8n_AmYsspADJBaNpkJvBdlch1-9vkhw
       - LOGFIRE_TOKEN=pylf_v1_us_659r32Hx0CWSbpJFLL6R0xhwm3N1Xjxq99DqYSJBpQWN
+      # Email configuration (replace with your SMTP settings)
+      - SMTP_HOST=smtp.gmail.com
+      - SMTP_PORT=587
+      - SMTP_USERNAME=charbeldaher34@gmail.com
+      - SMTP_PASSWORD=dqfp axar sozd qkps
+      - FROM_EMAIL=charbeldaher34@gmail.com
+      # OTP configuration
+      - OTP_EXPIRE_MINUTES=10
+      - OTP_LENGTH=6
   ai:
     build:
       context: ./ai

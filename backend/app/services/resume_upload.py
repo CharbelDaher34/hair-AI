@@ -141,8 +141,7 @@ class AgentClient:
             print(f"Status Code: {response.status_code}")
             if response.status_code == 200:
                 result = response.json()
-                print("✅ Success! Parsed data:")
-                print(json.dumps(result, indent=2))
+               
                 return result
             else:
                 print(f"❌ Error: {response.text}")

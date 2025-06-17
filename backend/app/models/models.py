@@ -315,6 +315,8 @@ class ApplicationBase(TimeBase):
             )
         ),
     )
+    
+    __table_args__ = (UniqueConstraint("candidate_id", "job_id", name="uq_candidate_job"),)
 
 
 class Application(ApplicationBase, table=True):

@@ -9,23 +9,35 @@ from core.security import TokenData  # For type hinting
 
 router = APIRouter()
 
-# @router.post("/", response_model=HRRead, status_code=status.HTTP_201_CREATED)
-# def create_hr(
-#     *,
-#     db: Session = Depends(get_session),
-#     hr_in: HRCreate
-# ) -> HRRead:
-#     """
-#     Create a new HR user.
-#     """
-#     # Check if email already exists
-#     if crud_hr.get_hr_by_email(db=db, email=hr_in.email):
-#         raise HTTPException(
-#             status_code=status.HTTP_400_BAD_REQUEST,
-#             detail="Email already registered"
-#         )
-#     hr = crud_hr.create_hr(db=db, hr_in=hr_in)
-#     return hr
+@router.post("/", response_model=HRRead, status_code=status.HTTP_201_CREATED)
+def create_hr(
+    *,
+    db: Session = Depends(get_session),
+    hr_in: HRCreate,
+    request: Request
+) -> HRRead:
+    """
+    Create a new HR user/employee.
+    """
+    current_user: Optional[TokenData] = request.state.user
+    if not current_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials or user not found in request state.",
+        )
+    
+    # Check if email already exists
+    if crud_hr.get_hr_by_email(db=db, email=hr_in.email):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered"
+        )
+    
+    # Set the employer_id from the current user's token
+    hr_in.employer_id = current_user.employer_id
+    
+    hr = crud_hr.create_hr(db=db, hr_in=hr_in)
+    return hr
 
 
 @router.get("/", response_model=HRRead)
@@ -52,7 +64,7 @@ def read_hr(*, db: Session = Depends(get_session), request: Request) -> HRRead:
     return hr
 
 
-@router.get("/", response_model=List[HRRead])
+@router.get("/all", response_model=List[HRRead])
 def read_hrs(
     *, db: Session = Depends(get_session), skip: int = 0, limit: int = 100
 ) -> List[HRRead]:
@@ -89,6 +101,30 @@ def read_hrs_by_company(
     """
     hrs = crud_hr.get_hrs_by_company(
         db=db, employer_id=employer_id, skip=skip, limit=limit
+    )
+    return hrs
+
+
+@router.get("/employees", response_model=List[HRRead])
+def read_company_employees(
+    *,
+    db: Session = Depends(get_session),
+    request: Request,
+    skip: int = 0,
+    limit: int = 100,
+) -> List[HRRead]:
+    """
+    Get all employees for the current user's company.
+    """
+    current_user: Optional[TokenData] = request.state.user
+    if not current_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials or user not found in request state.",
+        )
+    
+    hrs = crud_hr.get_hrs_by_company(
+        db=db, employer_id=current_user.employer_id, skip=skip, limit=limit
     )
     return hrs
 
