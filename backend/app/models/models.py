@@ -362,22 +362,23 @@ class MatchBase(TimeBase):
     # Main match result fields
     score: Optional[float] = Field(default=None)
     embedding_similarity: Optional[float] = Field(default=None)
+    score_breakdown: Optional[Dict] = Field(default=None, sa_column=Column(JSON))
 
-    # Skill analysis fields
-    match_percentage: Optional[float] = Field(default=None)
+    # Direct skill fields from matcher
     matching_skills: Optional[List[str]] = Field(default=None, sa_column=Column(JSON))
     missing_skills: Optional[List[str]] = Field(default=None, sa_column=Column(JSON))
     extra_skills: Optional[List[str]] = Field(default=None, sa_column=Column(JSON))
 
-    # Summary fields (from skill_analysis.summary)
+    # Weights used in matching
+    weights_used: Optional[Dict] = Field(default=None, sa_column=Column(JSON))
+
+    # Legacy fields (kept for backward compatibility but will be deprecated)
+    match_percentage: Optional[float] = Field(default=None)
     total_required_skills: Optional[int] = Field(default=None)
     matching_skills_count: Optional[int] = Field(default=None)
     missing_skills_count: Optional[int] = Field(default=None)
     extra_skills_count: Optional[int] = Field(default=None)
-
-    # Weights used in matching
-    skill_weight: Optional[float] = Field(default=None)
-    embedding_weight: Optional[float] = Field(default=None)
+    weights: Optional[Dict] = Field(default=None, sa_column=Column(JSON))
 
 
 class Match(MatchBase, table=True):

@@ -3,11 +3,15 @@ from copy import deepcopy
 import time
 from sqlmodel import Session, select
 
-from models.models import Match, Application, Candidate, Job
+from models.models import (
+    Match,
+    Application,
+    Candidate,
+    Job,
+)
 from models.candidate_pydantic import CandidateResume
 from schemas import MatchCreate, MatchUpdate
 from services.matching import match_candidates_client
-from utils.pydantic_utils import render_model
 
 
 def get_match(db: Session, match_id: int) -> Optional[Match]:
@@ -38,70 +42,57 @@ def create_match(db: Session, *, match_in: MatchCreate) -> Match:
     if not candidate or not job:
         raise ValueError("Candidate or Job not found for the application")
 
-    # Format comprehensive job description
-    job_description_parts = [
-        f"Job Title: {job.title}",
-        f"Description: {job.description}",
-        f"Job Type: {job.job_type.value}",
-        f"Seniority Level: {job.seniority_level.value}",
-        f"Experience Level: {job.experience_level.value}",
-    ]
+    # Prepare structured job and candidate data
+    job_data = job.model_dump(mode="json")
 
-    if job.job_category:
-        job_description_parts.append(f"Category: {job.job_category}")
-
-    job_description = "\n".join(job_description_parts)
-
-    candidate_text = render_model(candidate.parsed_resume)
-    # Extract structured data from parsed_resume using Pydantic model
-
-    candidates = [candidate_text]
+    if not candidate.parsed_resume:
+        raise ValueError(f"Candidate {candidate.id} has no parsed resume")
 
     candidate_resume = CandidateResume.model_validate(candidate.parsed_resume)
+    candidate_data = candidate_resume.model_dump(mode="json")
 
-    # Call the AI matcher
-
+    # Call the AI matcher with structured data
     ai_response = match_candidates_client(
-        job_description=job_description,
-        candidates=candidates,
-        candidate_skills=[skill.name for skill in candidate_resume.skills]
-        if candidate_resume.skills
-        else [],
+        job=job_data,
+        candidates=[candidate_data],
     )
-
 
     # Extract the first result (since we're matching one candidate)
     if not ai_response or not ai_response.get("results"):
         raise ValueError("No matching results returned from AI service")
 
     match_result = ai_response["results"][0]  # Get first result
-    skill_analysis = match_result["skill_analysis"]
-    summary = skill_analysis["summary"]
-    weights = match_result["weights"]
 
-    # Prepare match data with individual fields
+    # Prepare match data with the new structure
     match_data = match_in.model_dump()
 
     # Main match result fields
-    match_data["score"] = match_result["score"]
-    match_data["embedding_similarity"] = match_result["embedding_similarity"]
+    match_data["score"] = match_result.get("score", 0.0)
+    match_data["embedding_similarity"] = match_result.get("embedding_similarity", 0.0)
+    match_data["score_breakdown"] = match_result.get("score_breakdown", {})
 
-    # Skill analysis fields
-    match_data["match_percentage"] = skill_analysis["match_percentage"]
-    match_data["matching_skills"] = skill_analysis["matching_skills"]
-    match_data["missing_skills"] = skill_analysis["missing_skills"]
-    match_data["extra_skills"] = skill_analysis["extra_skills"]
+    # Direct skill fields from matcher
+    match_data["matching_skills"] = match_result.get("matching_skills", [])
+    match_data["missing_skills"] = match_result.get("missing_skills", [])
+    match_data["extra_skills"] = match_result.get("extra_skills", [])
 
-    # Summary fields
-    match_data["total_required_skills"] = summary["total_required_skills"]
-    match_data["matching_skills_count"] = summary["matching_skills_count"]
-    match_data["missing_skills_count"] = summary["missing_skills_count"]
-    match_data["extra_skills_count"] = summary["extra_skills_count"]
+    # Weights used in matching
+    match_data["weights_used"] = match_result.get("weights_used", {})
 
-    # Weights
-    match_data["skill_weight"] = weights["skill_weight"]
-    match_data["embedding_weight"] = weights["embedding_weight"]
+    # Calculate legacy fields for backward compatibility
+    total_matching = len(match_data["matching_skills"])
+    total_missing = len(match_data["missing_skills"])
+    total_extra = len(match_data["extra_skills"])
+    total_required = total_matching + total_missing
 
+    match_data["matching_skills_count"] = total_matching
+    match_data["missing_skills_count"] = total_missing
+    match_data["extra_skills_count"] = total_extra
+    match_data["total_required_skills"] = total_required
+    match_data["match_percentage"] = (total_matching / total_required * 100) if total_required > 0 else 0.0
+
+    # Legacy weights field (copy from weights_used)
+    match_data["weights"] = match_data["weights_used"]
 
     # Remove any existing match for this application
     existing_match = db.exec(

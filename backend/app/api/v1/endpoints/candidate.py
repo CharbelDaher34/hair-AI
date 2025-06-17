@@ -21,6 +21,9 @@ import time
 import json
 from typing import Optional
 from pydantic import BaseModel, EmailStr
+from crud import crud_interview, crud_application
+from schemas import ApplicationRead
+from schemas import InterviewRead
 from core.auth_middleware import TokenData
 from core.database import get_session, engine
 from core.config import RESUME_STORAGE_DIR
@@ -248,6 +251,42 @@ async def get_otp_status(email: str) -> OTPStatusResponse:
             detail="An error occurred while checking OTP status."
         )
 
+class CandidateTable(BaseModel):
+    candidate: CandidateRead
+    applications_count: int
+    interviews_count: int
+
+@router.get("/table", response_model=List[CandidateTable])
+def get_candidates_table(
+    *,
+    db: Session = Depends(get_session),
+    request: Request,
+) -> List[CandidateTable]:
+    token_data: Optional[TokenData] = request.state.user
+    
+    # Check if user is authenticated
+    if not token_data:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+        )
+    
+    # Get candidates table data for the current employer
+    candidates_data = crud_candidate.get_candidates_table_by_company(
+        db=db, employer_id=token_data.employer_id
+    )
+    
+    # Convert to CandidateTable objects
+    result = []
+    for data in candidates_data:
+        result.append(CandidateTable(
+            candidate=data["candidate"],
+            applications_count=data["applications_count"],
+            interviews_count=data["interviews_count"]
+        ))
+    
+    return result
+    
 
 @router.post("/", response_model=CandidateRead, status_code=status.HTTP_201_CREATED)
 def create_candidate(
@@ -340,6 +379,9 @@ def create_candidate(
                 print(f"[Candidate API] Failed to remove temp file: {temp_resume_path}")
 
     return candidate
+
+
+
 
 
 @router.get("/{candidate_id}", response_model=CandidateRead)
@@ -577,3 +619,21 @@ def get_candidate_employers(
             )
     
     return [{"id": emp.id, "name": emp.name, "domain": emp.domain} for emp in employers]
+
+
+
+# @router.get("/{candidate_id}/details", response_model=CandidateWithDetails)
+# def get_candidate_details(
+#     *,
+#     db: Session = Depends(get_session),
+#     candidate_id: int,
+#     request: Request,
+# ) -> CandidateWithDetails:
+#     token_data: Optional[TokenData] = request.state.user
+    
+#     candidate_with_details = crud_candidate.get_candidate_with_details(db=db, candidate_id=candidate_id)
+#     if not candidate_with_details:
+#         raise HTTPException(status_code=404, detail="Candidate not found")
+    
+#     return candidate_with_details
+

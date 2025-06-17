@@ -72,7 +72,7 @@ class JobAnalytics(SQLModel):
 #     candidates: List[CandidateRead]
 
 
-class jobGeneratedData(SQLModel):
+class JobGeneratedData(SQLModel):
     title: str
     description: str
     compensation: compensation_base = Field(

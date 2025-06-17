@@ -294,6 +294,18 @@ class ApiService {
     return this.request(`/candidates/${candidateId}/parsing-status`);
   }
 
+  async getAllCandidates(skip = 0, limit = 100) {
+    return this.request(`/candidates/?skip=${skip}&limit=${limit}`);
+  }
+
+  async getCandidatesTable() {
+    return this.request('/candidates/table');
+  }
+
+  async getCandidateDetails(candidateId) {
+    return this.request(`/candidates/${candidateId}/details`);
+  }
+
   // OTP endpoints
   async sendOTP(email, fullName = '') {
     return this.request('/candidates/send-otp', {

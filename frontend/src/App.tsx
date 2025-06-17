@@ -15,6 +15,7 @@ const JobDetails = lazy(() => import("./pages/JobDetails"));
 const ApplicationDashboard = lazy(() => import("./pages/ApplicationDashboard"));
 const ViewEditApplication = lazy(() => import("./pages/ViewEditApplication"));
 const AddApplication = lazy(() => import("./pages/AddApplication"));
+const Candidates = lazy(() => import("./pages/Candidates"));
 const Index = lazy(() => import("./pages/Index"));
 const JobAnalytics = lazy(() => import("./pages/JobAnalytics"));
 const InterviewList = lazy(() => import("./pages/InterviewList"));
@@ -77,6 +78,7 @@ const App = () => (
               <Route path="/applications/create" element={<AddApplication />} />
               <Route path="/applications/:id" element={<ViewEditApplication />} />
               <Route path="/applications/:id/edit" element={<ViewEditApplication />} />
+              <Route path="/candidates" element={<Candidates />} />
               <Route path="/interviews" element={<InterviewList />} />
               <Route path="/interviews/create" element={<AddEditInterview />} />
               <Route path="/interviews/:id/edit" element={<AddEditInterview />} />

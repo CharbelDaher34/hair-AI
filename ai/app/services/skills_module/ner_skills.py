@@ -79,7 +79,7 @@ class skill_ner:
         return sorted(skills)
 
     def match_skills(
-        job_skills: list[str], candidate_skills: list[str], threshold: int = 85
+        job_skills: list[str], candidate_skills: list[str], threshold: float = 85.0
     ):
         job_skills_set = set([x.lower() for x in job_skills])
         candidate_skills_set = set([x.lower() for x in candidate_skills])

@@ -1,6 +1,6 @@
 from typing import List, Optional
 from crud import crud_candidate
-from schemas.candidate import CandidateRead
+from schemas import CandidateRead
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlmodel import Session
 

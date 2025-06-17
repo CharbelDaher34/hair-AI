@@ -101,6 +101,10 @@ def create_match_for_application(application_id: int, max_retries: int = 3) -> b
                     print(
                         f"[Matcher] Successfully created match {new_match.id} for application {application_id}"
                     )
+                    print(f"[Matcher] Match score: {new_match.score:.3f}")
+                    print(f"[Matcher] Matching skills: {len(new_match.matching_skills or [])}")
+                    print(f"[Matcher] Missing skills: {len(new_match.missing_skills or [])}")
+                    print(f"[Matcher] Extra skills: {len(new_match.extra_skills or [])}")
                     return True
                 else:
                     print(

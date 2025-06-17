@@ -1,9 +1,9 @@
 from typing import List, Optional
 from crud import crud_candidate
-from schemas.candidate import CandidateRead
+from schemas import CandidateRead
 from crud import crud_match
 from crud import crud_company
-from schemas.form_key import FormKeyRead
+from schemas import FormKeyRead
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlmodel import Session
 from pydantic import BaseModel, Field
@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from core.database import get_session
 from crud import crud_job, crud_form_key, crud_application
 from schemas import JobCreate, JobUpdate, JobRead, CompanyRead, MatchRead
-from schemas.job import JobAnalytics, jobGeneratedData
+from schemas import JobAnalytics, JobGeneratedData
 from core.security import TokenData
 from models.models import Company, JobType, ExperienceLevel, SeniorityLevel
 from services.resume_upload import AgentClient
@@ -273,13 +273,13 @@ def get_job_matches(
         )
 
 
-@router.post("/generate_description", response_model=jobGeneratedData)
+@router.post("/generate_description", response_model=JobGeneratedData)
 def generate_description(
     *,
     db: Session = Depends(get_session),
     request_data: JobGenerationRequest,
     request: Request,
-) -> jobGeneratedData:
+) -> JobGeneratedData:
     """Generate a description for a job"""
     current_user: Optional[TokenData] = request.state.user
     if not current_user:
@@ -324,7 +324,7 @@ Required JSON structure:
 }
 
 Generate realistic and appropriate values for all fields. If specific information is not provided, infer reasonable values based on the job context and company information.""",
-        schema=jobGeneratedData.model_json_schema(),
+        schema=JobGeneratedData.model_json_schema(),
         inputs=[input],
     )
     return client.parse()
