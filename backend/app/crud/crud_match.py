@@ -30,7 +30,6 @@ def get_matches_by_application(
 
 def create_match(db: Session, *, match_in: MatchCreate) -> Match:
     # Fetch application, candidate, and job info
-    print("match_in to create match", match_in)
     application = db.get(Application, match_in.application_id)
     if not application:
         raise ValueError(f"Application with id {match_in.application_id} not found")
@@ -70,7 +69,6 @@ def create_match(db: Session, *, match_in: MatchCreate) -> Match:
         else [],
     )
 
-    # print("\n\n\nai_response", ai_response)
 
     # Extract the first result (since we're matching one candidate)
     if not ai_response or not ai_response.get("results"):
@@ -104,7 +102,6 @@ def create_match(db: Session, *, match_in: MatchCreate) -> Match:
     match_data["skill_weight"] = weights["skill_weight"]
     match_data["embedding_weight"] = weights["embedding_weight"]
 
-    print("\n\n\nmatch_data", match_data)
 
     # Remove any existing match for this application
     existing_match = db.exec(
@@ -113,10 +110,8 @@ def create_match(db: Session, *, match_in: MatchCreate) -> Match:
     if existing_match:
         db.delete(existing_match)
         db.flush()
-        print("deleted existing match", existing_match)
 
     db_match = Match.model_validate(match_data)
-    print("\n\n\nnew match", db_match)
     db.add(db_match)
     db.commit()
     db.refresh(db_match)

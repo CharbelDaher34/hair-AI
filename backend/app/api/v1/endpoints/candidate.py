@@ -20,6 +20,7 @@ import base64
 import time
 import json
 from typing import Optional
+from pydantic import BaseModel, EmailStr
 from core.auth_middleware import TokenData
 from core.database import get_session, engine
 from core.config import RESUME_STORAGE_DIR
@@ -28,8 +29,29 @@ from schemas import CandidateCreate, CandidateUpdate, CandidateRead
 from utils.file_utils import save_resume_file, get_resume_file_path, delete_resume_file
 from models.candidate_pydantic import CandidateResume
 from services.resume_upload import AgentClient
+from services.otp_service import otp_service
 
 router = APIRouter()
+
+
+# Pydantic models for OTP endpoints
+class SendOTPRequest(BaseModel):
+    email: EmailStr
+    full_name: str = ""
+
+
+class VerifyOTPRequest(BaseModel):
+    email: EmailStr
+    otp_code: str
+
+
+class OTPStatusResponse(BaseModel):
+    exists: bool
+    verified: bool
+    expired: bool
+    attempts: int
+    remaining_attempts: int
+    expires_at: Optional[str] = None
 
 
 def parse_resume_background(
@@ -145,6 +167,88 @@ def parse_resume_background(
             # Don't raise exception in background task - just log the error
 
 
+@router.post("/send-otp", status_code=status.HTTP_200_OK)
+async def send_otp(request: SendOTPRequest) -> dict:
+    """
+    Send OTP to candidate's email for verification.
+    """
+    try:
+        success = await otp_service.send_otp(request.email, request.full_name)
+        
+        if success:
+            return {
+                "success": True,
+                "message": f"OTP sent successfully to {request.email}",
+                "expires_in_minutes": otp_service.expire_minutes
+            }
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to send OTP. Please try again."
+            )
+    except Exception as e:
+        print(f"[OTP] Error sending OTP: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while sending OTP."
+        )
+
+
+@router.post("/verify-otp", status_code=status.HTTP_200_OK)
+async def verify_otp(request: VerifyOTPRequest) -> dict:
+    """
+    Verify OTP code for candidate's email.
+    """
+    try:
+        result = otp_service.verify_otp(request.email, request.otp_code)
+        
+        if result['success']:
+            return {
+                "success": True,
+                "message": result['message'],
+                "verified": True
+            }
+        else:
+            # Return appropriate HTTP status based on error type
+            if result['error_code'] in ['OTP_EXPIRED', 'OTP_NOT_FOUND', 'TOO_MANY_ATTEMPTS']:
+                status_code = status.HTTP_410_GONE  # Gone - need to request new OTP
+            else:
+                status_code = status.HTTP_400_BAD_REQUEST  # Bad request - invalid OTP
+                
+            raise HTTPException(
+                status_code=status_code,
+                detail={
+                    "message": result['message'],
+                    "error_code": result['error_code'],
+                    "remaining_attempts": result.get('remaining_attempts')
+                }
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[OTP] Error verifying OTP: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while verifying OTP."
+        )
+
+
+@router.get("/otp-status/{email}", response_model=OTPStatusResponse)
+async def get_otp_status(email: str) -> OTPStatusResponse:
+    """
+    Get the current OTP status for an email.
+    """
+    try:
+        status_data = otp_service.get_otp_status(email)
+        return OTPStatusResponse(**status_data)
+    except Exception as e:
+        print(f"[OTP] Error getting OTP status: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while checking OTP status."
+        )
+
+
 @router.post("/", response_model=CandidateRead, status_code=status.HTTP_201_CREATED)
 def create_candidate(
     *,
@@ -163,6 +267,18 @@ def create_candidate(
 
         candidate_data = candidate_obj.model_dump()
         print(f"[Candidate API] Token data: {token_data}")
+
+        # Check if email is verified (only for public applications, not HR-created candidates)
+        if not token_data:  # Public application
+            if not otp_service.is_email_verified(candidate_data['email']):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail={
+                        "message": "Email verification required. Please verify your email before submitting the application.",
+                        "error_code": "EMAIL_NOT_VERIFIED",
+                        "email": candidate_data['email']
+                    }
+                )
 
         # Create candidate first to get the ID
         candidate = crud_candidate.create_candidate(
@@ -210,6 +326,8 @@ def create_candidate(
                 print(f"[Candidate API] Error saving resume: {str(save_err)}")
                 # Don't fail the entire operation if resume saving fails
 
+    except HTTPException:
+        raise
     except Exception as e:
         print("[Candidate API] General error:", str(e))
         raise HTTPException(status_code=400, detail=str(e))

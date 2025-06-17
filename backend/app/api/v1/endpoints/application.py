@@ -1,4 +1,5 @@
 from itertools import count
+from datetime import datetime
 from typing import List
 from pydantic import BaseModel
 from schemas.candidate import CandidateRead
@@ -31,16 +32,18 @@ def create_application(
     application_in: ApplicationCreate,
     background_tasks: BackgroundTasks
 ) -> ApplicationRead:
-    application = crud_application.create_application(
-        db=db, application_in=application_in
-    )
-
-    # Schedule match creation as background task
-    background_tasks.add_task(create_match_background, application.id)
-    print(f"[Application API] Scheduled background match creation for application {application.id}")
-
-    return application
-
+    try:
+        application = crud_application.create_application(
+            db=db, application_in=application_in
+        )
+    
+        # Schedule match creation as background task
+        background_tasks.add_task(create_match_background, application.id)
+        print(f"[Application API] Scheduled background match creation for application {application.id}")
+    
+        return application
+    except Exception as e:
+        raise e
 
 class ApplicationDashboardResponse(BaseModel):
     applications: List[ApplicationWithDetails]
@@ -148,7 +151,7 @@ def update_application(
     )
     if not db_application:
         raise HTTPException(status_code=404, detail="Application not found")
-
+    application_in.updated_at = datetime.now()
     updated_application = crud_application.update_application(
         db=db, db_application=db_application, application_in=application_in
     )
@@ -174,7 +177,7 @@ def update_application_status(
         raise HTTPException(status_code=404, detail="Application not found")
 
     # Create an ApplicationUpdate with only the status field
-    application_update = ApplicationUpdate(status=status_update.status)
+    application_update = ApplicationUpdate(status=status_update.status,updated_at=datetime.now())
 
     updated_application = crud_application.update_application(
         db=db, db_application=db_application, application_in=application_update

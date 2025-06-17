@@ -276,9 +276,9 @@ def delete_application(db: Session, *, application_id: int) -> Optional[Applicat
 
 
 def get_applications_count_by_employer(db: Session, employer_id: int) -> int:
-    job_ids_subquery = select(Job.id).where(Job.employer_id == employer_id)
+    job_ids_subquery = select(Job.id).where(Job.employer_id == employer_id).where(Job.status != Status.CLOSED)
     statement = select(func.count(Application.id)).where(
-        Application.job_id.in_(job_ids_subquery)
+        Application.job_id.in_(job_ids_subquery) 
     )
     result = db.exec(statement)
     total = result.one()

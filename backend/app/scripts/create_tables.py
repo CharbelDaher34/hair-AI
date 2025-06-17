@@ -14,7 +14,7 @@ from sqlalchemy import text
 
 from core.database import get_admin_engine
 from core.database import test_rls
-
+from scripts.apply_rls_only import apply_rls_policies_only
 
 def read_sql_file() -> str:
     """Read the RLS setup SQL file and return its content as a string."""
@@ -39,7 +39,7 @@ def main():
     try:
         print("Creating database tables...")
         create_db_and_tables(admin=True)
-        apply_rls_policies()
+        apply_rls_policies_only()
         print("Database tables created successfully!")
     except Exception as e:
         print(f"Error creating database tables: {e}")

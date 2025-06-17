@@ -139,7 +139,7 @@ const JobDashboard = () => {
           <Button variant="outline" asChild className="shadow-md hover:shadow-lg transition-all duration-300">
             <Link to="/form-keys">
               <Settings className="mr-2 h-4 w-4" />
-              Manage Form Keys
+              Configure application form data
             </Link>
           </Button>
           <Button asChild className="button shadow-lg hover:shadow-xl transition-all duration-300">

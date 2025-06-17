@@ -5,6 +5,7 @@ from fastapi.security import HTTPBearer
 import traceback
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
+import asyncio
 
 from core.database import create_db_and_tables, check_db_tables
 from core.auth_middleware import AuthMiddleware
@@ -52,10 +53,13 @@ swagger_ui_bearer_scheme = HTTPBearer(
 # Import batch processing functions
 from scripts.resume_parser_batch import process_all_candidates
 from scripts.application_matcher_batch import process_all_applications
+from services.otp_service import cleanup_expired_otps_task
 
 
 # Global scheduler variable
 scheduler = None
+# Global OTP cleanup task
+otp_cleanup_task = None
 
 
 def safe_process_all_candidates():
@@ -90,10 +94,14 @@ def safe_process_all_applications():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global scheduler
+    global scheduler, otp_cleanup_task
 
     # Startup logic
     create_db_and_tables()
+
+    # Start OTP cleanup background task
+    print("[OTP] Starting OTP cleanup background task")
+    otp_cleanup_task = asyncio.create_task(cleanup_expired_otps_task())
 
     # Set up APScheduler if enabled
     if ENABLE_BATCH_SCHEDULER:
@@ -137,6 +145,14 @@ async def lifespan(app: FastAPI):
     yield  # Control passes to the application here
 
     # Shutdown logic
+    if otp_cleanup_task and not otp_cleanup_task.done():
+        print("[OTP] Shutting down OTP cleanup task")
+        otp_cleanup_task.cancel()
+        try:
+            await otp_cleanup_task
+        except asyncio.CancelledError:
+            print("[OTP] OTP cleanup task cancelled successfully")
+
     if scheduler and scheduler.running:
         print(f"[Scheduler] Shutting down batch processing scheduler")
         scheduler.shutdown(wait=True)

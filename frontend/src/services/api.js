@@ -139,6 +139,10 @@ class ApiService {
     });
   }
 
+  async getCompanyEmployees(skip = 0, limit = 100) {
+    return this.request(`/hrs/employees?skip=${skip}&limit=${limit}`);
+  }
+
   // Job endpoints
   async createJob(jobData) {
     return this.request('/jobs/', {
@@ -288,6 +292,35 @@ class ApiService {
 
   async getCandidateParsingStatus(candidateId) {
     return this.request(`/candidates/${candidateId}/parsing-status`);
+  }
+
+  // OTP endpoints
+  async sendOTP(email, fullName = '') {
+    return this.request('/candidates/send-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: email,
+        full_name: fullName
+      }),
+    });
+  }
+
+  async verifyOTP(email, otpCode) {
+    return this.request('/candidates/verify-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: email,
+        otp_code: otpCode
+      }),
+    });
+  }
+
+  async getOTPStatus(email) {
+    return this.request(`/candidates/otp-status/${encodeURIComponent(email)}`, {
+      method: 'GET',
+    });
   }
 
   // Form Key endpoints

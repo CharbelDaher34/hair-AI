@@ -28,7 +28,7 @@ import { toast } from "@/components/ui/sonner";
 
 const menuItems = [
   {
-    title: "Dashboard",
+    title: "Home",
     url: "/",
     icon: Home,
   },
@@ -47,11 +47,11 @@ const menuItems = [
     url: "/interviews",
     icon: Calendar,
   },
-  {
-    title: "Form Keys",
-    url: "/form-keys",
-    icon: Settings,
-  },
+  // {
+  //   title: "Form Keys",
+  //   url: "/form-keys",
+  //   icon: Settings,
+  // },
   {
     title: "AI Assistant",
     url: "/chatbot",

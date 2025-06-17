@@ -91,16 +91,29 @@ class CertificationItem(BaseModel):
     issue_date: Optional[date | str] = Field(
         None, description="Date when the certification was issued."
     )
-    # expiry_date: Optional[date] = Field(None, description="Expiry date of the certification if applicable.")
-    # cert_id: Optional[str] = Field(None, description="Unique certificate ID.")
-    # url: Optional[HttpUrl] = Field(None, description="URL to the certification credential.")
-
+  
 
 # Main model with flattened contact fields
 class CandidateResume(BaseModel):
     full_name: str = Field(..., description="Full name of the candidate.")
     email: Optional[EmailStr] = Field(None, description="Email of the candidate.")
     phone: Optional[str] = Field(None, description="Phone number of the candidate.")
+
+    # Candidate background
+    work_history: Optional[List[WorkHistoryItem]] = Field(
+        None, description="List of work experience entries."
+    )
+    education: Optional[List[EducationItem]] = Field(
+        None, description="List of education history entries."
+    )
+    skills: Optional[List[SkillItem]] = Field(
+        None, description="List of skills the candidate possesses."
+    )
+    certifications: Optional[List[CertificationItem]] = Field(
+        None, description="List of certifications held by the candidate."
+    )
+
+
     # created_at: datetime = Field(..., description="Datetime when this record was created.")
     # updated_at: datetime = Field(..., description="Datetime when this record was last updated.")
 
@@ -122,17 +135,3 @@ class CandidateResume(BaseModel):
     # telephones: List[str] = Field(..., description="List of phone numbers with type and normalization.")
     # email_addresses: List[EmailStr] = Field(..., description="List of valid email addresses.")
     # web_addresses: List[HttpUrl] = Field(..., description="List of personal/professional websites.")
-
-    # Candidate background
-    work_history: Optional[List[WorkHistoryItem]] = Field(
-        None, description="List of work experience entries."
-    )
-    education: Optional[List[EducationItem]] = Field(
-        None, description="List of education history entries."
-    )
-    skills: Optional[List[SkillItem]] = Field(
-        None, description="List of skills the candidate possesses."
-    )
-    certifications: Optional[List[CertificationItem]] = Field(
-        None, description="List of certifications held by the candidate."
-    )
