@@ -6,7 +6,7 @@ from sqlmodel import Session, select, func
 
 from models.models import Job, Application, Match, Interview, Candidate, Status, Company
 from schemas import JobCreate, JobUpdate
-from schemas.job import JobAnalytics, JobRead
+from schemas import JobAnalytics, JobRead
 
 
 def get_job(db: Session, job_id: int) -> Optional[Job]:

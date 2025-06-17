@@ -1,9 +1,9 @@
 from typing import Any, Dict, Optional, Union, List
 
-from sqlmodel import Session, select
+from sqlmodel import Session, select, func
 
-from models.models import Candidate, Application, Job, Company, CandidateEmployerLink
-from schemas import CandidateCreate, CandidateUpdate
+from models.models import Candidate, Application, Job, Company, CandidateEmployerLink, Interview
+from schemas import CandidateCreate, CandidateUpdate, InterviewRead
 
 
 def get_candidate(db: Session, candidate_id: int) -> Optional[Candidate]:
@@ -17,6 +17,7 @@ def get_candidate_by_email(db: Session, email: str) -> Optional[Candidate]:
 
 def get_candidates(db: Session, skip: int = 0, limit: int = 100) -> List[Candidate]:
     statement = select(Candidate).offset(skip).limit(limit)
+    
     return db.exec(statement).all()
 
 
@@ -130,3 +131,77 @@ def get_candidate_employers(db: Session, *, candidate_id: int) -> List[Company]:
         .where(CandidateEmployerLink.candidate_id == candidate_id)
     )
     return db.exec(statement).all()
+
+
+def get_candidates_table_by_company(db: Session, *, employer_id: int) -> List[Dict[str, Any]]:
+    """Get candidates with their application and interview counts for a specific company"""
+    # Get candidates associated with the company through applications or direct association
+    candidates = get_candidates_by_company(db, employer_id=employer_id)
+    
+    result = []
+    for candidate in candidates:
+        # Count applications for this candidate
+        applications_count = db.exec(
+            select(func.count(Application.id))
+            .join(Job, Application.job_id == Job.id)
+            .where(Application.candidate_id == candidate.id)
+            .where(Job.employer_id == employer_id)
+        ).one()
+        
+        # Count interviews for this candidate (through applications)
+        interviews_count = db.exec(
+            select(func.count(Interview.id))
+            .join(Application, Interview.application_id == Application.id)
+            .join(Job, Application.job_id == Job.id)
+            .where(Application.candidate_id == candidate.id)
+            .where(Job.employer_id == employer_id)
+        ).one()
+        
+        # Handle tuple results from func.count
+        if isinstance(applications_count, tuple):
+            applications_count = applications_count[0]
+        if isinstance(interviews_count, tuple):
+            interviews_count = interviews_count[0]
+        
+        result.append({
+            "candidate": candidate,
+            "applications_count": applications_count,
+            "interviews_count": interviews_count
+        })
+    
+    return result
+
+
+# def get_candidate_with_details(db: Session, candidate_id: int) -> Optional[CandidateWithDetails]:
+#     """Get candidate with applications and their interviews"""
+#     candidate = get_candidate(db=db, candidate_id=candidate_id)
+#     if not candidate:
+#         return None
+    
+#     # Get applications for this candidate
+#     applications_statement = select(Application).where(Application.candidate_id == candidate_id)
+#     applications = db.exec(applications_statement).all()
+    
+#     # Build ApplicationWithInterviews objects
+#     applications_with_interviews = []
+#     for application in applications:
+#         # Get interviews for this application
+#         interviews_statement = select(Interview).where(Interview.application_id == application.id)
+#         interviews = db.exec(interviews_statement).all()
+        
+#         # Convert interviews to InterviewRead objects
+#         interview_reads = [InterviewRead.model_validate(interview) for interview in interviews]
+        
+#         # Create ApplicationWithInterviews object
+#         app_with_interviews = ApplicationWithInterviews(
+#             **application.model_dump(),
+#             interviews=interview_reads
+#         )
+#         applications_with_interviews.append(app_with_interviews)
+    
+    
+#     # Create and return CandidateWithDetails
+#     return CandidateWithDetails(
+#         **candidate.model_dump(),
+#         data=applications_with_interviews
+#     )

@@ -4,7 +4,6 @@ from typing import List, Dict, Optional
 import sys
 from pathlib import Path
 
-
 from services.matcher.matcher import Matcher
 import logging
 
@@ -15,98 +14,108 @@ matcher_instance = Matcher()
 
 
 class MatchRequest(BaseModel):
-    job_description: str = Field(
-        ...,
-        example="We are looking for a software engineer with Python and FastAPI experience.",
+    job: Dict = Field(..., description="Job description and requirements")
+    candidates: List[Dict] = Field(..., description="List of candidates to match against the job")
+    weights: Optional[Dict[str, float]] = Field(
+        default=None,
+        description="Optional weights for different scoring components",
+        example={
+            "hard_skills": 0.30,
+            "soft_skills": 0.20,
+            "extracted_skills": 0.25,
+            "embedding_similarity": 0.25
+        }
     )
-    candidates: List[str] = Field(
-        ..., example=["I am a python developer with 3 years of experience in FastAPI."]
-    )
-    skill_weight: Optional[float] = Field(
-        0.4,
+    fuzzy_threshold: Optional[float] = Field(
+        default=80.0,
         ge=0,
-        le=1,
-        description="Weight for skill-based similarity, between 0 and 1.",
-    )
-    embedding_weight: Optional[float] = Field(
-        0.6,
-        ge=0,
-        le=1,
-        description="Weight for embedding-based similarity, between 0 and 1.",
-    )
-    candidate_skills: Optional[List[str]] = Field(
-        [], description="List of skills the candidate possesses."
+        le=100,
+        description="Minimum fuzzy match score for skills (0-100)"
     )
 
 
 class SkillAnalysisDetail(BaseModel):
-    match_percentage: float
-    matching_skills: List[str]
-    missing_skills: List[str]
-    extra_skills: List[str]
-    summary: Dict[str, int]
+    matching_skills: List[str] = Field(..., description="Skills that were successfully matched")
+    missing_skills: List[str] = Field(..., description="Required skills that the candidate doesn't have")
+    extra_skills: List[str] = Field(..., description="Additional skills the candidate has")
+
+
+class SkillAnalysis(BaseModel):
+    hard_skills: SkillAnalysisDetail = Field(..., description="Hard skills analysis")
+    soft_skills: SkillAnalysisDetail = Field(..., description="Soft skills analysis")
+    extracted_skills: SkillAnalysisDetail = Field(..., description="Extracted skills analysis")
 
 
 class MatchResult(BaseModel):
-    candidate: str
-    score: float
-    skill_analysis: SkillAnalysisDetail
-    embedding_similarity: float
-    weights: Dict[str, float]
+    candidate: str = Field(..., description="Candidate name")
+    score: float = Field(..., description="Overall matching score")
+    score_breakdown: Dict[str, float] = Field(..., description="Breakdown of score components")
+    missing_skills: List[str] = Field(..., description="Missing skills")
+    extra_skills: List[str] = Field(..., description="Extra skills")
+    matching_skills: List[str] = Field(..., description="Matching skills")
+    embedding_similarity: float = Field(..., description="Embedding similarity score")
+    weights_used: Dict[str, float] = Field(..., description="Weights used in calculation")
 
 
 class MatchResponse(BaseModel):
-    results: List[MatchResult]
+    results: List[MatchResult] = Field(..., description="List of matching results")
+    total_candidates: int = Field(..., description="Total number of candidates processed")
 
 
 @router.post("/match_candidates", response_model=MatchResponse)
 async def match_candidates_endpoint(request: MatchRequest):
     """
-    Matches a list of candidates against a job description.
+    Matches a list of candidates against a job using fuzzy skill matching and embedding similarity.
 
-    - **job_description**: The text of the job description.
-    - **candidates**: A list of candidate objects, each with an `id` and `text` (e.g., CV content).
-    - **skill_weight**: Optional weight for skill-based similarity (0.0 to 1.0).
-    - **embedding_weight**: Optional weight for embedding-based similarity (0.0 to 1.0).
+    Returns detailed analysis including:
+    - Overall matching scores with breakdown
+    - Skill analysis showing matching, missing, and extra skills
+    - Fuzzy matching details for each skill category
+    - Embedding similarity scores
     """
-    if not request.job_description or not request.candidates:
+    if not request.job or not request.candidates:
         raise HTTPException(
             status_code=400,
-            detail="Job description and candidates list cannot be empty.",
+            detail="Job and candidates list cannot be empty.",
         )
 
     try:
-        # Convert Pydantic Candidate models to dicts for the Matcher service
-        candidates_data = request.candidates
+        # Job and candidates are already dicts
+        job_dict = request.job
+        candidates_dicts = request.candidates
 
+        # Call the matcher with the new fuzzy matching implementation
         matched_results = matcher_instance.match_candidates(
-            job_description=request.job_description,
-            candidates=candidates_data,
-            skill_weight=request.skill_weight,
-            embedding_weight=request.embedding_weight,
-            candidate_skills=request.candidate_skills,
+            job=job_dict,
+            candidates=candidates_dicts,
+            weights=request.weights,
+            fuzzy_threshold=request.fuzzy_threshold
         )
 
-        # Convert results back to Pydantic models for the response
+        # Convert results to response format
         response_results = []
-        for res in matched_results:
-            # The Matcher service returns candidate as a dict, convert it back to Candidate model
-            # Ensure the 'candidate' dict from Matcher output matches the Candidate Pydantic model structure
-            candidate_model = res["candidate"]
+        for result in matched_results:
+            # Convert skill analysis details
 
-            skill_analysis_model = SkillAnalysisDetail(**res["skill_analysis"])
 
-            response_results.append(
-                MatchResult(
-                    candidate=candidate_model,
-                    score=res["score"],
-                    skill_analysis=skill_analysis_model,
-                    embedding_similarity=res["embedding_similarity"],
-                    weights=res["weights"],
-                )
+            match_result = MatchResult(
+                candidate=result["candidate"],
+                score=result["score"],
+                score_breakdown=result["score_breakdown"],
+                missing_skills=result["missing_skills"],
+                extra_skills=result["extra_skills"],
+                matching_skills=result["matching_skills"],
+                embedding_similarity=result["embedding_similarity"],
+                weights_used=result["weights_used"]
             )
 
-        return MatchResponse(results=response_results)
+            response_results.append(match_result)
+
+        return MatchResponse(
+            results=response_results,
+            total_candidates=len(request.candidates)
+        )
+
     except Exception as e:
         # Log the exception for debugging
         logger.error(f"Error during candidate matching: {e}")
@@ -116,29 +125,63 @@ async def match_candidates_endpoint(request: MatchRequest):
         )
 
 
-# To run this router (example, typically done in a main.py or app.py)
-# if __name__ == "__main__":
-#     import uvicorn
-#     from fastapi import FastAPI
-#
-#     app = FastAPI()
-#     app.include_router(router, prefix="/matcher", tags=["Matcher"])
-#
-#     # Example usage with dummy data
-#     test_job_desc = "Looking for a Python developer with FastAPI experience."
-#     test_candidates = [
-#         {"id": "c1", "text": "Experienced Python developer, worked with Django and Flask. Some FastAPI knowledge."},
-#         {"id": "c2", "text": "Java developer with 10 years of experience. No Python."},
-#         {"id": "c3", "text": "Junior Python dev, very interested in FastAPI."}
-#     ]
-#
-#     # This is just for local testing, actual API calls would be via HTTP
-#     async def run_test():
-#         req = MatchRequest(job_description=test_job_desc, candidates=[Candidate(**c) for c in test_candidates])
-#         response = await match_candidates_endpoint(req)
-#         print(response.model_dump_json(indent=2))
-#
-#     # import asyncio
-#     # asyncio.run(run_test())
-#
-#     # uvicorn.run(app, host="0.0.0.0", port=8000)
+# Example usage and testing
+if __name__ == "__main__":
+    import uvicorn
+    from fastapi import FastAPI
+    import json
+
+    app = FastAPI(title="Candidate Matcher API", version="1.0.0")
+    app.include_router(router, prefix="/matcher", tags=["Matcher"])
+
+    # Example test data using Dict format
+    test_job = {
+        "title": "Senior Python Developer",
+        "description": "We are looking for an experienced Python developer",
+        "responsibilities": ["Develop web applications", "Write clean code", "Collaborate with team"],
+        "seniority_level": "Senior",
+        "job_type": "Full-time",
+        "skills": {
+            "hard_skills": ["Python", "FastAPI", "PostgreSQL", "Docker"],
+            "soft_skills": ["Communication", "Teamwork", "Problem Solving"]
+        }
+    }
+
+    test_candidates = [
+        {
+            "full_name": "John Doe",
+            "skills": [
+                {"name": "Python", "type": "Hard"},
+                {"name": "FastAPI", "type": "Hard"},
+                {"name": "MySQL", "type": "Hard"},
+                {"name": "Communication", "type": "Soft"},
+                {"name": "Leadership", "type": "Soft"}
+            ],
+            "work_history": [{
+                "job_title": "Python Developer",
+                "company": "Tech Corp",
+                "summary": "Developed web applications using Python and FastAPI"
+            }]
+        },
+        {
+            "full_name": "Jane Smith",
+            "skills": [
+                {"name": "Java", "type": "Hard"},
+                {"name": "Spring Boot", "type": "Hard"},
+                {"name": "Teamwork", "type": "Soft"}
+            ],
+            "work_history": [{
+                "job_title": "Java Developer",
+                "company": "Enterprise Inc",
+                "summary": "Backend development with Java and Spring"
+            }]
+        }
+    ]
+
+    print("Matcher Router updated successfully!")
+    print("Example request structure:")
+    print(f"Job: {json.dumps(test_job, indent=2)}")
+    print(f"Candidates: {json.dumps(test_candidates, indent=2)}")
+
+    # Uncomment to run the server
+    # uvicorn.run(app, host="0.0.0.0", port=8000)

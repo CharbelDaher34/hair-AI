@@ -68,6 +68,9 @@ class EducationItem(BaseModel):
         None, description="Additional notes such as honors or thesis."
     )
 
+class skill_type(str, Enum):
+    hard = "Hard"
+    soft = "Soft"
 
 class SkillItem(BaseModel):
     name: str = Field(..., description="Name of the skill (e.g., Python).")
@@ -76,6 +79,9 @@ class SkillItem(BaseModel):
     )
     level: str = Field(
         ..., description="Proficiency level (e.g., Beginner, Intermediate, Expert)."
+    )
+    type: skill_type = Field(
+        ..., description="Type of the skill (e.g., Hard, Soft)."
     )
 
 

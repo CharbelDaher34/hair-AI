@@ -5,7 +5,7 @@ from sqlalchemy.sql.expression import true
 from sqlmodel import select
 
 from models.models import Interview, Application, Job, Status
-from schemas.interview import InterviewCreate, InterviewUpdate
+from schemas import InterviewCreate, InterviewUpdate
 
 
 def create_interview(db: Session, *, obj_in: InterviewCreate) -> Interview:
@@ -101,3 +101,19 @@ def get_interviews_by_application_id_with_details(
             db.refresh(interview.application, ["candidate", "job"])
 
     return interviews
+
+
+def get_interviews_by_candidate(
+    db: Session, candidate_id: int, skip: int = 0, limit: int = 100
+) -> List[Interview]:
+    """Get interviews by candidate ID through applications"""
+    from models.models import Application
+    
+    statement = (
+        select(Interview)
+        .join(Application, Interview.application_id == Application.id)
+        .where(Application.candidate_id == candidate_id)
+        .offset(skip)
+        .limit(limit)
+    )
+    return db.exec(statement).all()

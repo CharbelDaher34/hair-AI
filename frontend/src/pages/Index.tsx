@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
-import { Users, FileText, Calendar, TrendingUp, Target } from "lucide-react";
+import { Users, FileText, Calendar, TrendingUp, Target, UserCheck } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import apiService from "@/services/api";
@@ -55,6 +55,7 @@ const Index = () => {
   const stats = [
     { title: "Total Jobs", value: analytics_data.total_jobs, icon: FileText, change: "+16.7%" },
     { title: "Total Applications", value: analytics_data.total_applications, icon: Users, change: "+23.1%" },
+    { title: "Total Candidates", value: analytics_data.total_candidates || 0, icon: UserCheck, change: "+18.3%" },
     { title: "Total Interviews", value: analytics_data.total_interviews, icon: Calendar, change: "+12.5%" },
     { title: "Hire Rate", value: `${analytics_data.hire_rate}%`, icon: Target, change: "+5.2%" },
   ];
@@ -85,7 +86,7 @@ const Index = () => {
       </div>
 
       {/* Key Metrics */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
         {stats.map((stat, index) => (
           <Card key={stat.title} className="card hover:scale-105 transition-all duration-300 border-0 shadow-lg hover:shadow-xl" style={{animationDelay: `${index * 100}ms`}}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -124,6 +125,12 @@ const Index = () => {
               <Link to="/applications">
                 <Users className="mr-3 h-5 w-5" />
                 Review Applications
+              </Link>
+            </Button>
+            <Button variant="outline" asChild className="w-full justify-start h-12 text-base font-semibold shadow-sm hover:shadow-md transition-all duration-300 hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50">
+              <Link to="/candidates">
+                <UserCheck className="mr-3 h-5 w-5" />
+                View Candidates
               </Link>
             </Button>
             <Button variant="outline" asChild className="w-full justify-start h-12 text-base font-semibold shadow-sm hover:shadow-md transition-all duration-300 hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50">
