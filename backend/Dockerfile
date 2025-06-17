@@ -28,4 +28,5 @@ ENV PATH="/app/.venv/bin:$PATH"
 # Make port 8017 available to the world outside this container
 EXPOSE 8017
 
-CMD ["/bin/bash", "-c", "uv run scripts/create_tables.py && uv run main.py"]
+# CMD ["/bin/bash", "-c", "uv run scripts/create_tables.py && uv run main.py"]
+CMD ["uv", "run", "main.py"]

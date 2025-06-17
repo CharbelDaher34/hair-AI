@@ -34,7 +34,6 @@ def _get_matcher_url():
 try:
     MATCHER_URL = _get_matcher_url()
     print(f"✅ Matcher URL: {MATCHER_URL}")
-    time.sleep(10)
 except Exception as e:
     print(f"❌ Could not get matcher URL: {e}")
     MATCHER_URL = ""

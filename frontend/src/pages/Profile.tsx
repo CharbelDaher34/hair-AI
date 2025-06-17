@@ -50,11 +50,13 @@ const Profile = () => {
   const [company_data, set_company_data] = useState<CompanyData | null>(null);
   const [hr_data, set_hr_data] = useState<HRData | null>(null);
   const [recruitable_companies, set_recruitable_companies] = useState<RecruiterCompanyLinkWithCompany[]>([]);
+  const [employees, set_employees] = useState<HRData[]>([]);
   const [is_loading, set_is_loading] = useState(true);
   const [is_saving, set_is_saving] = useState(false);
   const [is_editing_company, set_is_editing_company] = useState(false);
   const [is_editing_personal, set_is_editing_personal] = useState(false);
   const [is_add_company_open, set_is_add_company_open] = useState(false);
+  const [is_add_employee_open, set_is_add_employee_open] = useState(false);
   
   // Form states
   const [company_form, set_company_form] = useState<Partial<CompanyData>>({});
@@ -71,6 +73,13 @@ const Profile = () => {
     industry: "",
     website: "",
     bio: "",
+  });
+  const [new_employee_form, set_new_employee_form] = useState({
+    full_name: "",
+    email: "",
+    role: "",
+    department: "",
+    password: "",
   });
   const [show_passwords, set_show_passwords] = useState({
     current: false,
@@ -105,6 +114,9 @@ const Profile = () => {
       // Load recruitable companies
       await load_recruitable_companies();
 
+      // Load employees
+      await load_employees();
+
     } catch (error: any) {
       toast.error("Failed to load profile data", {
         description: error?.message || "An unexpected error occurred.",
@@ -135,6 +147,15 @@ const Profile = () => {
     }
   };
 
+  const load_employees = async () => {
+    try {
+      const employees_data = await apiService.getCompanyEmployees();
+      set_employees(employees_data);
+    } catch (error: any) {
+      console.error("Failed to load employees:", error);
+    }
+  };
+
   const handle_company_form_change = (field: string, value: string) => {
     set_company_form(prev => ({ ...prev, [field]: value }));
   };
@@ -149,6 +170,10 @@ const Profile = () => {
 
   const handle_new_company_form_change = (field: string, value: string) => {
     set_new_company_form(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handle_new_employee_form_change = (field: string, value: string) => {
+    set_new_employee_form(prev => ({ ...prev, [field]: value }));
   };
 
   const save_company_changes = async () => {
@@ -291,6 +316,61 @@ const Profile = () => {
     }
   };
 
+  const add_employee = async () => {
+    if (!new_employee_form.full_name.trim() || !new_employee_form.email.trim() || !new_employee_form.role.trim()) {
+      toast.error("Please fill in all required fields");
+      return;
+    }
+
+    set_is_saving(true);
+    try {
+      const employee_payload = {
+        full_name: new_employee_form.full_name,
+        email: new_employee_form.email,
+        role: new_employee_form.role,
+        password: new_employee_form.password || "defaultPassword123", // You might want to generate a random password
+      };
+
+      await apiService.createHR(employee_payload);
+
+      // Reset form and close dialog
+      set_new_employee_form({
+        full_name: "",
+        email: "",
+        role: "",
+        department: "",
+        password: "",
+      });
+      set_is_add_employee_open(false);
+
+      // Reload employees
+      await load_employees();
+
+      toast.success("Employee added successfully!");
+    } catch (error: any) {
+      toast.error("Failed to add employee", {
+        description: error?.message || "An unexpected error occurred.",
+      });
+    } finally {
+      set_is_saving(false);
+    }
+  };
+
+  const remove_employee = async (employee_id: number) => {
+    set_is_saving(true);
+    try {
+      await apiService.deleteHR(employee_id);
+      await load_employees();
+      toast.success("Employee removed successfully!");
+    } catch (error: any) {
+      toast.error("Failed to remove employee", {
+        description: error?.message || "An unexpected error occurred.",
+      });
+    } finally {
+      set_is_saving(false);
+    }
+  };
+
   const cancel_company_edit = () => {
     set_company_form(company_data || {});
     set_is_editing_company(false);
@@ -323,7 +403,7 @@ const Profile = () => {
         </div>
 
         <Tabs defaultValue="company" className="space-y-8 max-w-full">
-          <TabsList className="grid w-full grid-cols-4 bg-white shadow-lg rounded-xl p-2 border-0">
+          <TabsList className="grid w-full grid-cols-5 bg-white shadow-lg rounded-xl p-2 border-0">
             <TabsTrigger value="company" className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-500 data-[state=active]:text-white rounded-lg transition-all duration-300">
               <Building2 className="h-4 w-4" />
               Company
@@ -331,6 +411,10 @@ const Profile = () => {
             <TabsTrigger value="personal" className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-500 data-[state=active]:text-white rounded-lg transition-all duration-300">
               <User className="h-4 w-4" />
               Personal
+            </TabsTrigger>
+            <TabsTrigger value="employees" className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-500 data-[state=active]:text-white rounded-lg transition-all duration-300">
+              <User className="h-4 w-4" />
+              Employees
             </TabsTrigger>
             <TabsTrigger value="recruitable" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-500 data-[state=active]:text-white rounded-lg transition-all duration-300">Recruitable</TabsTrigger>
             <TabsTrigger value="security" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-500 data-[state=active]:text-white rounded-lg transition-all duration-300">Security</TabsTrigger>
@@ -547,6 +631,179 @@ const Profile = () => {
                       Cancel
                     </Button>
                   </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="employees">
+            <Card className="card shadow-xl hover:shadow-2xl transition-all duration-300 border-0">
+              <CardHeader className="pb-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <CardTitle className="text-2xl font-bold text-gray-800">Company Employees</CardTitle>
+                    <CardDescription className="text-base text-gray-600">
+                      Manage your company's employees and their roles
+                    </CardDescription>
+                  </div>
+                  <Dialog open={is_add_employee_open} onOpenChange={set_is_add_employee_open}>
+                    <DialogTrigger asChild>
+                      <Button className="shadow-md hover:shadow-lg transition-all duration-300">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Employee
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-2xl">
+                      <DialogHeader>
+                        <DialogTitle>Add New Employee</DialogTitle>
+                        <DialogDescription>
+                          Add a new employee to your company with their role and department information.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="new_employee_name">Full Name *</Label>
+                            <Input
+                              id="new_employee_name"
+                              value={new_employee_form.full_name}
+                              onChange={(e) => handle_new_employee_form_change("full_name", e.target.value)}
+                              placeholder="Enter full name"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="new_employee_email">Email *</Label>
+                            <Input
+                              id="new_employee_email"
+                              type="email"
+                              value={new_employee_form.email}
+                              onChange={(e) => handle_new_employee_form_change("email", e.target.value)}
+                              placeholder="employee@company.com"
+                            />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="new_employee_role">Role *</Label>
+                            <Select
+                              value={new_employee_form.role}
+                              onValueChange={(value) => handle_new_employee_form_change("role", value)}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select role" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="hr_manager">HR Manager</SelectItem>
+                                <SelectItem value="recruiter">Recruiter</SelectItem>
+                                <SelectItem value="admin">Admin</SelectItem>
+                                <SelectItem value="coordinator">Coordinator</SelectItem>
+                                <SelectItem value="specialist">Specialist</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="new_employee_department">Department</Label>
+                            <Select
+                              value={new_employee_form.department}
+                              onValueChange={(value) => handle_new_employee_form_change("department", value)}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select department" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="human_resources">Human Resources</SelectItem>
+                                <SelectItem value="recruitment">Recruitment</SelectItem>
+                                <SelectItem value="talent_acquisition">Talent Acquisition</SelectItem>
+                                <SelectItem value="operations">Operations</SelectItem>
+                                <SelectItem value="administration">Administration</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="new_employee_password">Temporary Password</Label>
+                          <Input
+                            id="new_employee_password"
+                            type="password"
+                            value={new_employee_form.password}
+                            onChange={(e) => handle_new_employee_form_change("password", e.target.value)}
+                            placeholder="Leave empty for default password"
+                          />
+                          <p className="text-sm text-muted-foreground">
+                            If left empty, a default password will be assigned. The employee should change it on first login.
+                          </p>
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button
+                          variant="outline"
+                          onClick={() => set_is_add_employee_open(false)}
+                          disabled={is_saving}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          onClick={add_employee}
+                          disabled={is_saving}
+                        >
+                          {is_saving ? "Adding..." : "Add Employee"}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {employees.length === 0 ? (
+                  <div className="text-center py-8">
+                    <User className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-medium mb-2">No employees found</h3>
+                    <p className="text-muted-foreground mb-4">
+                      Add employees to manage your company's HR team.
+                    </p>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead>Added</TableHead>
+                        <TableHead></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {employees.map((employee) => (
+                        <TableRow key={employee.id}>
+                          <TableCell className="font-medium">
+                            {employee.full_name}
+                          </TableCell>
+                          <TableCell>
+                            {employee.email}
+                          </TableCell>
+                          <TableCell>
+                            <span className="capitalize">{employee.role.replace('_', ' ')}</span>
+                          </TableCell>
+                          <TableCell>
+                            {employee.created_at ? new Date(employee.created_at).toLocaleDateString() : "-"}
+                          </TableCell>
+                          <TableCell>
+                            {employee.id !== hr_data?.id && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => remove_employee(employee.id)}
+                                disabled={is_saving}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 )}
               </CardContent>
             </Card>

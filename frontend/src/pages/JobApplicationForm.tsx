@@ -8,8 +8,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
-import { Building2, MapPin, DollarSign, Clock, Briefcase, Upload, Send, Loader2, XCircle, User, FileTextIcon } from "lucide-react";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+import { Building2, MapPin, DollarSign, Clock, Briefcase, Upload, Send, Loader2, XCircle, User, FileTextIcon, Mail, Shield, CheckCircle, AlertCircle } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
+import apiService from "@/services/api";
 
 interface JobData {
   id: number;
@@ -47,6 +49,15 @@ const JobApplicationForm = () => {
   const [is_submitting, set_is_submitting] = useState(false);
   const [resume_file, set_resume_file] = useState<File | null>(null);
 
+  // Email verification states
+  const [email_verified, set_email_verified] = useState(false);
+  const [otp_sent, set_otp_sent] = useState(false);
+  const [is_sending_otp, set_is_sending_otp] = useState(false);
+  const [is_verifying_otp, set_is_verifying_otp] = useState(false);
+  const [otp_code, set_otp_code] = useState("");
+  const [otp_expires_in, set_otp_expires_in] = useState(0);
+  const [otp_timer, set_otp_timer] = useState<NodeJS.Timeout | null>(null);
+
   // Candidate form data
   const [candidate_data, set_candidate_data] = useState({
     full_name: "",
@@ -62,6 +73,31 @@ const JobApplicationForm = () => {
       load_job_data();
     }
   }, [job_id]);
+
+  // OTP timer effect
+  useEffect(() => {
+    if (otp_expires_in > 0) {
+      const timer = setTimeout(() => {
+        set_otp_expires_in(prev => prev - 1);
+      }, 1000);
+      set_otp_timer(timer);
+      return () => clearTimeout(timer);
+    } else if (otp_sent && otp_expires_in === 0) {
+      set_otp_sent(false);
+      toast.error("OTP expired", {
+        description: "Please request a new verification code.",
+      });
+    }
+  }, [otp_expires_in, otp_sent]);
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (otp_timer) {
+        clearTimeout(otp_timer);
+      }
+    };
+  }, [otp_timer]);
 
   const load_job_data = async () => {
     set_is_loading(true);
@@ -86,6 +122,18 @@ const JobApplicationForm = () => {
 
   const handle_candidate_change = (field: string, value: string) => {
     set_candidate_data(prev => ({ ...prev, [field]: value }));
+    
+    // Reset email verification if email changes
+    if (field === 'email' && value !== prev.email) {
+      set_email_verified(false);
+      set_otp_sent(false);
+      set_otp_code("");
+      set_otp_expires_in(0);
+      if (otp_timer) {
+        clearTimeout(otp_timer);
+        set_otp_timer(null);
+      }
+    }
   };
 
   const handle_form_response_change = (form_key_id: number, value: any) => {
@@ -116,6 +164,80 @@ const JobApplicationForm = () => {
     }
   };
 
+  const send_otp = async () => {
+    if (!candidate_data.email.trim()) {
+      toast.error("Please enter your email address first");
+      return;
+    }
+
+    set_is_sending_otp(true);
+    try {
+      const response = await apiService.sendOTP(candidate_data.email, candidate_data.full_name);
+      
+      if (response.success) {
+        set_otp_sent(true);
+        set_otp_expires_in(response.expires_in_minutes * 60); // Convert to seconds
+        toast.success("Verification code sent!", {
+          description: `Please check your email at ${candidate_data.email}`,
+        });
+      } else {
+        throw new Error(response.message || "Failed to send OTP");
+      }
+    } catch (error: any) {
+      console.error("OTP send error:", error);
+      toast.error("Failed to send verification code", {
+        description: error?.message || "Please try again.",
+      });
+    } finally {
+      set_is_sending_otp(false);
+    }
+  };
+
+  const verify_otp = async () => {
+    if (!otp_code || otp_code.length !== 6) {
+      toast.error("Please enter the complete 6-digit code");
+      return;
+    }
+
+    set_is_verifying_otp(true);
+    try {
+      const response = await apiService.verifyOTP(candidate_data.email, otp_code);
+      
+      if (response.success) {
+        set_email_verified(true);
+        set_otp_sent(false);
+        set_otp_expires_in(0);
+        if (otp_timer) {
+          clearTimeout(otp_timer);
+          set_otp_timer(null);
+        }
+        toast.success("Email verified successfully!", {
+          description: "You can now submit your application.",
+        });
+      } else {
+        throw new Error(response.message || "Invalid verification code");
+      }
+    } catch (error: any) {
+      console.error("OTP verify error:", error);
+      
+      // Handle different error types
+      if (error.status === 410) {
+        // OTP expired or not found
+        set_otp_sent(false);
+        set_otp_expires_in(0);
+        toast.error("Verification code expired", {
+          description: "Please request a new code.",
+        });
+      } else {
+        toast.error("Invalid verification code", {
+          description: error?.detail?.message || error?.message || "Please try again.",
+        });
+      }
+    } finally {
+      set_is_verifying_otp(false);
+    }
+  };
+
   const validate_form = () => {
     // Validate candidate data
     if (!candidate_data.full_name.trim()) {
@@ -124,6 +246,10 @@ const JobApplicationForm = () => {
     }
     if (!candidate_data.email.trim()) {
       toast.error("Email is required");
+      return false;
+    }
+    if (!email_verified) {
+      toast.error("Email verification is required");
       return false;
     }
     if (!resume_file) {
@@ -160,7 +286,8 @@ const JobApplicationForm = () => {
       });
 
       if (!candidate_response.ok) {
-        throw new Error(`Failed to create candidate: ${candidate_response.status}`);
+        const error_data = await candidate_response.json();
+        throw new Error(error_data?.detail?.message || `Failed to create candidate: ${candidate_response.status}`);
       }
 
       const created_candidate = await candidate_response.json();
@@ -192,14 +319,154 @@ const JobApplicationForm = () => {
       set_candidate_data({ full_name: "", email: "", phone: "" });
       set_form_responses({});
       set_resume_file(null);
+      set_email_verified(false);
+      set_otp_sent(false);
+      set_otp_code("");
 
     } catch (error: any) {
+      console.error("Application submission error:", error);
       toast.error("Failed to submit application", {
         description: error?.message || "An unexpected error occurred.",
       });
     } finally {
       set_is_submitting(false);
     }
+  };
+
+  const format_time = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+
+  const render_email_verification = () => {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-2 mb-2">
+          <Mail className="h-5 w-5 text-blue-600" />
+          <Label htmlFor="email" className="text-base font-semibold text-gray-700">
+            Email Address *
+          </Label>
+          {email_verified && (
+            <div className="flex items-center gap-1 text-green-600">
+              <CheckCircle className="h-4 w-4" />
+              <span className="text-sm font-medium">Verified</span>
+            </div>
+          )}
+        </div>
+        
+        <div className="flex gap-2">
+          <Input
+            id="email"
+            type="email"
+            value={candidate_data.email}
+            onChange={(e) => handle_candidate_change('email', e.target.value)} 
+            placeholder="your.email@example.com"
+            required
+            disabled={email_verified}
+            className="h-12 text-base bg-white shadow-sm focus:ring-purple-500 focus:border-purple-500 flex-1"
+          />
+          {!email_verified && (
+            <Button
+              type="button"
+              onClick={send_otp}
+              disabled={is_sending_otp || !candidate_data.email.trim() || otp_sent}
+              className="h-12 px-6 bg-blue-600 hover:bg-blue-700 text-white font-medium"
+            >
+              {is_sending_otp ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Sending...
+                </>
+              ) : otp_sent ? (
+                "Code Sent"
+              ) : (
+                "Send Code"
+              )}
+            </Button>
+          )}
+        </div>
+
+        {otp_sent && !email_verified && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-4">
+            <div className="flex items-center gap-2 text-blue-800">
+              <Shield className="h-5 w-5" />
+              <span className="font-medium">Email Verification Required</span>
+            </div>
+            <p className="text-blue-700 text-sm">
+              We've sent a 6-digit verification code to <strong>{candidate_data.email}</strong>. 
+              Please enter it below to verify your email address.
+            </p>
+            
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium text-blue-800">Verification Code</Label>
+                <span className="text-sm text-blue-600">
+                  Expires in: {format_time(otp_expires_in)}
+                </span>
+              </div>
+              
+              <div className="flex items-center gap-3">
+                <InputOTP
+                  maxLength={6}
+                  value={otp_code}
+                  onChange={set_otp_code}
+                  className="flex-1"
+                >
+                  <InputOTPGroup className="gap-2">
+                    <InputOTPSlot index={0} className="w-12 h-12 text-lg font-bold border-2 border-blue-300 focus:border-blue-500" />
+                    <InputOTPSlot index={1} className="w-12 h-12 text-lg font-bold border-2 border-blue-300 focus:border-blue-500" />
+                    <InputOTPSlot index={2} className="w-12 h-12 text-lg font-bold border-2 border-blue-300 focus:border-blue-500" />
+                    <InputOTPSlot index={3} className="w-12 h-12 text-lg font-bold border-2 border-blue-300 focus:border-blue-500" />
+                    <InputOTPSlot index={4} className="w-12 h-12 text-lg font-bold border-2 border-blue-300 focus:border-blue-500" />
+                    <InputOTPSlot index={5} className="w-12 h-12 text-lg font-bold border-2 border-blue-300 focus:border-blue-500" />
+                  </InputOTPGroup>
+                </InputOTP>
+                
+                <Button
+                  type="button"
+                  onClick={verify_otp}
+                  disabled={is_verifying_otp || otp_code.length !== 6}
+                  className="h-12 px-6 bg-green-600 hover:bg-green-700 text-white font-medium"
+                >
+                  {is_verifying_otp ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      Verifying...
+                    </>
+                  ) : (
+                    "Verify"
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-2">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={send_otp}
+                disabled={is_sending_otp || otp_expires_in > 0}
+                className="text-blue-600 hover:text-blue-700 text-sm"
+              >
+                {is_sending_otp ? "Sending..." : "Resend Code"}
+              </Button>
+              
+              <p className="text-xs text-blue-600">
+                Didn't receive the code? Check your spam folder.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {email_verified && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-center gap-2">
+            <CheckCircle className="h-5 w-5 text-green-600" />
+            <span className="text-green-800 font-medium">Email verified successfully!</span>
+          </div>
+        )}
+      </div>
+    );
   };
 
   const render_form_field = (form_key: FormKey) => {
@@ -406,15 +673,7 @@ const JobApplicationForm = () => {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="email" className="text-base font-semibold text-gray-700">Email Address *</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={candidate_data.email}
-                    onChange={(e) => handle_candidate_change('email', e.target.value)} 
-                    placeholder="your.email@example.com"
-                    required
-                    className="h-12 text-base bg-white shadow-sm focus:ring-purple-500 focus:border-purple-500"
-                  />
+                  {render_email_verification()}
                 </div>
               </div>
               <div className="space-y-2">

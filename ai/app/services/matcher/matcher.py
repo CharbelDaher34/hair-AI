@@ -16,7 +16,7 @@ logger.setLevel(logging.DEBUG)
 
 
 class Matcher:
-    def __init__(self, model_name: str = "all-MiniLM-L6-v2"):
+    def __init__(self, model_name: str = "TechWolf/JobBERT-v2"):
         """
         Initialize the Matcher with a sentence transformer model.
 
@@ -24,6 +24,7 @@ class Matcher:
             model_name: Name of the sentence transformer model to use
         """
         self.embedding_model = SentenceTransformer(model_name)
+        logger.error(f"Initialized embedding model: {model_name}")
         self.skills_ner = skill_ner()
 
     def get_embedding(self, text: str) -> np.ndarray:
