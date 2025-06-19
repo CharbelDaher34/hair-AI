@@ -3,8 +3,20 @@ from typing import Any, Dict, Optional, Union, List
 from sqlmodel import Session, select, func
 
 from models.models import Candidate, Application, Job, Company, CandidateEmployerLink, Interview
-from schemas import CandidateCreate, CandidateUpdate, InterviewRead
+from schemas import CandidateCreate, CandidateUpdate, InterviewRead, CandidateWithDetails, ApplicationWithInterviews
+from schemas.application import JobRead
 
+
+def check_candidate_exists(db: Session, candidate_email: str, phone: str) -> Optional[str]:
+    statement = select(Candidate).where(Candidate.email == candidate_email)
+    candidate = db.exec(statement).first()
+    if candidate:
+        return "Email already exists"
+    statement = select(Candidate).where(Candidate.phone == phone)
+    candidate = db.exec(statement).first()
+    if candidate:
+        return "Phone already exists"
+    return None
 
 def get_candidate(db: Session, candidate_id: int) -> Optional[Candidate]:
     return db.get(Candidate, candidate_id)
@@ -172,36 +184,41 @@ def get_candidates_table_by_company(db: Session, *, employer_id: int) -> List[Di
     return result
 
 
-# def get_candidate_with_details(db: Session, candidate_id: int) -> Optional[CandidateWithDetails]:
-#     """Get candidate with applications and their interviews"""
-#     candidate = get_candidate(db=db, candidate_id=candidate_id)
-#     if not candidate:
-#         return None
+def get_candidate_with_details(db: Session, candidate_id: int) -> Optional[CandidateWithDetails]:
+    """Get candidate with applications and their interviews"""
+    candidate = get_candidate(db=db, candidate_id=candidate_id)
+    if not candidate:
+        return None
     
-#     # Get applications for this candidate
-#     applications_statement = select(Application).where(Application.candidate_id == candidate_id)
-#     applications = db.exec(applications_statement).all()
-    
-#     # Build ApplicationWithInterviews objects
-#     applications_with_interviews = []
-#     for application in applications:
-#         # Get interviews for this application
-#         interviews_statement = select(Interview).where(Interview.application_id == application.id)
-#         interviews = db.exec(interviews_statement).all()
+    # Get applications for this candidate
+    applications_statement = select(Application).where(Application.candidate_id == candidate_id)
+    applications = db.exec(applications_statement).all()
+    print(f"Applications: {applications}")
+    # Build ApplicationWithInterviews objects
+    applications_with_interviews = []
+    for application in applications:
+        # Get interviews for this application
+        interviews_statement = select(Interview).where(Interview.application_id == application.id)
+        interviews = db.exec(interviews_statement).all()
+        print(f"Interviews: {interviews}")
+        # Convert interviews to InterviewRead objects
+        interview_reads = [InterviewRead.model_validate(interview) for interview in interviews]
         
-#         # Convert interviews to InterviewRead objects
-#         interview_reads = [InterviewRead.model_validate(interview) for interview in interviews]
+        # Get job information for this application
+        job = db.get(Job, application.job_id)
+        job_read = JobRead.model_validate(job) if job else None
         
-#         # Create ApplicationWithInterviews object
-#         app_with_interviews = ApplicationWithInterviews(
-#             **application.model_dump(),
-#             interviews=interview_reads
-#         )
-#         applications_with_interviews.append(app_with_interviews)
+        # Create ApplicationWithInterviews object
+        app_with_interviews = ApplicationWithInterviews(
+            **application.model_dump(),
+            interviews=interview_reads,
+            job=job_read
+        )
+        applications_with_interviews.append(app_with_interviews)
     
     
-#     # Create and return CandidateWithDetails
-#     return CandidateWithDetails(
-#         **candidate.model_dump(),
-#         data=applications_with_interviews
-#     )
+    # Create and return CandidateWithDetails
+    return CandidateWithDetails(
+        **candidate.model_dump(),
+        applications=applications_with_interviews
+    )

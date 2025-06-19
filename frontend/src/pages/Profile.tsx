@@ -416,7 +416,7 @@ const Profile = () => {
               <User className="h-4 w-4" />
               Employees
             </TabsTrigger>
-            <TabsTrigger value="recruitable" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-500 data-[state=active]:text-white rounded-lg transition-all duration-300">Recruitable</TabsTrigger>
+            <TabsTrigger value="recruitable" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-500 data-[state=active]:text-white rounded-lg transition-all duration-300">Companies you recruit to</TabsTrigger>
             <TabsTrigger value="security" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-500 data-[state=active]:text-white rounded-lg transition-all duration-300">Security</TabsTrigger>
           </TabsList>
 

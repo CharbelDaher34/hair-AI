@@ -142,10 +142,8 @@ export interface CandidateTable {
   interviews_count: number;
 }
 
-export interface CandidateDetails {
-  candidate: Candidate;
+export interface CandidateDetails extends Candidate {
   applications: Application[];
-  interviews: Interview[];
 }
 
 // Application types
@@ -260,11 +258,11 @@ export enum HRRole {
 
 export enum FormFieldType {
   TEXT = 'text',
-  EMAIL = 'email',
   NUMBER = 'number',
   SELECT = 'select',
   TEXTAREA = 'textarea',
   CHECKBOX = 'checkbox',
+  LINK = 'link',
 }
 
 export enum ApplicationStatus {

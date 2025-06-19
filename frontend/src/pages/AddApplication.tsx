@@ -28,7 +28,7 @@ const AddApplication = () => {
   });
   const [selected_job_id, setSelectedJobId] = useState<string>("");
   const [selected_job, setSelectedJob] = useState<any>(null);
-  const [form_responses, setFormResponses] = useState<Record<string, string>>( {} );
+  const [form_responses, setFormResponses] = useState<Record<string, any>>( {} );
   const [is_submitting, setIsSubmitting] = useState(false);
 
   // --- Derived state for button enable/disable ---
@@ -87,7 +87,7 @@ const AddApplication = () => {
   };
 
   // Form response change
-  const handleFormResponseChange = (key_id: string, value: string) => {
+  const handleFormResponseChange = (key_id: string, value: any) => {
     setFormResponses({ ...form_responses, [key_id]: value });
   };
 
@@ -172,10 +172,11 @@ const AddApplication = () => {
         {(() => {
           switch (form_key.field_type) {
             case "text":
-            case "email":
             case "number":
             case "date":
               return <Input type={form_key.field_type} {...common_props} placeholder={`Your ${form_key.name.toLowerCase()}`} />;
+            case "link":
+              return <Input type="url" {...common_props} placeholder={`Your ${form_key.name.toLowerCase()}`} />;
             case "textarea":
               return <Textarea {...common_props} placeholder={`Tell us about your ${form_key.name.toLowerCase()}...`} rows={4} className="bg-white shadow-sm resize-none" />;
             case "select":
@@ -305,7 +306,7 @@ const AddApplication = () => {
             </CardContent>
           </Card>
 
-          <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
+          <Card className={`card shadow-lg hover:shadow-xl transition-all duration-300 border-0 ${!is_candidate_selected ? 'opacity-50 pointer-events-none' : ''}`}>
             <CardHeader className="pb-4">
               <CardTitle className="text-xl font-bold text-gray-800">Job Selection</CardTitle>
               <CardDescription className="text-base text-gray-600">Choose the job for this application</CardDescription>

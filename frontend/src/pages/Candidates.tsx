@@ -348,7 +348,7 @@ const Candidates = () => {
             <>
               <DialogHeader>
                 <DialogTitle className="text-2xl font-bold text-gray-800">
-                  {selected_candidate.candidate.full_name}
+                  {selected_candidate.full_name}
                 </DialogTitle>
                 <DialogDescription className="text-gray-600">
                   Candidate profile and application history
@@ -370,7 +370,7 @@ const Candidates = () => {
                         <Label className="text-sm font-semibold text-gray-700">Email</Label>
                         <div className="flex items-center gap-2 mt-1 p-2 bg-slate-100 rounded-md">
                           <Mail className="h-4 w-4 text-blue-600" />
-                          <span className="text-gray-800">{selected_candidate.candidate.email}</span>
+                          <span className="text-gray-800">{selected_candidate.email}</span>
                         </div>
                       </div>
                       <div>
@@ -378,20 +378,20 @@ const Candidates = () => {
                         <div className="flex items-center gap-2 mt-1 p-2 bg-slate-100 rounded-md">
                           <Phone className="h-4 w-4 text-blue-600" />
                           <span className="text-gray-800">
-                            {selected_candidate.candidate.phone || "Not provided"}
+                            {selected_candidate.phone || "Not provided"}
                           </span>
                         </div>
                       </div>
                     </div>
                     
-                    {selected_candidate.candidate.resume_url && (
+                    {selected_candidate.resume_url && (
                       <div>
                         <Label className="text-sm font-semibold text-gray-700">Resume</Label>
                         <div className="flex items-center gap-2 mt-1">
                           <Button 
                             variant="link"
                             className="p-0 h-auto text-blue-600 hover:text-blue-700 hover:underline flex items-center gap-1"
-                            onClick={() => handle_view_resume(selected_candidate.candidate.id)}
+                            onClick={() => handle_view_resume(selected_candidate.id)}
                             disabled={pdf_loading}
                           >
                             {pdf_loading ? (
@@ -443,7 +443,7 @@ const Candidates = () => {
                                   onClick={() => {
                                     const link = document.createElement('a');
                                     link.href = resume_pdf_url;
-                                    link.download = `${selected_candidate.candidate.full_name}_resume.pdf`;
+                                    link.download = `${selected_candidate.full_name}_resume.pdf`;
                                     link.click();
                                   }}
                                 >
@@ -505,17 +505,17 @@ const Candidates = () => {
                 )}
 
                 {/* Interviews */}
-                {selected_candidate.interviews.length > 0 && (
+                {selected_candidate.applications.some(app => app.interviews && app.interviews.length > 0) && (
                   <Card>
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <Calendar className="h-5 w-5 text-blue-600" />
-                        Interviews ({selected_candidate.interviews.length})
+                        Interviews ({selected_candidate.applications.reduce((total, app) => total + (app.interviews?.length || 0), 0)})
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-3">
-                        {selected_candidate.interviews.map((interview) => (
+                        {selected_candidate.applications.flatMap(app => app.interviews || []).map((interview) => (
                           <div key={interview.id} className="p-4 border border-gray-200 rounded-lg">
                             <div className="flex items-center justify-between">
                               <div>
@@ -541,7 +541,7 @@ const Candidates = () => {
                 )}
 
                 {/* Parsed Resume Data */}
-                {selected_candidate.candidate.parsed_resume && (
+                {selected_candidate.parsed_resume && (
                   <Card>
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
@@ -552,11 +552,11 @@ const Candidates = () => {
                     <CardContent>
                       <div className="space-y-4">
                         {/* Skills */}
-                        {(selected_candidate.candidate.parsed_resume as any)?.skills && (
+                        {(selected_candidate.parsed_resume as any)?.skills && (
                           <div>
                             <Label className="text-sm font-semibold text-gray-700">Skills</Label>
                             <div className="flex flex-wrap gap-2 mt-2">
-                              {(selected_candidate.candidate.parsed_resume as any).skills.map((skill: any, index: number) => (
+                              {(selected_candidate.parsed_resume as any).skills.map((skill: any, index: number) => (
                                 <Badge key={index} variant="secondary" className="bg-blue-100 text-blue-700">
                                   {typeof skill === 'string' ? skill : skill.name}
                                 </Badge>
@@ -566,11 +566,11 @@ const Candidates = () => {
                         )}
                         
                         {/* Work History */}
-                        {(selected_candidate.candidate.parsed_resume as any)?.work_history && (
+                        {(selected_candidate.parsed_resume as any)?.work_history && (
                           <div>
                             <Label className="text-sm font-semibold text-gray-700">Work History</Label>
                             <div className="mt-2 space-y-3">
-                              {(selected_candidate.candidate.parsed_resume as any).work_history.map((job: any, index: number) => (
+                              {(selected_candidate.parsed_resume as any).work_history.map((job: any, index: number) => (
                                 <div key={index} className="p-3 bg-slate-100 rounded-md">
                                   <h4 className="font-semibold text-gray-800">{job.job_title} at {job.employer}</h4>
                                   <p className="text-sm text-gray-600">
@@ -584,11 +584,11 @@ const Candidates = () => {
                         )}
                         
                         {/* Education */}
-                        {(selected_candidate.candidate.parsed_resume as any)?.education && (
+                        {(selected_candidate.parsed_resume as any)?.education && (
                           <div>
                             <Label className="text-sm font-semibold text-gray-700">Education</Label>
                             <div className="mt-2 space-y-3">
-                              {(selected_candidate.candidate.parsed_resume as any).education.map((edu: any, index: number) => (
+                              {(selected_candidate.parsed_resume as any).education.map((edu: any, index: number) => (
                                 <div key={index} className="p-3 bg-slate-100 rounded-md">
                                   <h4 className="font-semibold text-gray-800">
                                     {edu.degree_type} in {edu.subject}

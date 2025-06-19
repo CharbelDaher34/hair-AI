@@ -4,17 +4,21 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Eye, Edit, BarChart3, Trash2, Plus, Search, MoreHorizontal, Settings, Loader2 } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Eye, Edit, BarChart3, Trash2, Plus, Search, MoreHorizontal, Settings, Loader2, RefreshCw, Copy, ExternalLink } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "@/components/ui/sonner";
 import apiService from "@/services/api";
+import { JobStatus } from "@/types";
 
 const JobDashboard = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [jobs, setJobs] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [jobToClose, setJobToClose] = useState(null);
+  const [isClosingJob, setIsClosingJob] = useState(false);
 
   // Fetch jobs on component mount
   useEffect(() => {
@@ -64,13 +68,11 @@ const JobDashboard = () => {
 
   const getStatusColor = (status: string) => {
     switch (status?.toLowerCase()) {
-      case "open":
-      case "active":
+      case "published":
         return "default";
       case "draft":
         return "secondary";
       case "closed":
-      case "inactive":
         return "destructive";
       default:
         return "secondary";
@@ -92,6 +94,100 @@ const JobDashboard = () => {
 
   const getApplicationCount = (job) => {
     return job.applications?.length || 0;
+  };
+
+  const handleStatusUpdate = async (job_id, new_status) => {
+    // If trying to close a job, show confirmation dialog
+    if (new_status === JobStatus.CLOSED) {
+      const job = jobs.find(j => j.id === job_id);
+      setJobToClose(job);
+      return;
+    }
+
+    try {
+      await apiService.updateJobStatus(job_id, new_status);
+      
+      // Update the job in the local state
+      setJobs(prev_jobs => 
+        prev_jobs.map(job => 
+          job.id === job_id 
+            ? { ...job, status: new_status }
+            : job
+        )
+      );
+      
+      toast.success("Job status updated successfully", {
+        description: `Status changed to ${new_status.charAt(0).toUpperCase() + new_status.slice(1)}`,
+      });
+    } catch (error) {
+      console.error('Failed to update job status:', error);
+      toast.error("Failed to update job status", {
+        description: error.message || "An unexpected error occurred.",
+      });
+    }
+  };
+
+  const confirmCloseJob = async () => {
+    if (!jobToClose) return;
+
+    setIsClosingJob(true);
+    try {
+      await apiService.updateJobStatus(jobToClose.id, JobStatus.CLOSED);
+      
+      // Remove the job from the local state since closed jobs don't appear in the list
+      setJobs(prev_jobs => prev_jobs.filter(job => job.id !== jobToClose.id));
+      
+      toast.success("Job closed successfully", {
+        description: "The job has been closed and will no longer appear in the dashboard.",
+      });
+    } catch (error) {
+      console.error('Failed to close job:', error);
+      toast.error("Failed to close job", {
+        description: error.message || "An unexpected error occurred.",
+      });
+    } finally {
+      setIsClosingJob(false);
+      setJobToClose(null);
+    }
+  };
+
+  const copyJobUrl = async (job_id) => {
+    const url = `${window.location.origin}/apply/${job_id}`;
+    
+    try {
+      // Try modern clipboard API first
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(url);
+        toast.success("URL Copied!", {
+          description: "The application URL has been copied to your clipboard.",
+        });
+      } else {
+        // Fallback for older browsers or non-HTTPS
+        const text_area = document.createElement('textarea');
+        text_area.value = url;
+        text_area.style.position = 'fixed';
+        text_area.style.opacity = '0';
+        document.body.appendChild(text_area);
+        text_area.select();
+        document.execCommand('copy');
+        document.body.removeChild(text_area);
+        
+        toast.success("URL Copied!", {
+          description: "The application URL has been copied to your clipboard.",
+        });
+      }
+    } catch (error) {
+      console.error('Failed to copy URL:', error);
+      // Show the URL in a toast so user can copy manually
+      toast.error("Failed to copy URL", {
+        description: `Please copy manually: ${url}`,
+        duration: 10000, // Show longer so user can copy
+      });
+    }
+  };
+
+  const getStatusOptions = (current_status) => {
+    return Object.values(JobStatus).filter(status => status !== current_status);
   };
 
   if (isLoading) {
@@ -194,7 +290,7 @@ const JobDashboard = () => {
                 <TableRow>
                     <TableHead className="font-semibold text-gray-700">Job Title</TableHead>
                     <TableHead className="font-semibold text-gray-700">Created Date</TableHead>
-                    <TableHead className="font-semibold text-gray-700">Status</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Status (Click to change)</TableHead>
                     <TableHead className="font-semibold text-gray-700">Applications</TableHead>
                     <TableHead className="font-semibold text-gray-700">Recruited To</TableHead>
                     <TableHead className="font-semibold text-gray-700">Actions</TableHead>
@@ -206,9 +302,45 @@ const JobDashboard = () => {
                       <TableCell className="font-semibold text-gray-800">{getJobTitle(job)}</TableCell>
                       <TableCell className="text-gray-600">{formatDate(job.created_at)}</TableCell>
                     <TableCell>
-                        <Badge variant={getStatusColor(job.status) as any} className="font-medium">
-                        {job.status ? job.status.charAt(0).toUpperCase() + job.status.slice(1) : 'Unknown'}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-auto p-0 hover:bg-transparent">
+                              <Badge variant={getStatusColor(job.status) as any} className="font-medium cursor-pointer hover:opacity-80 transition-opacity">
+                                {job.status ? job.status.charAt(0).toUpperCase() + job.status.slice(1) : 'Unknown'}
+                              </Badge>
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start">
+                            <div className="px-2 py-1.5 text-sm font-medium text-gray-700">
+                              Change Status
+                            </div>
+                            <DropdownMenuSeparator />
+                            {getStatusOptions(job.status).map((status) => (
+                              <DropdownMenuItem
+                                key={status}
+                                onClick={() => handleStatusUpdate(job.id, status)}
+                                className="cursor-pointer"
+                              >
+                                <RefreshCw className="mr-2 h-4 w-4" />
+                                {status.charAt(0).toUpperCase() + status.slice(1)}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                        
+                        {job.status === JobStatus.PUBLISHED && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => copyJobUrl(job.id)}
+                            className="h-7 px-2 text-xs"
+                          >
+                            <Copy className="h-3 w-3 mr-1" />
+                            Copy URL
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                       <TableCell>
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
@@ -257,6 +389,37 @@ const JobDashboard = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Confirmation Dialog for Closing Jobs */}
+      <AlertDialog open={!!jobToClose} onOpenChange={() => setJobToClose(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Close Job?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to close "{jobToClose ? getJobTitle(jobToClose) : 'this job'}"? 
+              Once closed, it will no longer appear in your dashboard and candidates won't be able to apply.
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isClosingJob}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmCloseJob}
+              disabled={isClosingJob}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isClosingJob ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Closing...
+                </>
+              ) : (
+                'Close Job'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

@@ -107,6 +107,14 @@ def read_jobs_by_status(
 ) -> List[JobRead]:
     return crud_job.get_jobs_by_status(db=db, status=status, skip=skip, limit=limit)
 
+@router.patch("/{job_id}/status", response_model=JobRead)
+def update_job_status(
+    *, db: Session = Depends(get_session), job_id: int, status: str
+) -> JobRead:
+    job = crud_job.get_job(db=db, job_id=job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return crud_job.update_job(db=db, db_job=job, job_in={"status": status})
 
 @router.patch("/{job_id}", response_model=JobRead)
 def update_job(

@@ -28,6 +28,13 @@ interface InterviewFormData {
   type: string;
   status: string;
   notes: string;
+  interviewer_id: string;
+}
+
+interface HR {
+  id: number;
+  full_name: string;
+  email: string;
 }
 
 const AddEditInterview = () => {
@@ -41,9 +48,11 @@ const AddEditInterview = () => {
     type: "phone",
     status: "scheduled",
     notes: "",
+    interviewer_id: "",
   });
 
   const [applications, setApplications] = useState<Application[]>([]);
+  const [hrUsers, setHrUsers] = useState<HR[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -78,6 +87,23 @@ const AddEditInterview = () => {
     }
   };
 
+  const fetchHrUsers = async () => {
+    try {
+      const data = await apiService.getCompanyEmployees();
+      console.log("HR users API response:", data);
+      
+      setHrUsers(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Error fetching HR users:", err);
+      setHrUsers([]);
+      toast({
+        title: "Error",
+        description: "Failed to fetch HR users",
+        variant: "destructive",
+      });
+    }
+  };
+
   const fetchInterview = async (interviewId: string) => {
     try {
       const data = await apiService.getInterview(parseInt(interviewId));
@@ -92,6 +118,7 @@ const AddEditInterview = () => {
         type: data.type,
         status: data.status,
         notes: data.notes || "",
+        interviewer_id: data.interviewer_id?.toString() || "",
       });
     } catch (err) {
       console.error("Error fetching interview:", err);
@@ -110,7 +137,7 @@ const AddEditInterview = () => {
       setError(null);
       
       try {
-        await fetchApplications();
+        await Promise.all([fetchApplications(), fetchHrUsers()]);
         
         if (isEditing && id) {
           await fetchInterview(id);
@@ -134,6 +161,16 @@ const AddEditInterview = () => {
 
     loadData();
   }, [id, isEditing]);
+
+  // Set first HR user as default when hrUsers is loaded and we're not editing
+  useEffect(() => {
+    if (!isEditing && hrUsers.length > 0 && !interviewData.interviewer_id) {
+      setInterviewData(prev => ({
+        ...prev,
+        interviewer_id: hrUsers[0].id.toString()
+      }));
+    }
+  }, [hrUsers, isEditing, interviewData.interviewer_id]);
 
   const getSelectedApplication = () => {
     if (!Array.isArray(applications)) {
@@ -161,6 +198,7 @@ const AddEditInterview = () => {
         type: interviewData.type,
         status: interviewData.status,
         notes: interviewData.notes || null,
+        interviewer_id: interviewData.interviewer_id ? parseInt(interviewData.interviewer_id) : null,
       };
 
       if (isEditing && id) {
@@ -350,6 +388,26 @@ const AddEditInterview = () => {
                   </SelectContent>
                 </Select>
               </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="interviewer" className="text-sm font-semibold text-gray-700">Interviewer</Label>
+                <Select
+                  value={interviewData.interviewer_id}
+                  onValueChange={(value) => setInterviewData({...interviewData, interviewer_id: value})}
+                >
+                  <SelectTrigger className="h-12 shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500">
+                    <SelectValue placeholder="Select an interviewer" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="None">No interviewer assigned</SelectItem>
+                    {hrUsers.map((hr) => (
+                      <SelectItem key={hr.id} value={hr.id.toString()}>
+                        {hr.full_name} ({hr.email})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </CardContent>
           </Card>
 
@@ -397,6 +455,13 @@ const AddEditInterview = () => {
               </div>
               <div>
                 <strong className="text-gray-700">Status:</strong> <span className="text-gray-800 font-medium">{interviewStatuses.find(s => s.value === interviewData.status)?.label || "Not specified"}</span>
+              </div>
+              <div>
+                <strong className="text-gray-700">Interviewer:</strong> <span className="text-gray-800 font-medium">{
+                  interviewData.interviewer_id 
+                    ? hrUsers.find(hr => hr.id.toString() === interviewData.interviewer_id)?.full_name || "Unknown"
+                    : "Not assigned"
+                }</span>
               </div>
             </CardContent>
           </Card>
