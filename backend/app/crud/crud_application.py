@@ -13,7 +13,7 @@ from models.models import (
     Status,
     ApplicationStatus,
 )
-from schemas import ApplicationCreate, ApplicationUpdate, MatchCreate
+from schemas import ApplicationCreate, ApplicationUpdate, MatchCreate, ApplicationWithDetails
 from . import crud_job
 from . import crud_match
 from . import crud_candidate
@@ -69,17 +69,17 @@ def get_random_applications_by_employer(
 
 def get_application_with_details(
     db: Session, application_id: int
-) -> Optional[Application]:
+) -> Optional[ApplicationWithDetails]:
     """Get application with candidate, job details, and transformed form_responses."""
     statement = (
         select(Application)
+        .join(Job, Application.job_id == Job.id)
         .where(Application.id == application_id)
         .where(Job.status != Status.CLOSED)
         .options(
             selectinload(Application.candidate),
-            selectinload(Application.job)
-            .selectinload(Job.form_key_constraints)
-            .selectinload(JobFormKeyConstraint.form_key),
+            selectinload(Application.job).selectinload(Job.form_key_constraints).selectinload(JobFormKeyConstraint.form_key),
+            selectinload(Application.matches),
         )
     )
     application = db.exec(statement).first()
@@ -118,7 +118,18 @@ def get_application_with_details(
             # Ensure it's an empty list if None or already empty, to match the new schema type
             application.form_responses = []
 
-    return application
+        # Convert to ApplicationWithDetails schema
+        # Get the first match if available (since schema expects single match)
+        match_data = application.matches[0] if application.matches else None
+        
+        return ApplicationWithDetails(
+            **application.model_dump(),
+            candidate=application.candidate,
+            job=application.job,
+            match=match_data
+        )
+
+    return None
 
 
 def create_match_background(application_id: int, max_retries: int = 3):

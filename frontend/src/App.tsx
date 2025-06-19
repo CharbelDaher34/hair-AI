@@ -5,6 +5,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
+import FloatingBackground from "@/components/FloatingBackground";
+import MainContentHeader from "@/components/MainContentHeader";
 
 // Import page components directly
 import Signup from "./pages/SignUp";
@@ -39,10 +41,12 @@ const AuthenticatedLayout = () => {
   }
 
   return (
-    <SidebarProvider>
-      <div className="min-h-screen flex w-full">
+    <SidebarProvider defaultOpen={true}>
+      <div className="min-h-screen flex w-full relative">
+        <FloatingBackground />
         <AppSidebar />
-        <main className="flex-1">
+        <main className="flex-1 relative z-10">
+          <MainContentHeader />
           {/* Outlet renders the matched child route element (e.g., Index, JobDashboard) */}
           <Outlet /> 
         </main>
@@ -56,11 +60,13 @@ const App = () => (
     <TooltipProvider>
       <SonnerToaster />
       <BrowserRouter>
-        <Routes>
-          {/* Public Routes */}
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
-          <Route path="/apply/:job_id" element={<JobApplicationForm />} />
+        <div className="relative min-h-screen">
+          <FloatingBackground />
+          <Routes>
+            {/* Public Routes */}
+            <Route path="/login" element={<div className="relative z-10"><Login /></div>} />
+            <Route path="/signup" element={<div className="relative z-10"><Signup /></div>} />
+            <Route path="/apply/:job_id" element={<div className="relative z-10"><JobApplicationForm /></div>} />
           
           {/* Authenticated Routes */}
           <Route element={<AuthenticatedLayout />}>
@@ -85,6 +91,7 @@ const App = () => (
             <Route path="*" element={<NotFound />} />
           </Route>
         </Routes>
+        </div>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
