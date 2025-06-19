@@ -2,8 +2,13 @@ from typing import Optional, List, Any
 from pydantic import BaseModel, field_validator
 from models.models import ApplicationBase
 from utils.pydantic_utils import make_optional
-from schemas.candidate import CandidateRead
-from schemas.job import JobRead
+from models.models import CandidateBase, JobBase
+
+class CandidateRead(CandidateBase):
+    id:int
+    
+class JobRead(JobBase):
+    id:int
 
 
 # New schema for individual form response items

@@ -245,11 +245,11 @@ const FormKeysManagement = () => {
                   <SelectContent>
                     <SelectItem value="text">Text</SelectItem>
                     <SelectItem value="number">Number</SelectItem>
-                    <SelectItem value="email">Email</SelectItem>
                     <SelectItem value="date">Date</SelectItem>
                     <SelectItem value="select">Select</SelectItem>
                     <SelectItem value="textarea">Textarea</SelectItem>
                     <SelectItem value="checkbox">Checkbox</SelectItem>
+                    <SelectItem value="link">Link</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

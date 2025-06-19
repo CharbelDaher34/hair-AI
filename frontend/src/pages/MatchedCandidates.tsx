@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CheckCircle, XCircle, Eye, Star, Filter, Users, Briefcase, Search, ChevronDown, Loader2, Info } from "lucide-react";
+import { CheckCircle, XCircle, Eye, Star, Filter, Users, Briefcase, Search, ChevronDown, Loader2, Info, AlertTriangle, Flag } from "lucide-react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import apiService from "@/services/api";
 import { toast } from "@/components/ui/sonner";
@@ -47,6 +47,9 @@ interface MatchedCandidateData {
   extra_skills_count: number;
   skill_weight: number;
   embedding_weight: number;
+  flags?: {
+    constraint_violations?: Record<string, string>;
+  };
   created_at: string;
   updated_at: string;
   // Candidate fields
@@ -247,6 +250,7 @@ const MatchedCandidatesPage = () => {
                 <TableRow className="bg-slate-50">
                   <TableHead className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Candidate</TableHead>
                   <TableHead className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Match Score</TableHead>
+                  <TableHead className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Flags</TableHead>
                   <TableHead className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -292,6 +296,43 @@ const MatchedCandidatesPage = () => {
                               <p className="text-gray-500 italic">No detailed skill info available.</p> }
                           </PopoverContent>
                         </Popover>
+                      )}
+                    </TableCell>
+                    <TableCell className="px-6 py-4 whitespace-nowrap">
+                      {mc.flags?.constraint_violations && Object.keys(mc.flags.constraint_violations).length > 0 ? (
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300 transition-all duration-150"
+                            >
+                              <AlertTriangle className="h-4 w-4 mr-1" />
+                              {Object.keys(mc.flags.constraint_violations).length} Issue{Object.keys(mc.flags.constraint_violations).length !== 1 ? 's' : ''}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-80 p-4 bg-white shadow-xl rounded-lg border border-red-200">
+                            <div className="space-y-3">
+                              <div className="flex items-center gap-2">
+                                <Flag className="h-5 w-5 text-red-600" />
+                                <h4 className="font-semibold text-red-800">Constraint Violations</h4>
+                              </div>
+                              <div className="space-y-2">
+                                {Object.entries(mc.flags.constraint_violations).map(([field, violation]) => (
+                                  <div key={field} className="p-2 bg-red-50 rounded border border-red-200">
+                                    <div className="font-medium text-red-800 text-sm">{field}</div>
+                                    <div className="text-red-600 text-xs mt-1">{violation}</div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                      ) : (
+                        <Badge variant="secondary" className="text-green-700 bg-green-100 border-green-200">
+                          <CheckCircle className="h-3 w-3 mr-1" />
+                          No Issues
+                        </Badge>
                       )}
                     </TableCell>
                     <TableCell className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">

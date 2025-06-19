@@ -105,7 +105,17 @@ const JobApplicationForm = () => {
       // Make a public API call without authentication
       const response = await fetch(`http://84.16.230.94:8017/api/v1/jobs/public/form-data/${job_id}`);
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        let error_message = `HTTP error! status: ${response.status}`;
+        try {
+          const error_data = await response.json();
+          error_message = error_data?.detail || error_data?.message || error_message;
+        } catch (e) {
+          // If response is not JSON, use default message
+        }
+        toast.error("Failed to load job information", {
+          description: error_message,
+        });
+        throw new Error(error_message);
       }
       const data = await response.json();
       console.log('Received job data:', data);
@@ -121,19 +131,21 @@ const JobApplicationForm = () => {
   };
 
   const handle_candidate_change = (field: string, value: string) => {
-    set_candidate_data(prev => ({ ...prev, [field]: value }));
-    
-    // Reset email verification if email changes
-    if (field === 'email' && value !== prev.email) {
-      set_email_verified(false);
-      set_otp_sent(false);
-      set_otp_code("");
-      set_otp_expires_in(0);
-      if (otp_timer) {
-        clearTimeout(otp_timer);
-        set_otp_timer(null);
+    set_candidate_data(prev => {
+      // Reset email verification if email changes
+      if (field === 'email' && value !== prev.email) {
+        set_email_verified(false);
+        set_otp_sent(false);
+        set_otp_code("");
+        set_otp_expires_in(0);
+        if (otp_timer) {
+          clearTimeout(otp_timer);
+          set_otp_timer(null);
+        }
       }
-    }
+      
+      return { ...prev, [field]: value };
+    });
   };
 
   const handle_form_response_change = (form_key_id: number, value: any) => {
@@ -287,7 +299,11 @@ const JobApplicationForm = () => {
 
       if (!candidate_response.ok) {
         const error_data = await candidate_response.json();
-        throw new Error(error_data?.detail?.message || `Failed to create candidate: ${candidate_response.status}`);
+        const error_message = error_data?.detail || error_data?.message || `Failed to create candidate: ${candidate_response.status}`;
+        toast.error("Failed to create candidate", {
+          description: error_message,
+        });
+        throw new Error(error_message);
       }
 
       const created_candidate = await candidate_response.json();
@@ -308,7 +324,12 @@ const JobApplicationForm = () => {
       });
 
       if (!application_response.ok) {
-        throw new Error(`Failed to create application: ${application_response.status}`);
+        const error_data = await application_response.json();
+        const error_message = error_data?.detail || error_data?.message || `Failed to create application: ${application_response.status}`;
+        toast.error("Failed to create application", {
+          description: error_message,
+        });
+        throw new Error(error_message);
       }
 
       toast.success("Application submitted successfully!", {
@@ -495,12 +516,13 @@ const JobApplicationForm = () => {
         {(() => {
     switch (form_key.field_type) {
       case "text":
-      case "email":
       case "number":
-            case "date":
-              return <Input type={form_key.field_type} {...common_props} placeholder={`Your ${form_key.name.toLowerCase()}`} />;
+      case "date":
+        return <Input type={form_key.field_type} {...common_props} placeholder={`Your ${form_key.name.toLowerCase()}`} />;
+      case "link":
+        return <Input type="url" {...common_props} placeholder={`Your ${form_key.name.toLowerCase()}`} />;
       case "textarea":
-              return <Textarea {...common_props} placeholder={`Tell us about your ${form_key.name.toLowerCase()}...`} rows={5} className="text-base bg-white shadow-sm focus:ring-purple-500 focus:border-purple-500 resize-none" />;
+        return <Textarea {...common_props} placeholder={`Tell us about your ${form_key.name.toLowerCase()}...`} rows={5} className="text-base bg-white shadow-sm focus:ring-purple-500 focus:border-purple-500 resize-none" />;
       case "select":
         return (
                 <Select {...select_common_props}>
@@ -523,12 +545,12 @@ const JobApplicationForm = () => {
                     onCheckedChange={checked => handle_form_response_change(form_key.id, checked)} 
             />
                   <Label htmlFor={common_props.id} className="text-base font-normal text-gray-700 cursor-pointer">
-                    I agree to the terms and conditions related to {form_key.name.toLowerCase()}
+                    {form_key.name}
             </Label>
           </div>
         );
       default:
-              return <Input type="text" {...common_props} placeholder={`Your ${form_key.name.toLowerCase()}`} />;
+        return <Input type="text" {...common_props} placeholder={`Your ${form_key.name.toLowerCase()}`} />;
           }
         })()}
       </div>

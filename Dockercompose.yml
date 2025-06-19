@@ -2,7 +2,7 @@ services:
   db:
     image: postgres:16
     container_name: local_pgdb
-    restart: always
+    restart: on-failure
     ports:
       - "5437:5432"
     environment:
@@ -14,7 +14,7 @@ services:
   pgadmin:
     image: dpage/pgadmin4
     container_name: pgadmin4_container
-    restart: always
+    restart: on-failure
     ports:
       - "8888:80"
     environment:
@@ -27,7 +27,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: backend
-    restart: always
+    restart: on-failure
     ports: 
       - "8017:8017"
     depends_on:
@@ -58,7 +58,7 @@ services:
       context: ./ai
       dockerfile: Dockerfile
     container_name: ai
-    restart: always
+    restart: on-failure
     ports: 
       - "8011:8011"
     environment:
@@ -70,7 +70,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: frontend
-    restart: always
+    restart: on-failure
     ports: 
       - "8080:8080"
     depends_on:

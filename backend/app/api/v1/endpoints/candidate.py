@@ -28,7 +28,7 @@ from core.auth_middleware import TokenData
 from core.database import get_session, engine
 from core.config import RESUME_STORAGE_DIR
 from crud import crud_candidate
-from schemas import CandidateCreate, CandidateUpdate, CandidateRead
+from schemas import CandidateCreate, CandidateUpdate, CandidateRead, CandidateWithDetails
 from utils.file_utils import save_resume_file, get_resume_file_path, delete_resume_file
 from models.candidate_pydantic import CandidateResume
 from services.resume_upload import AgentClient
@@ -318,6 +318,12 @@ def create_candidate(
                         "email": candidate_data['email']
                     }
                 )
+        candidate_exists = crud_candidate.check_candidate_exists(db=db, candidate_email=candidate_data['email'], phone=candidate_data['phone'])
+        if candidate_exists:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=candidate_exists
+            )
 
         # Create candidate first to get the ID
         candidate = crud_candidate.create_candidate(
@@ -532,30 +538,33 @@ def add_candidate_to_employer(
     employer_id: int,
     request: Request,
 ) -> dict:
-    """Associate a candidate with an employer."""
-    token_data: Optional[TokenData] = request.state.user
-    
-    # Check if user is authenticated and has permission
-    if not token_data or token_data.employer_id != employer_id:
-        raise HTTPException(
-            status_code=403, detail="Not authorized to add candidates to this employer"
+    try:
+        """Associate a candidate with an employer."""
+        token_data: Optional[TokenData] = request.state.user
+        
+        # Check if user is authenticated and has permission
+        if not token_data or token_data.employer_id != employer_id:
+            raise HTTPException(
+                status_code=403, detail="Not authorized to add candidates to this employer"
+            )
+        
+        # Check if candidate exists
+        candidate = crud_candidate.get_candidate(db=db, candidate_id=candidate_id)
+        if not candidate:
+            raise HTTPException(status_code=404, detail="Candidate not found")
+        
+        # Add the relationship
+        success = crud_candidate.add_candidate_to_employer(
+            db=db, candidate_id=candidate_id, employer_id=employer_id
         )
-    
-    # Check if candidate exists
-    candidate = crud_candidate.get_candidate(db=db, candidate_id=candidate_id)
-    if not candidate:
-        raise HTTPException(status_code=404, detail="Candidate not found")
-    
-    # Add the relationship
-    success = crud_candidate.add_candidate_to_employer(
-        db=db, candidate_id=candidate_id, employer_id=employer_id
-    )
-    
-    if success:
-        return {"message": "Candidate successfully added to employer"}
-    else:
-        return {"message": "Candidate is already associated with this employer"}
-
+        
+        if success:
+            return {"message": "Candidate successfully added to employer"}
+        else:
+            return {"message": "Candidate is already associated with this employer"}
+    except Exception as e:
+        print(f"[Candidate API] Error adding candidate to employer: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.delete("/{candidate_id}/employers/{employer_id}")
 def remove_candidate_from_employer(
@@ -622,18 +631,18 @@ def get_candidate_employers(
 
 
 
-# @router.get("/{candidate_id}/details", response_model=CandidateWithDetails)
-# def get_candidate_details(
-#     *,
-#     db: Session = Depends(get_session),
-#     candidate_id: int,
-#     request: Request,
-# ) -> CandidateWithDetails:
-#     token_data: Optional[TokenData] = request.state.user
+@router.get("/{candidate_id}/details", response_model=CandidateWithDetails)
+def get_candidate_details(
+    *,
+    db: Session = Depends(get_session),
+    candidate_id: int,
+    request: Request,
+) -> CandidateWithDetails:
+    token_data: Optional[TokenData] = request.state.user
     
-#     candidate_with_details = crud_candidate.get_candidate_with_details(db=db, candidate_id=candidate_id)
-#     if not candidate_with_details:
-#         raise HTTPException(status_code=404, detail="Candidate not found")
+    candidate_with_details = crud_candidate.get_candidate_with_details(db=db, candidate_id=candidate_id)
+    if not candidate_with_details:
+        raise HTTPException(status_code=404, detail="Candidate not found")
     
-#     return candidate_with_details
+    return candidate_with_details 
 

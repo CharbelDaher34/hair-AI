@@ -256,11 +256,6 @@ def update_application(
     db.commit()
     db.refresh(db_application)
 
-    if db_application.status == ApplicationStatus.HIRED:
-        job = crud_job.get_job(db, job_id=db_application.job_id)
-        if job:
-            crud_job.update_job(db, db_job=job, job_in={"status": Status.CLOSED})
-
     return db_application
 
 

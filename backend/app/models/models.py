@@ -100,11 +100,11 @@ class RecruiterCompanyLink(RecruiterCompanyLinkBase, table=True):
 class FieldType(str, Enum):
     TEXT = "text"
     NUMBER = "number"
-    EMAIL = "email"
     DATE = "date"
     SELECT = "select"
     TEXTAREA = "textarea"
     CHECKBOX = "checkbox"
+    LINK = "link"
 
 
 class FormKeyBase(TimeBase):
@@ -348,12 +348,16 @@ class InterviewBase(TimeBase):
     status: str
     # status: InterviewStatus = Field(default=InterviewStatus.SCHEDULED, sa_column=Column(SQLAlchemyEnum(InterviewStatus, name="interviewstatus_enum", create_type=True)))
     notes: Optional[str] = None
+    interviewer_id: Optional[int] = Field(default=None, foreign_key="hr.id")
 
 
 class Interview(InterviewBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
 
     application: Optional[Application] = Relationship(back_populates="interviews")
+    interviewer: Optional[HR] = Relationship(
+        sa_relationship_kwargs={"foreign_keys": "Interview.interviewer_id"}
+    )
 
 
 class MatchBase(TimeBase):
@@ -379,6 +383,9 @@ class MatchBase(TimeBase):
     missing_skills_count: Optional[int] = Field(default=None)
     extra_skills_count: Optional[int] = Field(default=None)
     weights: Optional[Dict] = Field(default=None, sa_column=Column(JSON))
+    
+    # Flags
+    flags: Optional[Dict] = Field(default=None, sa_column=Column(JSON))
 
 
 class Match(MatchBase, table=True):

@@ -4,7 +4,7 @@ from .application import (
     ApplicationRead,
     ApplicationWithDetails,
 )
-from .candidate import CandidateCreate, CandidateUpdate, CandidateRead
+from .candidate import CandidateCreate, CandidateUpdate, CandidateRead, CandidateWithDetails, ApplicationWithInterviews
 from .company import CompanyCreate, CompanyUpdate, CompanyRead
 from .form_key import FormKeyCreate, FormKeyUpdate, FormKeyRead
 from .hr import HRCreate, HRUpdate, HRRead
@@ -22,6 +22,10 @@ __all__ = [
     "CandidateCreate",
     "CandidateUpdate",
     "CandidateRead",
+    "CandidateWithDetails",
+    "ApplicationWithInterviews",
+    "FormResponseItem",
+    "ApplicationWithDetails",
     "CompanyCreate",
     "CompanyUpdate",
     "CompanyRead",
