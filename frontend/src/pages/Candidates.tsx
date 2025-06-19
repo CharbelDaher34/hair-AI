@@ -24,6 +24,9 @@ const Candidates = () => {
   const [candidate_dialog_open, set_candidate_dialog_open] = useState(false);
   const [resume_pdf_url, set_resume_pdf_url] = useState<string | null>(null);
   const [pdf_loading, set_pdf_loading] = useState(false);
+  const [match_dialog_open, set_match_dialog_open] = useState(false);
+  const [selected_match, set_selected_match] = useState<any>(null);
+  const [match_loading, set_match_loading] = useState(false);
 
   useEffect(() => {
     const fetch_candidates = async () => {
@@ -93,6 +96,15 @@ const Candidates = () => {
     }
   };
 
+  const handle_view_match = async (application: any) => {
+    if (!application.match) {
+      alert('No match data available for this application.');
+      return;
+    }
+    set_selected_match(application.match);
+    set_match_dialog_open(true);
+  };
+
   // Cleanup object URL on component unmount
   useEffect(() => {
     return () => {
@@ -158,7 +170,7 @@ const Candidates = () => {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid gap-6 md:grid-cols-3">
+      {/* <div className="grid gap-6 md:grid-cols-3">
         <Card className="card hover:scale-105 transition-all duration-300 border-0 shadow-lg hover:shadow-xl">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-semibold text-gray-700">Total Candidates</CardTitle>
@@ -209,7 +221,7 @@ const Candidates = () => {
             </p>
           </CardContent>
         </Card>
-      </div>
+      </div> */}
 
       {/* Candidates Table */}
       <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
@@ -472,18 +484,37 @@ const Candidates = () => {
                         {selected_candidate.applications.map((application) => (
                           <div key={application.id} className="p-4 border border-gray-200 rounded-lg hover:bg-slate-50">
                             <div className="flex items-center justify-between">
-                              <div>
+                              <div className="flex-1">
                                 <h4 className="font-semibold text-gray-800">
                                   {application.job?.title || "Unknown Job"}
                                 </h4>
                                 <p className="text-sm text-gray-600">
                                   Applied on {new Date(application.created_at).toLocaleDateString()}
                                 </p>
+                                {application.match && (
+                                  <div className="mt-2">
+                                    <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                                      <Star className="h-3 w-3 mr-1" />
+                                      Match: {(application.match.score * 100).toFixed(1)}%
+                                    </Badge>
+                                  </div>
+                                )}
                               </div>
                               <div className="flex items-center gap-2">
                                 <Badge variant="outline" className="capitalize">
                                   {application.status}
                                 </Badge>
+                                {application.match && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handle_view_match(application)}
+                                    className="button-outline shadow-sm hover:shadow-md transition-all duration-300"
+                                  >
+                                    <Star className="h-4 w-4 mr-1" />
+                                    Match
+                                  </Button>
+                                )}
                                 <Button
                                   variant="outline"
                                   size="sm"
@@ -609,6 +640,153 @@ const Candidates = () => {
               </div>
             </>
           ) : null}
+        </DialogContent>
+      </Dialog>
+
+      {/* Match Details Dialog */}
+      <Dialog open={match_dialog_open} onOpenChange={set_match_dialog_open}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+              <Star className="h-6 w-6 text-yellow-500" />
+              Match Analysis
+            </DialogTitle>
+            <DialogDescription className="text-gray-600">
+              Detailed matching analysis for this application
+            </DialogDescription>
+          </DialogHeader>
+
+          {selected_match && (
+            <div className="space-y-6 mt-4">
+              {/* Overall Score */}
+              <div className="text-center p-4 bg-gradient-to-r from-green-50 to-blue-50 rounded-lg border border-green-200">
+                <Label className="text-sm font-semibold text-gray-700 block mb-2">Overall Match Score</Label>
+                <Badge variant="outline" className="font-bold text-2xl text-green-600 border-green-300 bg-green-50 px-4 py-2">
+                  {selected_match.score ? (selected_match.score * 100).toFixed(1) : 'N/A'}%
+                </Badge>
+                {selected_match.embedding_similarity && (
+                  <p className="text-sm text-gray-600 mt-2">
+                    Embedding Similarity: {(selected_match.embedding_similarity * 100).toFixed(1)}%
+                  </p>
+                )}
+              </div>
+
+              {/* Skills Analysis */}
+              <div className="grid gap-4 md:grid-cols-3">
+                {/* Matching Skills */}
+                {selected_match.matching_skills && selected_match.matching_skills.length > 0 && (
+                  <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                    <Label className="text-sm font-semibold text-green-700 block mb-2">
+                      Matching Skills ({selected_match.matching_skills.length})
+                    </Label>
+                    <div className="flex flex-wrap gap-1">
+                      {selected_match.matching_skills.map((skill: string, index: number) => (
+                        <Badge key={index} variant="secondary" className="bg-green-100 text-green-700 border-green-200 text-xs">
+                          {skill}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Missing Skills */}
+                {selected_match.missing_skills && selected_match.missing_skills.length > 0 && (
+                  <div className="p-4 bg-red-50 rounded-lg border border-red-200">
+                    <Label className="text-sm font-semibold text-red-700 block mb-2">
+                      Missing Skills ({selected_match.missing_skills.length})
+                    </Label>
+                    <div className="flex flex-wrap gap-1">
+                      {selected_match.missing_skills.map((skill: string, index: number) => (
+                        <Badge key={index} variant="secondary" className="bg-red-100 text-red-700 border-red-200 text-xs">
+                          {skill}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Extra Skills */}
+                {selected_match.extra_skills && selected_match.extra_skills.length > 0 && (
+                  <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <Label className="text-sm font-semibold text-blue-700 block mb-2">
+                      Additional Skills ({selected_match.extra_skills.length})
+                    </Label>
+                    <div className="flex flex-wrap gap-1">
+                      {selected_match.extra_skills.map((skill: string, index: number) => (
+                        <Badge key={index} variant="secondary" className="bg-blue-100 text-blue-700 border-blue-200 text-xs">
+                          {skill}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Score Breakdown */}
+              {selected_match.score_breakdown && (
+                <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                  <Label className="text-sm font-semibold text-gray-700 block mb-3">Score Breakdown</Label>
+                  <div className="grid gap-2 md:grid-cols-2">
+                    {Object.entries(selected_match.score_breakdown).map(([key, value]: [string, any]) => (
+                      <div key={key} className="flex justify-between items-center p-2 bg-white rounded border">
+                        <span className="text-sm font-medium text-gray-700 capitalize">
+                          {key.replace(/_/g, ' ')}
+                        </span>
+                        <span className="text-sm font-bold text-gray-800">
+                          {typeof value === 'number' ? (value * 100).toFixed(1) + '%' : String(value)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Weights Used */}
+              {selected_match.weights_used && (
+                <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                  <Label className="text-sm font-semibold text-yellow-700 block mb-3">Matching Weights</Label>
+                  <div className="grid gap-2 md:grid-cols-2">
+                    {Object.entries(selected_match.weights_used).map(([key, value]: [string, any]) => (
+                      <div key={key} className="flex justify-between items-center p-2 bg-white rounded border">
+                        <span className="text-sm font-medium text-gray-700 capitalize">
+                          {key.replace(/_/g, ' ')}
+                        </span>
+                        <span className="text-sm font-bold text-gray-800">
+                          {typeof value === 'number' ? value.toFixed(2) : String(value)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Flags */}
+              {selected_match.flags && Object.keys(selected_match.flags).length > 0 && (
+                <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
+                  <Label className="text-sm font-semibold text-purple-700 block mb-3">Match Flags</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {Object.entries(selected_match.flags).map(([key, value]: [string, any]) => (
+                      <Badge key={key} variant="outline" className={`text-xs ${
+                        value ? 'bg-purple-100 text-purple-700 border-purple-200' : 'bg-gray-100 text-gray-600 border-gray-200'
+                      }`}>
+                        {key.replace(/_/g, ' ')}: {String(value)}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Legacy Match Percentage (if available) */}
+              {selected_match.match_percentage && selected_match.match_percentage !== selected_match.score && (
+                <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                  <Label className="text-sm font-semibold text-gray-600 block mb-1">Legacy Match Percentage</Label>
+                  <span className="text-sm text-gray-700">
+                    {(selected_match.match_percentage * 100).toFixed(1)}%
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

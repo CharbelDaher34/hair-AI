@@ -10,6 +10,7 @@ from models.models import (
     Interview,
     Status,
     ApplicationStatus,
+    Candidate,
 )
 from pydantic import BaseModel
 from typing import List, Optional
@@ -49,7 +50,7 @@ class CompanyAnalyticsData(BaseModel):
     job_performance: List[JobPerformanceData]
     recent_jobs: List[RecentJobData]
     applications_by_status: List[ApplicationStatusData]
-
+    total_candidates: int
 
 @router.get("/company/", response_model=CompanyAnalyticsData)
 def get_company_analytics(request: Request, db: Session = Depends(get_session)):
@@ -82,7 +83,14 @@ def get_company_analytics(request: Request, db: Session = Depends(get_session)):
             .join(Job)
             .where(Job.employer_id == employer_id)
         ).one()
-
+        
+        total_candidates = db.exec(
+            select(func.count(Candidate.id))
+            .join(Application)
+            .join(Job)
+            .where(Job.employer_id == employer_id)
+        ).one()
+        
         # 4. Calculate real hire rate based on interviews marked as "done" vs total applications
         hired_applications = db.exec(
             select(func.count(Application.id))
@@ -212,4 +220,5 @@ def get_company_analytics(request: Request, db: Session = Depends(get_session)):
         job_performance=job_performance_data,
         recent_jobs=recent_jobs_data,
         applications_by_status=applications_by_status_data,
+        total_candidates=total_candidates,
     )

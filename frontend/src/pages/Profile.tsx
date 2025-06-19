@@ -607,8 +607,9 @@ const Profile = () => {
                   <Input
                     id="role"
                     value={personal_form.role || ""}
-                    disabled={true}
-                    className="bg-muted"
+                    onChange={(e) => handle_personal_form_change("role", e.target.value)}
+                    disabled={!is_editing_personal}
+                    className="h-12 shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500"
                   />
                 </div>
 
@@ -685,39 +686,21 @@ const Profile = () => {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div className="space-y-2">
                             <Label htmlFor="new_employee_role">Role *</Label>
-                            <Select
+                            <Input
+                              id="new_employee_role"
                               value={new_employee_form.role}
-                              onValueChange={(value) => handle_new_employee_form_change("role", value)}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select role" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="hr_manager">HR Manager</SelectItem>
-                                <SelectItem value="recruiter">Recruiter</SelectItem>
-                                <SelectItem value="admin">Admin</SelectItem>
-                                <SelectItem value="coordinator">Coordinator</SelectItem>
-                                <SelectItem value="specialist">Specialist</SelectItem>
-                              </SelectContent>
-                            </Select>
+                              onChange={(e) => handle_new_employee_form_change("role", e.target.value)}
+                              placeholder="Enter role (e.g., HR Manager, Recruiter, Admin)"
+                            />
                           </div>
                           <div className="space-y-2">
                             <Label htmlFor="new_employee_department">Department</Label>
-                            <Select
+                            <Input
+                              id="new_employee_department"
                               value={new_employee_form.department}
-                              onValueChange={(value) => handle_new_employee_form_change("department", value)}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select department" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="human_resources">Human Resources</SelectItem>
-                                <SelectItem value="recruitment">Recruitment</SelectItem>
-                                <SelectItem value="talent_acquisition">Talent Acquisition</SelectItem>
-                                <SelectItem value="operations">Operations</SelectItem>
-                                <SelectItem value="administration">Administration</SelectItem>
-                              </SelectContent>
-                            </Select>
+                              onChange={(e) => handle_new_employee_form_change("department", e.target.value)}
+                              placeholder="Enter department (e.g., Human Resources, Recruitment)"
+                            />
                           </div>
                         </div>
                         <div className="space-y-2">

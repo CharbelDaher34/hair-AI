@@ -2,8 +2,8 @@ from typing import Any, Dict, Optional, Union, List
 
 from sqlmodel import Session, select, func
 
-from models.models import Candidate, Application, Job, Company, CandidateEmployerLink, Interview
-from schemas import CandidateCreate, CandidateUpdate, InterviewRead, CandidateWithDetails, ApplicationWithInterviews
+from models.models import Candidate, Application, Job, Company, CandidateEmployerLink, Interview, Match
+from schemas import CandidateCreate, CandidateUpdate, InterviewRead, CandidateWithDetails, ApplicationWithInterviews, MatchRead
 from schemas.application import JobRead
 
 
@@ -198,12 +198,25 @@ def get_candidate_with_details(db: Session, candidate_id: int) -> Optional[Candi
     applications_with_interviews = []
     for application in applications:
         # Get interviews for this application
-        interviews_statement = select(Interview).where(Interview.application_id == application.id)
-        interviews = db.exec(interviews_statement).all()
-        print(f"Interviews: {interviews}")
-        # Convert interviews to InterviewRead objects
-        interview_reads = [InterviewRead.model_validate(interview) for interview in interviews]
-        
+        try:
+            interviews_statement = select(Interview).where(Interview.application_id == application.id)
+            interviews = db.exec(interviews_statement).all()
+            print(f"Interviews: {interviews}")
+            # Convert interviews to InterviewRead objects
+            interview_reads = [InterviewRead.model_validate(interview) for interview in interviews]
+        except Exception as e:
+            print(f"Error getting interviews: {e}")
+            interview_reads = []
+        # Get matches for this application
+        try:
+            matches_statement = select(Match).where(Match.application_id == application.id)
+            match = db.exec(matches_statement).first()
+            print(f"Match: {match}")
+            # Convert matches to MatchRead objects
+            match_read = MatchRead.model_validate(match)
+        except Exception as e:
+            print(f"Error getting match: {e}")
+            match_read = None
         # Get job information for this application
         job = db.get(Job, application.job_id)
         job_read = JobRead.model_validate(job) if job else None
@@ -212,7 +225,8 @@ def get_candidate_with_details(db: Session, candidate_id: int) -> Optional[Candi
         app_with_interviews = ApplicationWithInterviews(
             **application.model_dump(),
             interviews=interview_reads,
-            job=job_read
+            job=job_read,
+            match=match_read
         )
         applications_with_interviews.append(app_with_interviews)
     
