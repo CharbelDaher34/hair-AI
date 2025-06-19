@@ -410,13 +410,13 @@ const CreateEditJob = () => {
       return;
     }
 
-    // Helper function to convert object-like arrays to proper arrays
+    // Helper function to convert object-like arrays to proper arrays and filter empty items
     const normalizeArray = (data: any): any[] => {
       if (Array.isArray(data)) {
-        return data;
+        return data.filter(item => item && item.toString().trim() !== "");
       }
       if (data && typeof data === 'object') {
-        return Object.values(data);
+        return Object.values(data).filter(item => item && item.toString().trim() !== "");
       }
       return [];
     };
@@ -709,7 +709,7 @@ const CreateEditJob = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                     <Label htmlFor="base_salary" className="text-sm font-medium">
-                      Base Salary {ai_generated_fields.has('compensation.base_salary') && <AIGeneratedBadge />}
+                      Monthly Base Salary ($) {ai_generated_fields.has('compensation.base_salary') && <AIGeneratedBadge />}
                   </Label>
                   <Input
                       id="base_salary"
@@ -836,7 +836,7 @@ const CreateEditJob = () => {
                       console.log("Responsibilities textarea value:", value, "from data:", job_data.responsibilities);
                       return value;
                     })()}
-                    onChange={(e) => set_job_data({ ...job_data, responsibilities: e.target.value.split("\n").filter(item => item.trim() !== "") })}
+                    onChange={(e) => set_job_data({ ...job_data, responsibilities: e.target.value.split("\n") })}
                     placeholder="e.g., Develop and maintain web applications&#10;Collaborate with cross-functional teams&#10;Participate in code reviews&#10;Mentor junior developers"
                     rows={6}
                     className="resize-none"

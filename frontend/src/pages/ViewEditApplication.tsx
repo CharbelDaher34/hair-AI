@@ -373,47 +373,7 @@ const ViewApplication = () => {
             </CardContent>
           </Card>
 
-          {parsed_resume && (
-            <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
-              <CardHeader className="pb-4">
-                <CardTitle className="flex items-center gap-3 text-xl font-bold text-gray-800">
-                  <Star className="h-6 w-6 text-yellow-500" />
-                  Parsed Resume Highlights
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4 pt-4">
-                {parsed_resume.skills && parsed_resume.skills.length > 0 && (
-                  <div className="space-y-2">
-                    <Label className="text-sm font-semibold text-gray-700">Skills</Label>
-                    <div className="flex flex-wrap gap-2">
-                      {parsed_resume.skills.map((skill: any, index: number) => (
-                        <Badge key={index} variant="secondary" className="bg-blue-100 text-blue-700 border-blue-200 text-sm px-3 py-1">
-                          {typeof skill === 'string' ? skill : skill.name}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {parsed_resume.experience && parsed_resume.experience.length > 0 && (
-                  <div className="space-y-3">
-                    <Label className="text-sm font-semibold text-gray-700">Work Experience</Label>
-                    {parsed_resume.experience.map((exp: any, index: number) => (
-                      <div key={index} className="p-3 bg-slate-100 rounded-md border border-slate-200">
-                        <h4 className="font-semibold text-gray-800">{exp.title} at {exp.company}</h4>
-                        <p className="text-sm text-gray-600">{exp.dates}</p>
-                        {exp.description && <p className="text-sm text-gray-700 mt-1 whitespace-pre-line">{exp.description}</p>}
-                    </div>
-                  ))}
-                  </div>
-                )}
-                 {(!parsed_resume.skills || parsed_resume.skills.length === 0) && 
-                  (!parsed_resume.experience || parsed_resume.experience.length === 0) && (
-                    <p className="text-gray-600 italic">No highlights extracted from resume.</p>
-                 )
-                }
-              </CardContent>
-            </Card>
-          )}
+
         </div>
 
         <div className="space-y-6">
@@ -450,33 +410,142 @@ const ViewApplication = () => {
             </CardContent>
           </Card>
 
-          {application_data.matches && application_data.matches.length > 0 && (
+          {application_data.match && (
             <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
               <CardHeader className="pb-4">
                 <CardTitle className="flex items-center gap-3 text-xl font-bold text-gray-800">
                   <Star className="h-6 w-6 text-yellow-500" />
-                  Match Details
-              </CardTitle>
-            </CardHeader>
-              <CardContent className="pt-4">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="font-semibold text-gray-700">Score</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {application_data.matches.map((match: any) => (
-                      <TableRow key={match.id} className="hover:bg-slate-50">
-                        <TableCell>
-                          <Badge variant="outline" className="font-bold text-lg text-green-600 border-green-300 bg-green-50">
-                            {(match.score * 100).toFixed(1)}%
+                  Match Analysis
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-4 space-y-6">
+                {/* Overall Score */}
+                <div className="text-center p-4 bg-gradient-to-r from-green-50 to-blue-50 rounded-lg border border-green-200">
+                  <Label className="text-sm font-semibold text-gray-700 block mb-2">Overall Match Score</Label>
+                  <Badge variant="outline" className="font-bold text-2xl text-green-600 border-green-300 bg-green-50 px-4 py-2">
+                    {application_data.match.score ? (application_data.match.score * 100).toFixed(1) : 'N/A'}%
+                  </Badge>
+                  {application_data.match.embedding_similarity && (
+                    <p className="text-sm text-gray-600 mt-2">
+                      Embedding Similarity: {(application_data.match.embedding_similarity * 100).toFixed(1)}%
+                    </p>
+                  )}
+                </div>
+
+                {/* Skills Analysis */}
+                <div className="grid gap-4 md:grid-cols-3">
+                  {/* Matching Skills */}
+                  {application_data.match.matching_skills && application_data.match.matching_skills.length > 0 && (
+                    <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                      <Label className="text-sm font-semibold text-green-700 block mb-2">
+                        Matching Skills ({application_data.match.matching_skills.length})
+                      </Label>
+                      <div className="flex flex-wrap gap-1">
+                        {application_data.match.matching_skills.map((skill: string, index: number) => (
+                          <Badge key={index} variant="secondary" className="bg-green-100 text-green-700 border-green-200 text-xs">
+                            {skill}
                           </Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Missing Skills */}
+                  {application_data.match.missing_skills && application_data.match.missing_skills.length > 0 && (
+                    <div className="p-4 bg-red-50 rounded-lg border border-red-200">
+                      <Label className="text-sm font-semibold text-red-700 block mb-2">
+                        Missing Skills ({application_data.match.missing_skills.length})
+                      </Label>
+                      <div className="flex flex-wrap gap-1">
+                        {application_data.match.missing_skills.map((skill: string, index: number) => (
+                          <Badge key={index} variant="secondary" className="bg-red-100 text-red-700 border-red-200 text-xs">
+                            {skill}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Extra Skills */}
+                  {application_data.match.extra_skills && application_data.match.extra_skills.length > 0 && (
+                    <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                      <Label className="text-sm font-semibold text-blue-700 block mb-2">
+                        Additional Skills ({application_data.match.extra_skills.length})
+                      </Label>
+                      <div className="flex flex-wrap gap-1">
+                        {application_data.match.extra_skills.map((skill: string, index: number) => (
+                          <Badge key={index} variant="secondary" className="bg-blue-100 text-blue-700 border-blue-200 text-xs">
+                            {skill}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Score Breakdown */}
+                {application_data.match.score_breakdown && (
+                  <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                    <Label className="text-sm font-semibold text-gray-700 block mb-3">Score Breakdown</Label>
+                    <div className="grid gap-2 md:grid-cols-2">
+                      {Object.entries(application_data.match.score_breakdown).map(([key, value]: [string, any]) => (
+                        <div key={key} className="flex justify-between items-center p-2 bg-white rounded border">
+                          <span className="text-sm font-medium text-gray-700 capitalize">
+                            {key.replace(/_/g, ' ')}
+                          </span>
+                          <span className="text-sm font-bold text-gray-800">
+                            {typeof value === 'number' ? (value * 100).toFixed(1) + '%' : String(value)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Weights Used */}
+                {application_data.match.weights_used && (
+                  <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                    <Label className="text-sm font-semibold text-yellow-700 block mb-3">Matching Weights</Label>
+                    <div className="grid gap-2 md:grid-cols-2">
+                      {Object.entries(application_data.match.weights_used).map(([key, value]: [string, any]) => (
+                        <div key={key} className="flex justify-between items-center p-2 bg-white rounded border">
+                          <span className="text-sm font-medium text-gray-700 capitalize">
+                            {key.replace(/_/g, ' ')}
+                          </span>
+                          <span className="text-sm font-bold text-gray-800">
+                            {typeof value === 'number' ? value.toFixed(2) : String(value)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Flags */}
+                {application_data.match.flags && Object.keys(application_data.match.flags).length > 0 && (
+                  <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
+                    <Label className="text-sm font-semibold text-purple-700 block mb-3">Match Flags</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {Object.entries(application_data.match.flags).map(([key, value]: [string, any]) => (
+                        <Badge key={key} variant="outline" className={`text-xs ${
+                          value ? 'bg-purple-100 text-purple-700 border-purple-200' : 'bg-gray-100 text-gray-600 border-gray-200'
+                        }`}>
+                          {key.replace(/_/g, ' ')}: {String(value)}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Legacy Match Percentage (if available) */}
+                {application_data.match.match_percentage && application_data.match.match_percentage !== application_data.match.score && (
+                  <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <Label className="text-sm font-semibold text-gray-600 block mb-1">Legacy Match Percentage</Label>
+                    <span className="text-sm text-gray-700">
+                      {(application_data.match.match_percentage * 100).toFixed(1)}%
+                    </span>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}

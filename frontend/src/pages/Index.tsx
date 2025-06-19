@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
-import { Users, FileText, Calendar, TrendingUp, Target, UserCheck } from "lucide-react";
+import { Users, FileText, Calendar, TrendingUp, Target, UserCheck, Bot } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import apiService from "@/services/api";
@@ -109,7 +109,7 @@ const Index = () => {
 
       <div className="grid gap-8 lg:grid-cols-3">
         {/* Quick Actions - Moved to first position */}
-        <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
+        {/* <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
           <CardHeader className="pb-4">
             <CardTitle className="text-xl font-bold text-gray-800">Quick Actions</CardTitle>
             <CardDescription className="text-base text-gray-600">Common tasks to get you started</CardDescription>
@@ -134,9 +134,9 @@ const Index = () => {
               </Link>
             </Button>
             <Button variant="outline" asChild className="w-full justify-start h-12 text-base font-semibold shadow-sm hover:shadow-md transition-all duration-300 hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50">
-              <Link to="/interviews/create">
+              <Link to="/interviews">
                 <Calendar className="mr-3 h-5 w-5" />
-                Schedule Interview
+                Interviews
               </Link>
             </Button>
             <Button variant="outline" asChild className="w-full justify-start h-12 text-base font-semibold shadow-sm hover:shadow-md transition-all duration-300 hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50">
@@ -145,8 +145,14 @@ const Index = () => {
                 View Analytics
               </Link>
             </Button>
+            <Button variant="outline" asChild className="w-full justify-start h-12 text-base font-semibold shadow-sm hover:shadow-md transition-all duration-300 hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50">
+              <Link to="/chatbot">
+                <Bot className="mr-3 h-5 w-5" />
+                Chatbot
+              </Link>
+            </Button>
           </CardContent>
-        </Card>
+        </Card> */}
 
         {/* Applications Over Time */}
         <Card className="lg:col-span-2 card shadow-lg hover:shadow-xl transition-all duration-300 border-0">

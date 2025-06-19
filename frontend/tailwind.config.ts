@@ -84,11 +84,49 @@ export default {
 					to: {
 						height: '0'
 					}
+				},
+				'float-slow': {
+					'0%, 100%': { transform: 'translateY(0px) translateX(0px)' },
+					'50%': { transform: 'translateY(-20px) translateX(10px)' }
+				},
+				'float-reverse': {
+					'0%, 100%': { transform: 'translateY(0px) translateX(0px)' },
+					'50%': { transform: 'translateY(15px) translateX(-15px)' }
+				},
+				'float-diagonal': {
+					'0%, 100%': { transform: 'translateY(0px) translateX(0px)' },
+					'50%': { transform: 'translateY(-15px) translateX(20px)' }
+				},
+				'float-center': {
+					'0%, 100%': { transform: 'translate(-50%, -50%) scale(1)' },
+					'50%': { transform: 'translate(-50%, -50%) scale(1.05)' }
+				},
+				'float-small': {
+					'0%, 100%': { transform: 'translateY(0px) translateX(0px) rotate(0deg)' },
+					'33%': { transform: 'translateY(-10px) translateX(5px) rotate(2deg)' },
+					'66%': { transform: 'translateY(5px) translateX(-8px) rotate(-1deg)' }
+				},
+				'float-small-reverse': {
+					'0%, 100%': { transform: 'translateY(0px) translateX(0px) rotate(0deg)' },
+					'33%': { transform: 'translateY(8px) translateX(-5px) rotate(-2deg)' },
+					'66%': { transform: 'translateY(-5px) translateX(10px) rotate(1deg)' }
+				},
+				'float-tiny': {
+					'0%, 100%': { transform: 'translateY(0px) translateX(0px)' },
+					'25%': { transform: 'translateY(-5px) translateX(3px)' },
+					'75%': { transform: 'translateY(3px) translateX(-5px)' }
 				}
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
-				'accordion-up': 'accordion-up 0.2s ease-out'
+				'accordion-up': 'accordion-up 0.2s ease-out',
+				'float-slow': 'float-slow 20s ease-in-out infinite',
+				'float-reverse': 'float-reverse 25s ease-in-out infinite',
+				'float-diagonal': 'float-diagonal 18s ease-in-out infinite',
+				'float-center': 'float-center 30s ease-in-out infinite',
+				'float-small': 'float-small 15s ease-in-out infinite',
+				'float-small-reverse': 'float-small-reverse 12s ease-in-out infinite',
+				'float-tiny': 'float-tiny 10s ease-in-out infinite'
 			}
 		}
 	},

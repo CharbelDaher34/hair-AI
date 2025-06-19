@@ -1,7 +1,7 @@
 from typing import Optional, Dict, List, Any
 from pydantic import BaseModel, field_validator
 from sqlmodel import SQLModel
-from models.models import CandidateBase, ApplicationBase, InterviewBase
+from models.models import CandidateBase, ApplicationBase, InterviewBase, MatchBase
 from utils.pydantic_utils import make_optional
 from schemas.application import JobRead
 
@@ -24,11 +24,14 @@ class ApplicationRead(ApplicationBase):
     
 class InterviewRead(InterviewBase):
     id:int
+class MatchRead(MatchBase):
+    id:int
 
   
 class ApplicationWithInterviews(ApplicationRead):
     interviews: Optional[List[InterviewRead]] = None
     job: Optional[JobRead] = None
+    match: Optional[MatchRead] = None
     
 class CandidateWithDetails(CandidateRead):
     applications: Optional[List[ApplicationWithInterviews]] = None

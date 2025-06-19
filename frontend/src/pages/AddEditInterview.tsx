@@ -26,7 +26,6 @@ interface InterviewFormData {
   application_id: string;
   date: string;
   type: string;
-  status: string;
   notes: string;
   interviewer_id: string;
 }
@@ -37,45 +36,37 @@ interface HR {
   email: string;
 }
 
+const INTERVIEW_TYPES = [
+  { value: "phone", label: "Phone" },
+  { value: "online", label: "Online" },
+  { value: "in_person", label: "In Person" },
+];
+
 const AddEditInterview = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const isEditing = Boolean(id);
+  const is_editing = Boolean(id);
 
-  const [interviewData, setInterviewData] = useState<InterviewFormData>({
+  const [interview_data, setInterviewData] = useState<InterviewFormData>({
     application_id: "",
     date: "",
     type: "phone",
-    status: "scheduled",
     notes: "",
     interviewer_id: "",
   });
 
   const [applications, setApplications] = useState<Application[]>([]);
-  const [hrUsers, setHrUsers] = useState<HR[]>([]);
+  const [hr_users, setHrUsers] = useState<HR[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const interviewTypes = [
-    { value: "phone", label: "Phone" },
-    { value: "online", label: "Online" },
-    { value: "in_person", label: "In Person" },
-  ];
-
-  const interviewStatuses = [
-    { value: "scheduled", label: "Scheduled" },
-    { value: "done", label: "Done" },
-    { value: "canceled", label: "Canceled" },
-  ];
-
-  const fetchApplications = async () => {
+  // Fetch applications data
+  const fetch_applications = async () => {
     try {
       const data = await apiService.getEmployerApplications();
-      console.log("Applications API response:", data);
-      
-      const applicationsArray = data?.applications || [];
-      setApplications(Array.isArray(applicationsArray) ? applicationsArray : []);
+      const applications_array = data?.applications || [];
+      setApplications(Array.isArray(applications_array) ? applications_array : []);
     } catch (err) {
       console.error("Error fetching applications:", err);
       setApplications([]);
@@ -87,11 +78,10 @@ const AddEditInterview = () => {
     }
   };
 
-  const fetchHrUsers = async () => {
+  // Fetch HR users data
+  const fetch_hr_users = async () => {
     try {
       const data = await apiService.getCompanyEmployees();
-      console.log("HR users API response:", data);
-      
       setHrUsers(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Error fetching HR users:", err);
@@ -104,19 +94,17 @@ const AddEditInterview = () => {
     }
   };
 
-  const fetchInterview = async (interviewId: string) => {
+  // Fetch interview data for editing
+  const fetch_interview = async (interview_id: string) => {
     try {
-      const data = await apiService.getInterview(parseInt(interviewId));
-      
-      // Convert the date to the format expected by the datetime-local input
+      const data = await apiService.getInterview(parseInt(interview_id));
       const date = new Date(data.date);
-      const formattedDate = date.toISOString().slice(0, 16); // YYYY-MM-DDTHH:mm
+      const formatted_date = date.toISOString().slice(0, 16);
       
       setInterviewData({
         application_id: data.application_id.toString(),
-        date: formattedDate,
+        date: formatted_date,
         type: data.type,
-        status: data.status,
         notes: data.notes || "",
         interviewer_id: data.interviewer_id?.toString() || "",
       });
@@ -131,24 +119,25 @@ const AddEditInterview = () => {
     }
   };
 
+  // Load initial data
   useEffect(() => {
-    const loadData = async () => {
+    const load_data = async () => {
       setLoading(true);
       setError(null);
       
       try {
-        await Promise.all([fetchApplications(), fetchHrUsers()]);
+        await Promise.all([fetch_applications(), fetch_hr_users()]);
         
-        if (isEditing && id) {
-          await fetchInterview(id);
+        if (is_editing && id) {
+          await fetch_interview(id);
         } else {
-          // Check if application_id is passed as URL parameter
-          const urlParams = new URLSearchParams(window.location.search);
-          const applicationId = urlParams.get('application_id');
-          if (applicationId) {
+          // Check for application_id in URL parameters
+          const url_params = new URLSearchParams(window.location.search);
+          const application_id = url_params.get('application_id');
+          if (application_id) {
             setInterviewData(prev => ({
               ...prev,
-              application_id: applicationId
+              application_id: application_id
             }));
           }
         }
@@ -159,28 +148,26 @@ const AddEditInterview = () => {
       }
     };
 
-    loadData();
-  }, [id, isEditing]);
+    load_data();
+  }, [id, is_editing]);
 
-  // Set first HR user as default when hrUsers is loaded and we're not editing
+  // Set default interviewer when HR users are loaded
   useEffect(() => {
-    if (!isEditing && hrUsers.length > 0 && !interviewData.interviewer_id) {
+    if (!is_editing && hr_users.length > 0 && !interview_data.interviewer_id) {
       setInterviewData(prev => ({
         ...prev,
-        interviewer_id: hrUsers[0].id.toString()
+        interviewer_id: hr_users[0].id.toString()
       }));
     }
-  }, [hrUsers, isEditing, interviewData.interviewer_id]);
+  }, [hr_users, is_editing, interview_data.interviewer_id]);
 
-  const getSelectedApplication = () => {
-    if (!Array.isArray(applications)) {
-      return undefined;
-    }
-    return applications.find(app => app.id.toString() === interviewData.application_id);
+  const get_selected_application = () => {
+    if (!Array.isArray(applications)) return undefined;
+    return applications.find(app => app.id.toString() === interview_data.application_id);
   };
 
-  const handleSubmit = async () => {
-    if (!interviewData.application_id || !interviewData.date) {
+  const handle_submit = async () => {
+    if (!interview_data.application_id || !interview_data.date) {
       toast({
         title: "Error",
         description: "Please fill in all required fields.",
@@ -192,23 +179,23 @@ const AddEditInterview = () => {
     setSubmitting(true);
     
     try {
-      const submitData = {
-        application_id: parseInt(interviewData.application_id),
-        date: new Date(interviewData.date).toISOString(),
-        type: interviewData.type,
-        status: interviewData.status,
-        notes: interviewData.notes || null,
-        interviewer_id: interviewData.interviewer_id ? parseInt(interviewData.interviewer_id) : null,
+      const submit_data = {
+        application_id: parseInt(interview_data.application_id),
+        date: new Date(interview_data.date).toISOString(),
+        type: interview_data.type,
+        status: "SCHEDULED",
+        notes: interview_data.notes || null,
+        interviewer_id: interview_data.interviewer_id && interview_data.interviewer_id !== "none" ? parseInt(interview_data.interviewer_id) : null,
       };
 
-      if (isEditing && id) {
-        await apiService.updateInterview(parseInt(id), submitData);
+      if (is_editing && id) {
+        await apiService.updateInterview(parseInt(id), submit_data);
         toast({
           title: "Success",
           description: "Interview updated successfully.",
         });
       } else {
-        await apiService.createInterview(submitData);
+        await apiService.createInterview(submit_data);
         toast({
           title: "Success",
           description: "Interview scheduled successfully.",
@@ -220,7 +207,7 @@ const AddEditInterview = () => {
       console.error("Error saving interview:", err);
       toast({
         title: "Error",
-        description: `Failed to ${isEditing ? "update" : "create"} interview.`,
+        description: `Failed to ${is_editing ? "update" : "create"} interview.`,
         variant: "destructive",
       });
     } finally {
@@ -228,6 +215,7 @@ const AddEditInterview = () => {
     }
   };
 
+  // Loading state
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center p-8 bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
@@ -239,6 +227,7 @@ const AddEditInterview = () => {
     );
   }
 
+  // Error state
   if (error) {
     return (
       <div className="flex-1 flex items-center justify-center p-8 bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
@@ -254,52 +243,68 @@ const AddEditInterview = () => {
     );
   }
 
-  const selectedApplication = getSelectedApplication();
+  const selected_application = get_selected_application();
 
   return (
     <div className="flex-1 space-y-8 p-8 bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
+      {/* Header Section */}
       <div className="flex items-center justify-between">
         <div className="space-y-2">
           <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            {isEditing ? "Edit Interview" : "Schedule Interview"}
+            {is_editing ? "Edit Interview" : "Schedule Interview"}
           </h1>
           <p className="text-lg text-gray-600">
-            {isEditing ? "Update interview details" : "Schedule a new interview with a candidate"}
+            {is_editing ? "Update interview details" : "Schedule a new interview with a candidate"}
           </p>
         </div>
         <div className="flex gap-3">
-          <Button variant="outline" onClick={() => navigate("/interviews")} className="shadow-md hover:shadow-lg transition-all duration-300">
+          <Button 
+            variant="outline" 
+            onClick={() => navigate("/interviews")} 
+            className="shadow-md hover:shadow-lg transition-all duration-300"
+          >
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={submitting} className="button shadow-lg hover:shadow-xl transition-all duration-300">
+          <Button 
+            onClick={handle_submit} 
+            disabled={submitting} 
+            className="button shadow-lg hover:shadow-xl transition-all duration-300"
+          >
             {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {isEditing ? "Update Interview" : "Schedule Interview"}
+            {is_editing ? "Update Interview" : "Schedule Interview"}
           </Button>
         </div>
       </div>
 
-      <div className="grid gap-8 lg:grid-cols-3">
-        <div className="lg:col-span-2 space-y-6">
+      {/* Main Content */}
+      <div className="grid gap-8 lg:grid-cols-2">
+        {/* Left Column - Main Form */}
+        <div className="space-y-6">
+          {/* Application Selection */}
           <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
             <CardHeader className="pb-4">
               <CardTitle className="flex items-center gap-3 text-xl font-bold text-gray-800">
                 <User className="h-5 w-5 text-blue-600" />
                 Application Details
               </CardTitle>
-              <CardDescription className="text-base text-gray-600">Select the candidate and position</CardDescription>
+              <CardDescription className="text-base text-gray-600">
+                Select the candidate and position for this interview
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="application" className="text-sm font-semibold text-gray-700">Application *</Label>
+                <Label htmlFor="application" className="text-sm font-semibold text-gray-700">
+                  Application *
+                </Label>
                 <Select
-                  value={interviewData.application_id}
-                  onValueChange={(value) => setInterviewData({...interviewData, application_id: value})}
+                  value={interview_data.application_id}
+                  onValueChange={(value) => setInterviewData({...interview_data, application_id: value})}
                 >
                   <SelectTrigger className="h-12 shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500">
                     <SelectValue placeholder="Select an application" />
                   </SelectTrigger>
                   <SelectContent>
-                    {Array.isArray(applications) && applications.map((app) => (
+                    {applications.map((app) => (
                       <SelectItem key={app.id} value={app.id.toString()}>
                         {app.candidate.full_name} - {app.job.title}
                       </SelectItem>
@@ -308,99 +313,83 @@ const AddEditInterview = () => {
                 </Select>
               </div>
 
-              {selectedApplication && (
+              {selected_application && (
                 <div className="p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg space-y-2 border border-blue-100 shadow-sm">
                   <div>
-                    <strong className="text-gray-700">Candidate:</strong> <span className="text-gray-800 font-medium">{selectedApplication.candidate.full_name}</span>
+                    <strong className="text-gray-700">Candidate:</strong>{" "}
+                    <span className="text-gray-800 font-medium">{selected_application.candidate.full_name}</span>
                   </div>
                   <div>
-                    <strong className="text-gray-700">Position:</strong> <span className="text-gray-800 font-medium">{selectedApplication.job.title}</span>
+                    <strong className="text-gray-700">Position:</strong>{" "}
+                    <span className="text-gray-800 font-medium">{selected_application.job.title}</span>
                   </div>
                 </div>
               )}
             </CardContent>
           </Card>
 
+          {/* Interview Schedule */}
           <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
             <CardHeader className="pb-4">
               <CardTitle className="flex items-center gap-3 text-xl font-bold text-gray-800">
                 <Calendar className="h-5 w-5 text-blue-600" />
                 Interview Schedule
               </CardTitle>
-              <CardDescription className="text-base text-gray-600">Set the date and time</CardDescription>
+              <CardDescription className="text-base text-gray-600">
+                Set the date, time, and interview type
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="date" className="text-sm font-semibold text-gray-700">Date & Time *</Label>
-                <Input
-                  id="date"
-                  type="datetime-local"
-                  value={interviewData.date}
-                  onChange={(e) => setInterviewData({...interviewData, date: e.target.value})}
-                  className="h-12 shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500"
-                />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="date" className="text-sm font-semibold text-gray-700">
+                    Date & Time *
+                  </Label>
+                  <Input
+                    id="date"
+                    type="datetime-local"
+                    value={interview_data.date}
+                    onChange={(e) => setInterviewData({...interview_data, date: e.target.value})}
+                    className="h-12 shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500"
+                  />
+                </div>
 
-        <div className="space-y-6">
-          <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
-            <CardHeader className="pb-4">
-              <CardTitle className="text-xl font-bold text-gray-800">Interview Details</CardTitle>
-              <CardDescription className="text-base text-gray-600">Specify interview type and status</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="type" className="text-sm font-semibold text-gray-700">Interview Type *</Label>
-                <Select
-                  value={interviewData.type}
-                  onValueChange={(value) => setInterviewData({...interviewData, type: value})}
-                >
-                  <SelectTrigger className="h-12 shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500">
-                    <SelectValue placeholder="Select interview type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {interviewTypes.map((type) => (
-                      <SelectItem key={type.value} value={type.value}>
-                        {type.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="space-y-2">
+                  <Label htmlFor="type" className="text-sm font-semibold text-gray-700">
+                    Interview Type *
+                  </Label>
+                  <Select
+                    value={interview_data.type}
+                    onValueChange={(value) => setInterviewData({...interview_data, type: value})}
+                  >
+                    <SelectTrigger className="h-12 shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500">
+                      <SelectValue placeholder="Select interview type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {INTERVIEW_TYPES.map((type) => (
+                        <SelectItem key={type.value} value={type.value}>
+                          {type.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="status" className="text-sm font-semibold text-gray-700">Interview Status</Label>
+                <Label htmlFor="interviewer" className="text-sm font-semibold text-gray-700">
+                  Interviewer
+                </Label>
                 <Select
-                  value={interviewData.status}
-                  onValueChange={(value) => setInterviewData({...interviewData, status: value})}
-                >
-                  <SelectTrigger className="h-12 shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {interviewStatuses.map((status) => (
-                      <SelectItem key={status.value} value={status.value}>
-                        {status.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="interviewer" className="text-sm font-semibold text-gray-700">Interviewer</Label>
-                <Select
-                  value={interviewData.interviewer_id}
-                  onValueChange={(value) => setInterviewData({...interviewData, interviewer_id: value})}
+                  value={interview_data.interviewer_id}
+                  onValueChange={(value) => setInterviewData({...interview_data, interviewer_id: value})}
                 >
                   <SelectTrigger className="h-12 shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500">
                     <SelectValue placeholder="Select an interviewer" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="None">No interviewer assigned</SelectItem>
-                    {hrUsers.map((hr) => (
+                    <SelectItem value="none">No interviewer assigned</SelectItem>
+                    {hr_users.map((hr) => (
                       <SelectItem key={hr.id} value={hr.id.toString()}>
                         {hr.full_name} ({hr.email})
                       </SelectItem>
@@ -411,18 +400,23 @@ const AddEditInterview = () => {
             </CardContent>
           </Card>
 
+          {/* Notes Section */}
           <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
             <CardHeader className="pb-4">
-              <CardTitle className="text-xl font-bold text-gray-800">Notes</CardTitle>
-              <CardDescription className="text-base text-gray-600">Additional information and preparation notes</CardDescription>
+              <CardTitle className="text-xl font-bold text-gray-800">Interview Notes</CardTitle>
+              <CardDescription className="text-base text-gray-600">
+                Additional information and preparation notes
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
-                <Label htmlFor="notes" className="text-sm font-semibold text-gray-700">Interview Notes</Label>
+                <Label htmlFor="notes" className="text-sm font-semibold text-gray-700">
+                  Notes
+                </Label>
                 <Textarea
                   id="notes"
-                  value={interviewData.notes}
-                  onChange={(e) => setInterviewData({...interviewData, notes: e.target.value})}
+                  value={interview_data.notes}
+                  onChange={(e) => setInterviewData({...interview_data, notes: e.target.value})}
                   placeholder="Add any notes about the interview, preparation items, or outcomes..."
                   rows={6}
                   className="shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500 resize-none"
@@ -430,38 +424,57 @@ const AddEditInterview = () => {
               </div>
             </CardContent>
           </Card>
+        </div>
 
+        {/* Right Column - Summary */}
+        <div className="space-y-6">
           <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
             <CardHeader className="pb-4">
               <CardTitle className="text-xl font-bold text-gray-800">Interview Summary</CardTitle>
-              <CardDescription className="text-base text-gray-600">Review the interview details</CardDescription>
+              <CardDescription className="text-base text-gray-600">
+                Review the interview details before scheduling
+              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3 p-6 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-100 shadow-sm">
-              <div>
-                <strong className="text-gray-700">Candidate:</strong> <span className="text-gray-800 font-medium">{selectedApplication?.candidate.full_name || "Not selected"}</span>
-              </div>
-              <div>
-                <strong className="text-gray-700">Position:</strong> <span className="text-gray-800 font-medium">{selectedApplication?.job.title || "Not selected"}</span>
-              </div>
-              <div>
-                <strong className="text-gray-700">Date & Time:</strong> <span className="text-gray-800 font-medium">{
-                  interviewData.date
-                    ? new Date(interviewData.date).toLocaleString()
-                    : "Not scheduled"
-                }</span>
-              </div>
-              <div>
-                <strong className="text-gray-700">Type:</strong> <span className="text-gray-800 font-medium">{interviewTypes.find(t => t.value === interviewData.type)?.label || "Not specified"}</span>
-              </div>
-              <div>
-                <strong className="text-gray-700">Status:</strong> <span className="text-gray-800 font-medium">{interviewStatuses.find(s => s.value === interviewData.status)?.label || "Not specified"}</span>
-              </div>
-              <div>
-                <strong className="text-gray-700">Interviewer:</strong> <span className="text-gray-800 font-medium">{
-                  interviewData.interviewer_id 
-                    ? hrUsers.find(hr => hr.id.toString() === interviewData.interviewer_id)?.full_name || "Unknown"
-                    : "Not assigned"
-                }</span>
+            <CardContent className="space-y-4">
+              <div className="p-6 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-100 shadow-sm space-y-3">
+                <div>
+                  <strong className="text-gray-700">Candidate:</strong>{" "}
+                  <span className="text-gray-800 font-medium">
+                    {selected_application?.candidate.full_name || "Not selected"}
+                  </span>
+                </div>
+                <div>
+                  <strong className="text-gray-700">Position:</strong>{" "}
+                  <span className="text-gray-800 font-medium">
+                    {selected_application?.job.title || "Not selected"}
+                  </span>
+                </div>
+                <div>
+                  <strong className="text-gray-700">Date & Time:</strong>{" "}
+                  <span className="text-gray-800 font-medium">
+                    {interview_data.date
+                      ? new Date(interview_data.date).toLocaleString()
+                      : "Not scheduled"}
+                  </span>
+                </div>
+                <div>
+                  <strong className="text-gray-700">Type:</strong>{" "}
+                  <span className="text-gray-800 font-medium">
+                    {INTERVIEW_TYPES.find(t => t.value === interview_data.type)?.label || "Not specified"}
+                  </span>
+                </div>
+                <div>
+                  <strong className="text-gray-700">Status:</strong>{" "}
+                  <span className="text-gray-800 font-medium">Scheduled</span>
+                </div>
+                                 <div>
+                   <strong className="text-gray-700">Interviewer:</strong>{" "}
+                   <span className="text-gray-800 font-medium">
+                     {interview_data.interviewer_id && interview_data.interviewer_id !== "none"
+                       ? hr_users.find(hr => hr.id.toString() === interview_data.interviewer_id)?.full_name || "Unknown"
+                       : "Not assigned"}
+                   </span>
+                 </div>
               </div>
             </CardContent>
           </Card>
