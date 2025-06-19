@@ -79,7 +79,7 @@ FORM_FIELD_NAMES = [
     "Visa Status",
 ]
 
-FIELD_TYPES = ["text", "number", "email", "date", "select", "textarea", "checkbox"]
+FIELD_TYPES = ["text", "number", "link", "date", "select", "textarea", "checkbox"]
 
 # Job categories and types
 JOB_CATEGORIES = [

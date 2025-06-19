@@ -18,6 +18,7 @@ interface Interview {
   type: string;
   status: string;
   notes?: string;
+  interviewer_id?: number;
   created_at: string;
   updated_at: string;
   application?: {
@@ -30,6 +31,11 @@ interface Interview {
       id: number;
       title: string;
     };
+  };
+  interviewer?: {
+    id: number;
+    full_name: string;
+    email: string;
   };
 }
 
@@ -82,6 +88,25 @@ const InterviewList = () => {
       toast({
         title: "Error",
         description: "Failed to delete interview",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleStatusUpdate = async (interviewId: number, newStatus: string) => {
+    try {
+      await apiService.updateInterviewStatus(interviewId, newStatus);
+      toast({
+        title: "Success",
+        description: "Interview status updated successfully",
+      });
+      // Refresh the list
+      fetchInterviews();
+    } catch (err) {
+      console.error("Error updating interview status:", err);
+      toast({
+        title: "Error",
+        description: "Failed to update interview status",
         variant: "destructive",
       });
     }
@@ -151,8 +176,6 @@ const InterviewList = () => {
 
   const statItems: StatItem[] = [
     { title: "This Week", value: stats.thisWeek, note: "Interviews scheduled", icon: Calendar },
-    { title: "Completion Rate", value: `${stats.successRate}%`, note: "Interviews completed", icon: Calendar }, // Assuming Calendar for all, adjust if different icons are needed
-    { title: "Scheduled", value: stats.pending, note: "Awaiting interviews", icon: Calendar }
   ];
 
   if (loading) {
@@ -223,14 +246,14 @@ const InterviewList = () => {
               <SelectTrigger className="w-48 h-12 shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500">
                 <SelectValue placeholder="Filter by type" />
               </SelectTrigger>
-              <SelectContent>
+              {/* <SelectContent>
                 <SelectItem value="all">All Types</SelectItem>
                 {getUniqueTypes().map((type) => (
                   <SelectItem key={type} value={type.toLowerCase()}>
                     {type}
                   </SelectItem>
                 ))}
-              </SelectContent>
+              </SelectContent> */}
             </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-48 h-12 shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500">
@@ -273,6 +296,7 @@ const InterviewList = () => {
                     <TableHead className="font-semibold text-gray-700">Date & Time</TableHead>
                     <TableHead className="font-semibold text-gray-700">Type</TableHead>
                     <TableHead className="font-semibold text-gray-700">Status</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Interviewer</TableHead>
                     <TableHead className="font-semibold text-gray-700">Notes</TableHead>
                     <TableHead className="font-semibold text-gray-700">Actions</TableHead>
                 </TableRow>
@@ -302,9 +326,45 @@ const InterviewList = () => {
                           </Badge>
                       </TableCell>
                       <TableCell>
-                          <Badge variant={getStatusVariant(interview.status)} className="font-medium">
-                          {interview.status}
-                        </Badge>
+                        <Select
+                          value={interview.status}
+                          onValueChange={(newStatus) => handleStatusUpdate(interview.id, newStatus)}
+                        >
+                          <SelectTrigger className="w-32 h-8 text-xs">
+                            <SelectValue>
+                              <Badge variant={getStatusVariant(interview.status)} className="font-medium text-xs px-2 py-1">
+                                {interview.status}
+                              </Badge>
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="scheduled">
+                              <Badge variant="secondary" className="font-medium text-xs">
+                                Scheduled
+                              </Badge>
+                            </SelectItem>
+                            <SelectItem value="done">
+                              <Badge variant="default" className="font-medium text-xs">
+                                Done
+                              </Badge>
+                            </SelectItem>
+                            <SelectItem value="canceled">
+                              <Badge variant="destructive" className="font-medium text-xs">
+                                Canceled
+                              </Badge>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell>
+                          <div className="font-medium text-gray-800">
+                            {interview.interviewer?.full_name || "-"}
+                          </div>
+                          {interview.interviewer?.email && (
+                            <div className="text-xs text-gray-500">
+                              {interview.interviewer.email}
+                            </div>
+                          )}
                       </TableCell>
                       <TableCell>
                           <div className="max-w-[200px] truncate text-sm text-gray-600">

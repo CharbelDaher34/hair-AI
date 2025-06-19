@@ -1,7 +1,8 @@
-from typing import Any, List
+from datetime import datetime
+from typing import Any, List, Optional
 
 from core.database import get_session
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from crud import crud_interview
@@ -11,6 +12,7 @@ from schemas import (
     InterviewRead,
     InterviewReadWithApplication,
 )
+from core.security import TokenData  # For type hinting
 
 router = APIRouter()
 
@@ -20,13 +22,17 @@ def create_interview(
     *,
     db: Session = Depends(get_session),
     interview_in: InterviewCreate,
-    # current_user: models.User = Depends(deps.get_current_active_user),
+    request: Request,
 ) -> Any:
     """
     Create new interview.
     """
-    # if not crud.user.is_superuser(current_user) and (interview_in.application_id not in [app.id for app in current_user.applications]):
-    #     raise HTTPException(status_code=400, detail="Not enough permissions")
+    current_user: Optional[TokenData] = request.state.user
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not interview_in.interviewer_id:
+        interview_in.interviewer_id = current_user.employer_id
     interview = crud_interview.create_interview(db=db, obj_in=interview_in)
     return interview
 
@@ -72,16 +78,19 @@ def read_interview(
 
 @router.get("/", response_model=List[InterviewReadWithApplication])
 def read_interviews(
+    request: Request,
     db: Session = Depends(get_session),
     skip: int = 0,
     limit: int = 100,
-    # current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
     """
     Retrieve interviews with application details.
     """
+    current_user: Optional[TokenData] = request.state.user
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
     interviews = crud_interview.get_interviews_with_application(
-        db, skip=skip, limit=limit
+        db, skip=skip, limit=limit, employer_id=current_user.employer_id
     )
 
     return interviews
@@ -108,6 +117,24 @@ def update_interview(
     )
     return interview
 
+@router.patch("/{interview_id}/status", response_model=InterviewRead)
+def update_interview_status(
+    *,
+    db: Session = Depends(get_session),
+    interview_id: int,
+    interview_in: InterviewUpdate,
+) -> Any:
+    """
+    Update interview status.
+    """
+    interview = crud_interview.get_interview(db=db, interview_id=interview_id)
+    if not interview:
+        raise HTTPException(status_code=404, detail="Interview not found")
+    interview_in = InterviewUpdate(status=interview_in.status,updated_at=datetime.now())
+    interview = crud_interview.update_interview(
+        db=db, db_obj=interview, obj_in=interview_in
+    )
+    return interview
 
 @router.delete("/{interview_id}", response_model=InterviewRead)
 def delete_interview(

@@ -571,26 +571,6 @@ const CreateEditJob = () => {
                 {is_editing ? "Update the details of the job listing." : "Fill in the form to create a new job listing."}
           </p>
         </div>
-        {is_editing && (
-          <div className="flex gap-3">
-                <Button variant="outline" onClick={generate_form_url}>
-              <ExternalLink className="mr-2 h-4 w-4" />
-              Generate URL
-            </Button>
-            {generated_url && (
-                  <Button variant="outline" onClick={() => {
-                  navigator.clipboard.writeText(generated_url);
-                  toast({
-                    title: "URL Copied!",
-                    description: "The application URL has been copied to your clipboard.",
-                  });
-                  }}>
-                <Copy className="mr-2 h-4 w-4" />
-                Copy URL
-              </Button>
-            )}
-          </div>
-        )}
           </div>
       </div>
 
@@ -876,7 +856,7 @@ const CreateEditJob = () => {
                         }
                         return Array.isArray(hard_skills) ? hard_skills.join("\n") : "";
                       })()}
-                      onChange={(e) => set_job_data({ ...job_data, skills: { ...job_data.skills, hard_skills: e.target.value.split("\n").filter(item => item.trim() !== "") } })}
+                      onChange={(e) => set_job_data({ ...job_data, skills: { ...job_data.skills, hard_skills: e.target.value.split("\n") } })}
                       placeholder="e.g., React&#10;TypeScript&#10;Node.js&#10;PostgreSQL"
                       rows={6}
                       className="resize-none"
@@ -895,7 +875,7 @@ const CreateEditJob = () => {
                         }
                         return Array.isArray(soft_skills) ? soft_skills.join("\n") : "";
                       })()}
-                      onChange={(e) => handle_nested_change("skills", "soft_skills", e.target.value.split("\n").filter(item => item.trim() !== ""))}
+                      onChange={(e) => set_job_data({ ...job_data, skills: { ...job_data.skills, soft_skills: e.target.value.split("\n") } })}
                       placeholder="e.g., Communication&#10;Problem Solving&#10;Teamwork&#10;Leadership"
                       rows={6}
                       className="resize-none"
@@ -1031,17 +1011,25 @@ const CreateEditJob = () => {
                             </div>
                           </div>
                         )}
-                        {form_key.field_type === "text" && (
+                        {form_key.field_type === "link" && (
                           <div>
-                            <Label className="text-xs">Pattern (Regex)</Label>
+                            <Label className="text-xs">Domain Restriction (optional)</Label>
                             <Input
-                              placeholder="e.g., https://.*"
-                              value={constraints[form_key.id]?.pattern || ""}
+                              placeholder="e.g., linkedin.com, github.com"
+                              value={constraints[form_key.id]?.allowed_domain || ""}
                               onChange={(e) => 
-                                handle_constraint_change(form_key.id, "pattern", e.target.value)
+                                handle_constraint_change(form_key.id, "allowed_domain", e.target.value)
                               }
                                 className="h-8 text-xs"
                             />
+                            <p className="text-xs text-gray-500 mt-1">
+                              Leave empty to allow any valid URL, or specify domain to restrict (e.g., linkedin.com)
+                            </p>
+                          </div>
+                        )}
+                        {(form_key.field_type === "text" || form_key.field_type === "textarea") && (
+                          <div className="text-xs text-gray-500 italic">
+                            No constraints available for text fields
                           </div>
                         )}
                         {form_key.field_type === "date" && (
@@ -1093,6 +1081,33 @@ const CreateEditJob = () => {
                                 </div>
                               ))}
                             </div>
+                          </div>
+                        )}
+                        {form_key.field_type === "checkbox" && (
+                          <div>
+                            <Label className="text-xs">Expected State</Label>
+                            <Select
+                              value={constraints[form_key.id]?.expected_state?.toString() || "any"}
+                              onValueChange={(value) => 
+                                handle_constraint_change(
+                                  form_key.id, 
+                                  "expected_state", 
+                                  value === "true" ? true : value === "false" ? false : null
+                                )
+                              }
+                            >
+                              <SelectTrigger className="h-8 text-xs">
+                                <SelectValue placeholder="Any" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="any">Any</SelectItem>
+                                <SelectItem value="true">Must be checked (Yes)</SelectItem>
+                                <SelectItem value="false">Must be unchecked (No)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <p className="text-xs text-gray-500 mt-1">
+                              Specify if the checkbox must be checked or unchecked for the application.
+                            </p>
                           </div>
                         )}
                       </div>

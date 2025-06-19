@@ -1,3 +1,5 @@
+import { toast } from "sonner";
+
 // Determine the API base URL based on environment
 const get_api_base_url = () => {
   // Check if we're running in Docker (set via environment variable)
@@ -61,7 +63,20 @@ class ApiService {
             window.location.href = '/login';
           }
         }
-        throw new Error(`HTTP error! status: ${response.status}`);
+        
+        // Try to get error details from response
+        let errorMessage = `HTTP error! status: ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.detail || errorData.message || errorMessage;
+        } catch (e) {
+          // If response is not JSON, use default message
+        }
+        
+        // Display error toast
+        toast.error(errorMessage);
+        
+        throw new Error(errorMessage);
       }
       
       const data = await response.json();
@@ -159,6 +174,12 @@ class ApiService {
     return this.request(`/jobs/${jobId}`, {
       method: 'PATCH',
       body: JSON.stringify(updateData),
+    });
+  }
+
+  async updateJobStatus(jobId, status) {
+    return this.request(`/jobs/${jobId}/status?status=${status}`, {
+      method: 'PATCH',
     });
   }
 
@@ -573,8 +594,16 @@ class ApiService {
   async getInterviewsByApplication(applicationId) {
     return this.request(`/interviews/by-application/${applicationId}`);
   }
+
+  async updateInterviewStatus(interviewId, status) {
+    return this.request(`/interviews/${interviewId}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    });
+  }
 }
 
 // Create and export a singleton instance
 const apiService = new ApiService();
+
 export default apiService;
