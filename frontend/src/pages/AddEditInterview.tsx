@@ -28,6 +28,7 @@ interface InterviewFormData {
   type: string;
   notes: string;
   interviewer_id: string;
+  category: string;
 }
 
 interface HR {
@@ -53,6 +54,7 @@ const AddEditInterview = () => {
     type: "phone",
     notes: "",
     interviewer_id: "",
+    category: "",
   });
 
   const [applications, setApplications] = useState<Application[]>([]);
@@ -107,6 +109,7 @@ const AddEditInterview = () => {
         type: data.type,
         notes: data.notes || "",
         interviewer_id: data.interviewer_id?.toString() || "",
+        category: data.category || "",
       });
     } catch (err) {
       console.error("Error fetching interview:", err);
@@ -186,6 +189,7 @@ const AddEditInterview = () => {
         status: "SCHEDULED",
         notes: interview_data.notes || null,
         interviewer_id: interview_data.interviewer_id && interview_data.interviewer_id !== "none" ? parseInt(interview_data.interviewer_id) : null,
+        category: interview_data.category || null,
       };
 
       if (is_editing && id) {
@@ -376,26 +380,49 @@ const AddEditInterview = () => {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="interviewer" className="text-sm font-semibold text-gray-700">
-                  Interviewer
-                </Label>
-                <Select
-                  value={interview_data.interviewer_id}
-                  onValueChange={(value) => setInterviewData({...interview_data, interviewer_id: value})}
-                >
-                  <SelectTrigger className="h-12 shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500">
-                    <SelectValue placeholder="Select an interviewer" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No interviewer assigned</SelectItem>
-                    {hr_users.map((hr) => (
-                      <SelectItem key={hr.id} value={hr.id.toString()}>
-                        {hr.full_name} ({hr.email})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="interviewer" className="text-sm font-semibold text-gray-700">
+                    Interviewer
+                  </Label>
+                  <Select
+                    value={interview_data.interviewer_id}
+                    onValueChange={(value) => setInterviewData({...interview_data, interviewer_id: value})}
+                  >
+                    <SelectTrigger className="h-12 shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500">
+                      <SelectValue placeholder="Select an interviewer" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No interviewer assigned</SelectItem>
+                      {hr_users.map((hr) => (
+                        <SelectItem key={hr.id} value={hr.id.toString()}>
+                          {hr.full_name} ({hr.email})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="category" className="text-sm font-semibold text-gray-700">
+                    Category
+                  </Label>
+                  <Select
+                    value={interview_data.category}
+                    onValueChange={(value) => setInterviewData({...interview_data, category: value})}
+                  >
+                    <SelectTrigger className="h-12 shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500">
+                      <SelectValue placeholder="Select interview category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="technical">Technical</SelectItem>
+                      <SelectItem value="behavioral">Behavioral</SelectItem>
+                      <SelectItem value="hr_screening">HR Screening</SelectItem>
+                      <SelectItem value="final">Final</SelectItem>
+                      <SelectItem value="culture_fit">Culture Fit</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -467,14 +494,20 @@ const AddEditInterview = () => {
                   <strong className="text-gray-700">Status:</strong>{" "}
                   <span className="text-gray-800 font-medium">Scheduled</span>
                 </div>
-                                 <div>
-                   <strong className="text-gray-700">Interviewer:</strong>{" "}
-                   <span className="text-gray-800 font-medium">
-                     {interview_data.interviewer_id && interview_data.interviewer_id !== "none"
-                       ? hr_users.find(hr => hr.id.toString() === interview_data.interviewer_id)?.full_name || "Unknown"
-                       : "Not assigned"}
-                   </span>
-                 </div>
+                <div>
+                  <strong className="text-gray-700">Interviewer:</strong>{" "}
+                  <span className="text-gray-800 font-medium">
+                    {interview_data.interviewer_id && interview_data.interviewer_id !== "none"
+                      ? hr_users.find(hr => hr.id.toString() === interview_data.interviewer_id)?.full_name || "Unknown"
+                      : "Not assigned"}
+                  </span>
+                </div>
+                <div>
+                  <strong className="text-gray-700">Category:</strong>{" "}
+                  <span className="text-gray-800 font-medium">
+                    {interview_data.category ? interview_data.category.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) : "Not specified"}
+                  </span>
+                </div>
               </div>
             </CardContent>
           </Card>

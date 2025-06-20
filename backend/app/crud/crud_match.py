@@ -166,8 +166,9 @@ def create_match(db: Session, *, match_in: MatchCreate) -> Match:
 
     # Main match result fields
     match_data["score"] = match_result.get("score", 0.0)
-    match_data["embedding_similarity"] = match_result.get("embedding_similarity", 0.0)
     match_data["score_breakdown"] = match_result.get("score_breakdown", {})
+    match_data["overall_embedding_similarity"] = match_result.get("overall_embedding_similarity", 0.0)
+    match_data["skills_embedding_similarity"] = match_result.get("skills_embedding_similarity", 0.0)
 
     # Direct skill fields from matcher
     match_data["matching_skills"] = match_result.get("matching_skills", [])
@@ -177,7 +178,10 @@ def create_match(db: Session, *, match_in: MatchCreate) -> Match:
     # Weights used in matching
     match_data["weights_used"] = match_result.get("weights_used", {})
 
-    # Calculate legacy fields for backward compatibility
+    # Legacy fields for backward compatibility
+    match_data["embedding_similarity"] = match_result.get("overall_embedding_similarity", 0.0)  # Use overall_embedding_similarity as fallback
+    
+    # Calculate legacy skill counts
     total_matching = len(match_data["matching_skills"])
     total_missing = len(match_data["missing_skills"])
     total_extra = len(match_data["extra_skills"])
@@ -187,7 +191,7 @@ def create_match(db: Session, *, match_in: MatchCreate) -> Match:
     match_data["missing_skills_count"] = total_missing
     match_data["extra_skills_count"] = total_extra
     match_data["total_required_skills"] = total_required
-    match_data["match_percentage"] = (total_matching / total_required * 100) if total_required > 0 else 0.0
+    match_data["match_percentage"] = (total_matching / total_required) if total_required > 0 else 0.0
 
     # Legacy weights field (copy from weights_used)
     match_data["weights"] = match_data["weights_used"]

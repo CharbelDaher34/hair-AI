@@ -16,14 +16,20 @@ matcher_instance = Matcher()
 class MatchRequest(BaseModel):
     job: Dict = Field(..., description="Job description and requirements")
     candidates: List[Dict] = Field(..., description="List of candidates to match against the job")
-    weights: Optional[Dict[str, float]] = Field(
+    weights: Optional[Dict] = Field(
         default=None,
-        description="Optional weights for different scoring components",
+        description="Optional nested dictionary for weights",
         example={
-            "hard_skills": 0.30,
-            "soft_skills": 0.20,
-            "extracted_skills": 0.25,
-            "embedding_similarity": 0.25
+            "final_score_weights": {
+                "skills_score": 0.6,
+                "overall_embedding_similarity": 0.4,
+            },
+            "skill_score_weights": {
+                "hard_skills": 0.30,
+                "soft_skills": 0.20,
+                "extracted_skills": 0.25,
+                "skills_embedding_similarity": 0.25,
+            }
         }
     )
     fuzzy_threshold: Optional[float] = Field(
@@ -34,27 +40,26 @@ class MatchRequest(BaseModel):
     )
 
 
-class SkillAnalysisDetail(BaseModel):
-    matching_skills: List[str] = Field(..., description="Skills that were successfully matched")
-    missing_skills: List[str] = Field(..., description="Required skills that the candidate doesn't have")
-    extra_skills: List[str] = Field(..., description="Additional skills the candidate has")
+class ScoreBreakdown(BaseModel):
+    final_score_components: Dict[str, float]
+    skills_score_components: Dict[str, float]
 
 
-class SkillAnalysis(BaseModel):
-    hard_skills: SkillAnalysisDetail = Field(..., description="Hard skills analysis")
-    soft_skills: SkillAnalysisDetail = Field(..., description="Soft skills analysis")
-    extracted_skills: SkillAnalysisDetail = Field(..., description="Extracted skills analysis")
+class WeightsUsed(BaseModel):
+    final_weights: Dict[str, float]
+    skill_weights: Dict[str, float]
 
 
 class MatchResult(BaseModel):
     candidate: str = Field(..., description="Candidate name")
     score: float = Field(..., description="Overall matching score")
-    score_breakdown: Dict[str, float] = Field(..., description="Breakdown of score components")
+    score_breakdown: ScoreBreakdown = Field(..., description="Breakdown of score components")
     missing_skills: List[str] = Field(..., description="Missing skills")
     extra_skills: List[str] = Field(..., description="Extra skills")
     matching_skills: List[str] = Field(..., description="Matching skills")
-    embedding_similarity: float = Field(..., description="Embedding similarity score")
-    weights_used: Dict[str, float] = Field(..., description="Weights used in calculation")
+    overall_embedding_similarity: float = Field(..., description="Overall embedding similarity between job and candidate profiles")
+    skills_embedding_similarity: float = Field(..., description="Embedding similarity between job and candidate skills")
+    weights_used: WeightsUsed = Field(..., description="Weights used in calculation")
 
 
 class MatchResponse(BaseModel):
@@ -95,9 +100,6 @@ async def match_candidates_endpoint(request: MatchRequest):
         # Convert results to response format
         response_results = []
         for result in matched_results:
-            # Convert skill analysis details
-
-
             match_result = MatchResult(
                 candidate=result["candidate"],
                 score=result["score"],
@@ -105,7 +107,8 @@ async def match_candidates_endpoint(request: MatchRequest):
                 missing_skills=result["missing_skills"],
                 extra_skills=result["extra_skills"],
                 matching_skills=result["matching_skills"],
-                embedding_similarity=result["embedding_similarity"],
+                overall_embedding_similarity=result["overall_embedding_similarity"],
+                skills_embedding_similarity=result["skills_embedding_similarity"],
                 weights_used=result["weights_used"]
             )
 

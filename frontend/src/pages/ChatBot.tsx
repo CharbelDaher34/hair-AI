@@ -315,35 +315,6 @@ const ChatBot = () => {
             </CardContent>
           </Card>
 
-          <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
-            <CardHeader className="pb-4">
-              <CardTitle className="text-lg font-bold text-gray-800">Analytics Overview</CardTitle>
-              <CardDescription className="text-sm text-gray-600">Key metrics at a glance</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between p-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg">
-              <div className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5 text-blue-600" />
-                  <span className="text-sm font-medium text-gray-700">Applications</span>
-                </div>
-                <Badge className="bg-green-100 text-green-800 hover:bg-green-200">+23%</Badge>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg">
-              <div className="flex items-center gap-2">
-                  <Users className="h-5 w-5 text-blue-600" />
-                  <span className="text-sm font-medium text-gray-700">Active Jobs</span>
-                </div>
-                <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-200">12</Badge>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg">
-              <div className="flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-blue-600" />
-                  <span className="text-sm font-medium text-gray-700">Conversion Rate</span>
-              </div>
-                <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-200">16%</Badge>
-              </div>
-            </CardContent>
-          </Card>
         </div>
       </div>
     </div>

@@ -11,6 +11,7 @@ from models.models import (
     Status,
     ApplicationStatus,
     Candidate,
+    Match,
 )
 from pydantic import BaseModel
 from typing import List, Optional
@@ -41,16 +42,25 @@ class ApplicationStatusData(BaseModel):
     count: int
 
 
+class InterviewStatusData(BaseModel):
+    status: str
+    count: int
+
+
 class CompanyAnalyticsData(BaseModel):
     total_jobs: int
+    total_open_jobs: int
     total_applications: int
     total_interviews: int
+    interviews_by_status: List[InterviewStatusData]
     hire_rate: float
     applications_over_time: List[ApplicationsOverTimeData]
     job_performance: List[JobPerformanceData]
     recent_jobs: List[RecentJobData]
     applications_by_status: List[ApplicationStatusData]
     total_candidates: int
+    average_match_score: float
+
 
 @router.get("/company/", response_model=CompanyAnalyticsData)
 def get_company_analytics(request: Request, db: Session = Depends(get_session)):
@@ -64,10 +74,12 @@ def get_company_analytics(request: Request, db: Session = Depends(get_session)):
 
         employer_id = current_user.employer_id
 
-        # 1. Total Jobs
-        total_jobs = db.exec(
-            select(func.count(Job.id)).where(Job.employer_id == employer_id)
-        ).one()
+        # 1. Total Jobs and Open Jobs
+        total_jobs_query = select(
+            func.count(Job.id),
+            func.count(case((Job.status == Status.PUBLISHED, Job.id), else_=None)),
+        ).where(Job.employer_id == employer_id)
+        total_jobs, total_open_jobs = db.exec(total_jobs_query).one()
 
         # 2. Total Applications
         total_applications = db.exec(
@@ -76,22 +88,32 @@ def get_company_analytics(request: Request, db: Session = Depends(get_session)):
             .where(Job.employer_id == employer_id)
         ).one()
 
-        # 3. Total Interviews
-        total_interviews = db.exec(
-            select(func.count(Interview.id))
+        # 3. Total Interviews and by status
+        interviews_by_status_query = (
+            select(Interview.status, func.count(Interview.id))
             .join(Application)
             .join(Job)
             .where(Job.employer_id == employer_id)
-        ).one()
-        
+            .group_by(Interview.status)
+        )
+        interviews_by_status_results = db.exec(interviews_by_status_query).all()
+
+        interviews_by_status_data = [
+            InterviewStatusData(status=status if status else "unknown", count=count)
+            for status, count in interviews_by_status_results
+        ]
+
+        total_interviews = sum(item.count for item in interviews_by_status_data)
+
+        # 4. Total distinct candidates
         total_candidates = db.exec(
-            select(func.count(Candidate.id))
-            .join(Application)
-            .join(Job)
+            select(func.count(func.distinct(Candidate.id)))
+            .join(Application, Candidate.id == Application.candidate_id)
+            .join(Job, Application.job_id == Job.id)
             .where(Job.employer_id == employer_id)
         ).one()
-        
-        # 4. Calculate real hire rate based on interviews marked as "done" vs total applications
+
+        # 5. Calculate real hire rate
         hired_applications = db.exec(
             select(func.count(Application.id))
             .join(Job)
@@ -104,7 +126,7 @@ def get_company_analytics(request: Request, db: Session = Depends(get_session)):
             if total_applications > 0
             else 0.0
         )
-        # 5. Applications Over Time (last 6 months)
+        # 6. Applications Over Time (last 6 months)
         applications_over_time_data = []
         today = datetime.utcnow()
 
@@ -153,7 +175,7 @@ def get_company_analytics(request: Request, db: Session = Depends(get_session)):
 
         applications_over_time_data.reverse()
 
-        # 6. Job Performance (top 5 jobs by application count)
+        # 7. Job Performance (top 5 jobs by application count)
         job_performance_query = (
             select(Job.title, func.count(Application.id).label("application_count"))
             .join(Application, Job.id == Application.job_id)
@@ -168,7 +190,7 @@ def get_company_analytics(request: Request, db: Session = Depends(get_session)):
             for title, count in job_performance_results
         ]
 
-        # 7. Recent Jobs (last 5 jobs with application counts)
+        # 8. Recent Jobs (last 5 jobs with application counts)
         recent_jobs_query = (
             select(
                 Job.title,
@@ -193,7 +215,7 @@ def get_company_analytics(request: Request, db: Session = Depends(get_session)):
             for title, count, status, created_at in recent_jobs_results
         ]
 
-        # 8. Applications by status
+        # 9. Applications by status
         applications_by_status_query = (
             select(Application.status, func.count(Application.id).label("status_count"))
             .join(Job)
@@ -208,17 +230,32 @@ def get_company_analytics(request: Request, db: Session = Depends(get_session)):
             for status, count in applications_by_status_results
         ]
 
+        # 10. Average match score
+        average_match_score = (
+            db.exec(
+                select(func.avg(Match.score))
+                .join(Application)
+                .join(Job)
+                .where(Job.employer_id == employer_id)
+                .where(Match.score.isnot(None))
+            ).one()
+            or 0.0
+        )*100
+
     except Exception as e:
         print(f"Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
     return CompanyAnalyticsData(
         total_jobs=total_jobs,
+        total_open_jobs=total_open_jobs,
         total_applications=total_applications,
         total_interviews=total_interviews,
+        interviews_by_status=interviews_by_status_data,
         hire_rate=hire_rate,
         applications_over_time=applications_over_time_data,
         job_performance=job_performance_data,
         recent_jobs=recent_jobs_data,
         applications_by_status=applications_by_status_data,
         total_candidates=total_candidates,
+        average_match_score=round(average_match_score, 2),
     )

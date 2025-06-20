@@ -9,6 +9,7 @@ import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CheckCircle, XCircle, Eye, Star, Filter, Users, Briefcase, Search, ChevronDown, Loader2, Info, AlertTriangle, Flag } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import apiService from "@/services/api";
 import { toast } from "@/components/ui/sonner";
@@ -31,22 +32,28 @@ interface Job {
   status: string;
 }
 
+interface ScoreBreakdown {
+  final_score_components: Record<string, number>;
+  skills_score_components: Record<string, number>;
+}
+
+interface WeightsUsed {
+  final_weights: Record<string, number>;
+  skill_weights: Record<string, number>;
+}
+
 interface MatchedCandidateData {
   // Match fields
   id: number;
   application_id: number;
   score: number;
-  embedding_similarity: number;
-  match_percentage: number;
+  score_breakdown: ScoreBreakdown;
+  weights_used: WeightsUsed;
+  overall_embedding_similarity: number;
+  skills_embedding_similarity: number;
   matching_skills: string[];
   missing_skills: string[];
   extra_skills: string[];
-  total_required_skills: number;
-  matching_skills_count: number;
-  missing_skills_count: number;
-  extra_skills_count: number;
-  skill_weight: number;
-  embedding_weight: number;
   flags?: {
     constraint_violations?: Record<string, string>;
   };
@@ -59,6 +66,10 @@ interface MatchedCandidateData {
   resume_url?: string;
   parsed_resume?: any;
   employer_id?: number;
+
+  // Legacy fields for backward compatibility
+  embedding_similarity?: number;
+  match_percentage?: number;
 }
 
 interface JobMatchesResponse {
@@ -250,6 +261,7 @@ const MatchedCandidatesPage = () => {
                 <TableRow className="bg-slate-50">
                   <TableHead className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Candidate</TableHead>
                   <TableHead className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Match Score</TableHead>
+                  <TableHead className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Skills</TableHead>
                   <TableHead className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Flags</TableHead>
                   <TableHead className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</TableHead>
                 </TableRow>
@@ -272,12 +284,62 @@ const MatchedCandidatesPage = () => {
                       <div className={`text-lg ${get_score_color_class(mc.score)}`}>
                         {(mc.score * 100).toFixed(1)}%
                       </div>
-                      {mc.matching_skills_count !== undefined && mc.total_required_skills !== undefined && (
+                      {mc.score_breakdown && (
                         <Popover>
                           <PopoverTrigger asChild>
                             <Button variant="link" size="sm" className="p-0 h-auto text-xs text-gray-500 hover:text-blue-600">
-                              ({mc.matching_skills_count}/{mc.total_required_skills} skills matched)
+                              View Score Breakdown
                               <Info className="ml-1 h-3 w-3" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-80 text-sm p-3 space-y-3 bg-white shadow-xl rounded-lg border border-gray-200">
+                            <div>
+                              <strong className="font-semibold text-gray-800">Final Score Components</strong>
+                              <div className="mt-1 space-y-1">
+                                {Object.entries(mc.score_breakdown.final_score_components).map(([key, value]) => (
+                                  <div key={key} className="flex justify-between text-xs">
+                                    <span className="text-gray-600 capitalize">{key.replace(/_/g, " ")}:</span>
+                                    <span className="font-medium text-gray-800">{(value * 100).toFixed(1)}%</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                            <Separator />
+                            <div>
+                              <strong className="font-semibold text-gray-800">Skills Score Components</strong>
+                              <div className="mt-1 space-y-1">
+                                {Object.entries(mc.score_breakdown.skills_score_components).map(([key, value]) => (
+                                  <div key={key} className="flex justify-between text-xs">
+                                    <span className="text-gray-600 capitalize">{key.replace(/_/g, " ")}:</span>
+                                    <span className="font-medium text-gray-800">{(value * 100).toFixed(1)}%</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                            <Separator />
+                             <div>
+                              <strong className="font-semibold text-gray-800">Similarity Scores</strong>
+                              <div className="mt-1 space-y-1 text-xs">
+                                <div className="flex justify-between">
+                                  <span className="text-gray-600">Overall Embedding:</span>
+                                  <span className="font-medium text-gray-800">{(mc.overall_embedding_similarity * 100).toFixed(1)}%</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-gray-600">Skills Embedding:</span>
+                                  <span className="font-medium text-gray-800">{(mc.skills_embedding_similarity * 100).toFixed(1)}%</span>
+                                </div>
+                              </div>
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                      )}
+                    </TableCell>
+                    <TableCell className="px-6 py-4 whitespace-nowrap">
+                      {mc.matching_skills || mc.missing_skills || mc.extra_skills ? (
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" size="sm" className="text-xs">
+                              <CheckCircle className="h-3 w-3 mr-1 text-green-500"/> {mc.matching_skills?.length || 0} Matched
                             </Button>
                           </PopoverTrigger>
                           <PopoverContent className="w-64 text-sm p-3 space-y-2 bg-white shadow-xl rounded-lg border border-gray-200">
@@ -290,12 +352,10 @@ const MatchedCandidatesPage = () => {
                             {mc.extra_skills && mc.extra_skills.length > 0 && 
                               <div><strong className="font-semibold text-blue-600">Extra Skills:</strong> {mc.extra_skills.join(", ")}</div>
                             }
-                            {(!mc.matching_skills || mc.matching_skills.length === 0) && 
-                             (!mc.missing_skills || mc.missing_skills.length === 0) &&
-                             (!mc.extra_skills || mc.extra_skills.length === 0) &&
-                              <p className="text-gray-500 italic">No detailed skill info available.</p> }
                           </PopoverContent>
                         </Popover>
+                      ) : (
+                         <span className="text-xs text-gray-500 italic">No skill data</span>
                       )}
                     </TableCell>
                     <TableCell className="px-6 py-4 whitespace-nowrap">
