@@ -15,7 +15,7 @@ from fastapi.responses import FileResponse
 import shutil
 import tempfile
 import os
-from sqlmodel import Session
+from sqlmodel import Session, select
 import base64
 import time
 import json
@@ -29,6 +29,7 @@ from core.database import get_session, engine
 from core.config import RESUME_STORAGE_DIR
 from crud import crud_candidate
 from schemas import CandidateCreate, CandidateUpdate, CandidateRead, CandidateWithDetails
+from models.models import Candidate
 from utils.file_utils import save_resume_file, get_resume_file_path, delete_resume_file
 from models.candidate_pydantic import CandidateResume
 from services.resume_upload import AgentClient
@@ -251,6 +252,40 @@ async def get_otp_status(email: str) -> OTPStatusResponse:
             detail="An error occurred while checking OTP status."
         )
 
+
+@router.get("/check-email/{email}")
+async def check_candidate_email(email: str, db: Session = Depends(get_session)) -> dict:
+    """
+    Check if a candidate exists with the given email address.
+    Returns candidate information if exists, otherwise indicates new candidate.
+    """
+    try:
+        candidate = crud_candidate.get_candidate_by_email(db=db, email=email)
+        
+        if candidate:
+            return {
+                "exists": True,
+                "candidate": {
+                    "id": candidate.id,
+                    "full_name": candidate.full_name,
+                    "email": candidate.email,
+                    "phone": candidate.phone,
+                    "has_resume": bool(candidate.resume_url),
+                    "created_at": candidate.created_at.isoformat() if candidate.created_at else None
+                }
+            }
+        else:
+            return {
+                "exists": False,
+                "candidate": None
+            }
+    except Exception as e:
+        print(f"[Candidate API] Error checking candidate email: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while checking candidate email."
+        )
+
 class CandidateTable(BaseModel):
     candidate: CandidateRead
     applications_count: int
@@ -318,17 +353,50 @@ def create_candidate(
                         "email": candidate_data['email']
                     }
                 )
-        candidate_exists = crud_candidate.check_candidate_exists(db=db, candidate_email=candidate_data['email'], phone=candidate_data['phone'])
-        if candidate_exists:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=candidate_exists
-            )
 
-        # Create candidate first to get the ID
-        candidate = crud_candidate.create_candidate(
-            db=db, candidate_in=CandidateCreate(**candidate_data)
-        )
+        # Check if candidate already exists by email
+        existing_candidate = crud_candidate.get_candidate_by_email(db=db, email=candidate_data['email'])
+        
+        if existing_candidate:
+            # For existing candidates, update their information if provided and different
+            update_data = {}
+            if candidate_data.get('full_name') and candidate_data['full_name'] != existing_candidate.full_name:
+                update_data['full_name'] = candidate_data['full_name']
+            if candidate_data.get('phone') and candidate_data['phone'] != existing_candidate.phone:
+                # Check if phone is already used by another candidate
+                phone_check = crud_candidate.check_candidate_exists(db=db, candidate_email="", phone=candidate_data['phone'])
+                if phone_check and phone_check == "Phone already exists":
+                    other_candidate = db.exec(select(Candidate).where(Candidate.phone == candidate_data['phone'])).first()
+                    if other_candidate and other_candidate.id != existing_candidate.id:
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="Phone number is already used by another candidate"
+                        )
+                update_data['phone'] = candidate_data['phone']
+            
+            # Update candidate if there are changes
+            if update_data:
+                candidate = crud_candidate.update_candidate(
+                    db=db, db_candidate=existing_candidate, candidate_in=update_data
+                )
+            else:
+                candidate = existing_candidate
+                
+            print(f"[Candidate API] Using existing candidate with ID: {candidate.id}")
+        else:
+            # Check for phone conflicts for new candidates
+            phone_check = crud_candidate.check_candidate_exists(db=db, candidate_email="", phone=candidate_data['phone'])
+            if phone_check:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=phone_check
+                )
+            
+            # Create new candidate
+            candidate = crud_candidate.create_candidate(
+                db=db, candidate_in=CandidateCreate(**candidate_data)
+            )
+            print(f"[Candidate API] Created new candidate with ID: {candidate.id}")
         
         # If user is authenticated, associate candidate with their employer
         if token_data and token_data.employer_id:

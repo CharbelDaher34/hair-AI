@@ -30,6 +30,7 @@ interface HRData {
   email: string;
   role: string;
   employer_id: number;
+  department?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -328,6 +329,7 @@ const Profile = () => {
         full_name: new_employee_form.full_name,
         email: new_employee_form.email,
         role: new_employee_form.role,
+        department: new_employee_form.department || null,
         password: new_employee_form.password || "defaultPassword123", // You might want to generate a random password
       };
 
@@ -602,15 +604,28 @@ const Profile = () => {
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="role" className="text-sm font-semibold text-gray-700">Role</Label>
-                  <Input
-                    id="role"
-                    value={personal_form.role || ""}
-                    onChange={(e) => handle_personal_form_change("role", e.target.value)}
-                    disabled={!is_editing_personal}
-                    className="h-12 shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500"
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="role" className="text-sm font-semibold text-gray-700">Role</Label>
+                    <Input
+                      id="role"
+                      value={personal_form.role || ""}
+                      onChange={(e) => handle_personal_form_change("role", e.target.value)}
+                      disabled={!is_editing_personal}
+                      className="h-12 shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="department" className="text-sm font-semibold text-gray-700">Department</Label>
+                    <Input
+                      id="department"
+                      value={personal_form.department || ""}
+                      onChange={(e) => handle_personal_form_change("department", e.target.value)}
+                      disabled={!is_editing_personal}
+                      placeholder="e.g., Human Resources, Recruitment"
+                      className="h-12 shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500"
+                    />
+                  </div>
                 </div>
 
                 {is_editing_personal && (
@@ -746,47 +761,51 @@ const Profile = () => {
                     </p>
                   </div>
                 ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Role</TableHead>
-                        <TableHead>Added</TableHead>
-                        <TableHead></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {employees.map((employee) => (
-                        <TableRow key={employee.id}>
-                          <TableCell className="font-medium">
-                            {employee.full_name}
-                          </TableCell>
-                          <TableCell>
-                            {employee.email}
-                          </TableCell>
-                          <TableCell>
-                            <span className="capitalize">{employee.role.replace('_', ' ')}</span>
-                          </TableCell>
-                          <TableCell>
-                            {employee.created_at ? new Date(employee.created_at).toLocaleDateString() : "-"}
-                          </TableCell>
-                          <TableCell>
-                            {employee.id !== hr_data?.id && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => remove_employee(employee.id)}
-                                disabled={is_saving}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            )}
-                          </TableCell>
+                                      <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Role</TableHead>
+                          <TableHead>Department</TableHead>
+                          <TableHead>Added</TableHead>
+                          <TableHead></TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {employees.map((employee) => (
+                          <TableRow key={employee.id}>
+                            <TableCell className="font-medium">
+                              {employee.full_name}
+                            </TableCell>
+                            <TableCell>
+                              {employee.email}
+                            </TableCell>
+                            <TableCell>
+                              <span className="capitalize">{employee.role.replace('_', ' ')}</span>
+                            </TableCell>
+                            <TableCell>
+                              {employee.department || "-"}
+                            </TableCell>
+                            <TableCell>
+                              {employee.created_at ? new Date(employee.created_at).toLocaleDateString() : "-"}
+                            </TableCell>
+                            <TableCell>
+                              {employee.id !== hr_data?.id && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => remove_employee(employee.id)}
+                                  disabled={is_saving}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
                 )}
               </CardContent>
             </Card>

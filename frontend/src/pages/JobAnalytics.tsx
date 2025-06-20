@@ -37,17 +37,22 @@ interface MatchCandidate {
   id: number;
   application_id: number;
   score: number;
-  embedding_similarity: number;
-  match_percentage: number;
-  matching_skills: string[];
-  missing_skills: string[];
-  extra_skills: string[];
-  total_required_skills: number;
-  matching_skills_count: number;
-  missing_skills_count: number;
-  extra_skills_count: number;
-  skill_weight: number;
-  embedding_weight: number;
+  score_breakdown?: {
+    final_score_components: Record<string, number>;
+    skills_score_components: Record<string, number>;
+  };
+  weights_used?: {
+    final_weights: Record<string, number>;
+    skill_weights: Record<string, number>;
+  };
+  overall_embedding_similarity?: number;
+  skills_embedding_similarity?: number;
+  matching_skills?: string[];
+  missing_skills?: string[];
+  extra_skills?: string[];
+  flags?: {
+    constraint_violations?: Record<string, string>;
+  };
   created_at: string;
   updated_at: string;
   // Candidate fields
@@ -57,7 +62,7 @@ interface MatchCandidate {
   resume_url?: string;
   parsed_resume?: any;
   employer_id?: number;
-  // Application status (moved from match to application)
+  // Application status
   application_status?: string;
 }
 
@@ -79,7 +84,7 @@ interface ChartData {
   color?: string;
 }
 
-type SortField = 'score' | 'match_percentage' | 'embedding_similarity' | 'full_name' | 'matching_skills_count';
+type SortField = 'score' | 'overall_embedding_similarity' | 'skills_embedding_similarity' | 'full_name';
 type SortDirection = 'asc' | 'desc';
 
 const JobAnalytics = () => {
@@ -162,10 +167,10 @@ const JobAnalytics = () => {
     return 'text-red-600';
   };
 
-  const getMatchPercentageColor = (percentage: number) => {
-    if (percentage >= 80) return 'text-green-600';
-    if (percentage >= 60) return 'text-yellow-600';
-    return 'text-red-600';
+  const getSimilarityColor = (similarity: number) => {
+    if (similarity >= 0.8) return 'text-green-600';
+    if (similarity >= 0.6) return 'text-blue-600';
+    return 'text-gray-600';
   };
 
   if (isLoading) {
@@ -343,28 +348,19 @@ const JobAnalytics = () => {
                     <TableHead>
                       <Button
                         variant="ghost"
-                        onClick={() => handleSort('match_percentage')}
+                        onClick={() => handleSort('overall_embedding_similarity')}
                         className="h-auto p-2 font-semibold text-gray-700 hover:bg-gray-200 transition-colors duration-200"
                       >
-                        Skill Match {getSortIcon('match_percentage')}
+                        Overall Similarity {getSortIcon('overall_embedding_similarity')}
                       </Button>
                     </TableHead>
                     <TableHead>
                       <Button
                         variant="ghost"
-                        onClick={() => handleSort('embedding_similarity')}
+                        onClick={() => handleSort('skills_embedding_similarity')}
                         className="h-auto p-2 font-semibold text-gray-700 hover:bg-gray-200 transition-colors duration-200"
                       >
-                        Similarity {getSortIcon('embedding_similarity')}
-                      </Button>
-                    </TableHead>
-                    <TableHead>
-                      <Button
-                        variant="ghost"
-                        onClick={() => handleSort('matching_skills_count')}
-                        className="h-auto p-2 font-semibold text-gray-700 hover:bg-gray-200 transition-colors duration-200"
-                      >
-                        Skills Match {getSortIcon('matching_skills_count')}
+                        Skills Similarity {getSortIcon('skills_embedding_similarity')}
                       </Button>
                     </TableHead>
                     <TableHead className="font-semibold text-gray-700">Matching Skills</TableHead>
@@ -384,33 +380,39 @@ const JobAnalytics = () => {
                         <div className={`font-bold text-lg ${getScoreColor(match.score)}`}>
                           {(match.score * 100).toFixed(1)}%
                         </div>
+                        {match.score_breakdown && (
+                          <div className="text-xs text-gray-500 mt-1">
+                            View breakdown for details
+                          </div>
+                        )}
                       </TableCell>
                       <TableCell>
-                        <div className={`font-semibold ${getMatchPercentageColor(match.match_percentage)}`}>
-                          {match.match_percentage.toFixed(1)}%
+                        <div className={`font-medium ${getSimilarityColor(match.overall_embedding_similarity || 0)}`}>
+                          {match.overall_embedding_similarity ? (match.overall_embedding_similarity * 100).toFixed(1) + '%' : 'N/A'}
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="font-medium text-gray-700">
-                          {(match.embedding_similarity * 100).toFixed(1)}%
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="font-medium text-gray-700">
-                          {match.matching_skills_count}/{match.total_required_skills}
+                        <div className={`font-medium ${getSimilarityColor(match.skills_embedding_similarity || 0)}`}>
+                          {match.skills_embedding_similarity ? (match.skills_embedding_similarity * 100).toFixed(1) + '%' : 'N/A'}
                         </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1 max-w-xs">
-                          {match.matching_skills?.slice(0, 3).map((skill, index) => (
-                            <Badge key={index} variant="secondary" className="text-xs bg-blue-100 text-blue-700">
-                              {skill}
-                            </Badge>
-                          ))}
-                          {match.matching_skills?.length > 3 && (
-                            <Badge variant="outline" className="text-xs border-blue-200 text-blue-600">
-                              +{match.matching_skills.length - 3} more
-                            </Badge>
+                          {match.matching_skills && match.matching_skills.length > 0 ? (
+                            <>
+                              {match.matching_skills.slice(0, 3).map((skill, index) => (
+                                <Badge key={index} variant="secondary" className="text-xs bg-green-100 text-green-700">
+                                  {skill}
+                                </Badge>
+                              ))}
+                              {match.matching_skills.length > 3 && (
+                                <Badge variant="outline" className="text-xs border-green-200 text-green-600">
+                                  +{match.matching_skills.length - 3} more
+                                </Badge>
+                              )}
+                            </>
+                          ) : (
+                            <span className="text-xs text-gray-500 italic">No matching skills</span>
                           )}
                         </div>
                       </TableCell>

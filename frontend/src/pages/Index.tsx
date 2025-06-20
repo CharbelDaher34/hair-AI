@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, Legend } from "recharts";
 import { Users, FileText, Calendar, TrendingUp, Target, UserCheck, Bot } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
@@ -53,16 +53,20 @@ const Index = () => {
   }
 
   const stats = [
-    { title: "Total Jobs", value: analytics_data.total_jobs, icon: FileText, change: "+16.7%" },
+    { title: "Open Jobs", value: analytics_data.total_open_jobs, icon: FileText, change: "+16.7%" },
     { title: "Total Applications", value: analytics_data.total_applications, icon: Users, change: "+23.1%" },
     { title: "Total Candidates", value: analytics_data.total_candidates || 0, icon: UserCheck, change: "+18.3%" },
     { title: "Total Interviews", value: analytics_data.total_interviews, icon: Calendar, change: "+12.5%" },
     { title: "Hire Rate", value: `${analytics_data.hire_rate}%`, icon: Target, change: "+5.2%" },
+    { title: "Avg. Match Score", value: `${analytics_data.average_match_score}%`, icon: Bot, change: "+2.1%" }
   ];
 
   const applications_over_time = analytics_data.applications_over_time;
   const job_performance = analytics_data.job_performance;
   const recent_jobs = analytics_data.recent_jobs;
+  const applications_by_status = analytics_data.applications_by_status;
+
+  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF', '#FF1919'];
 
   return (
     <div className="flex-1 space-y-8 p-8 bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
@@ -86,7 +90,7 @@ const Index = () => {
       </div>
 
       {/* Key Metrics */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-6 md:grid-cols-3 lg:grid-cols-6">
         {stats.map((stat, index) => (
           <Card key={stat.title} className="card hover:scale-105 transition-all duration-300 border-0 shadow-lg hover:shadow-xl" style={{animationDelay: `${index * 100}ms`}}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -97,63 +101,12 @@ const Index = () => {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-gray-800 mb-1">{stat.value}</div>
-              <div className="flex items-center space-x-2 text-xs">
-                <TrendingUp className="h-3 w-3 text-green-500" />
-                <span className="text-green-600 font-medium">{stat.change}</span>
-                <span className="text-gray-600">from last month</span>
-              </div>
             </CardContent>
           </Card>
         ))}
       </div>
 
       <div className="grid gap-8 lg:grid-cols-3">
-        {/* Quick Actions - Moved to first position */}
-        {/* <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-xl font-bold text-gray-800">Quick Actions</CardTitle>
-            <CardDescription className="text-base text-gray-600">Common tasks to get you started</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Button asChild className="w-full justify-start button h-12 text-base font-semibold shadow-md hover:shadow-lg transition-all duration-300">
-              <Link to="/jobs/create">
-                <FileText className="mr-3 h-5 w-5" />
-                Create New Job
-              </Link>
-            </Button>
-            <Button variant="outline" asChild className="w-full justify-start h-12 text-base font-semibold shadow-sm hover:shadow-md transition-all duration-300 hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50">
-              <Link to="/applications">
-                <Users className="mr-3 h-5 w-5" />
-                Review Applications
-              </Link>
-            </Button>
-            <Button variant="outline" asChild className="w-full justify-start h-12 text-base font-semibold shadow-sm hover:shadow-md transition-all duration-300 hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50">
-              <Link to="/candidates">
-                <UserCheck className="mr-3 h-5 w-5" />
-                View Candidates
-              </Link>
-            </Button>
-            <Button variant="outline" asChild className="w-full justify-start h-12 text-base font-semibold shadow-sm hover:shadow-md transition-all duration-300 hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50">
-              <Link to="/interviews">
-                <Calendar className="mr-3 h-5 w-5" />
-                Interviews
-              </Link>
-            </Button>
-            <Button variant="outline" asChild className="w-full justify-start h-12 text-base font-semibold shadow-sm hover:shadow-md transition-all duration-300 hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50">
-              <Link to="/analytics">
-                <TrendingUp className="mr-3 h-5 w-5" />
-                View Analytics
-              </Link>
-            </Button>
-            <Button variant="outline" asChild className="w-full justify-start h-12 text-base font-semibold shadow-sm hover:shadow-md transition-all duration-300 hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50">
-              <Link to="/chatbot">
-                <Bot className="mr-3 h-5 w-5" />
-                Chatbot
-              </Link>
-            </Button>
-          </CardContent>
-        </Card> */}
-
         {/* Applications Over Time */}
         <Card className="lg:col-span-2 card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
           <CardHeader className="pb-4">
@@ -187,6 +140,53 @@ const Index = () => {
             ) : (
               <div className="flex items-center justify-center h-[300px] text-gray-500">
                 No application data available
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Application Status Distribution */}
+        <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-xl font-bold text-gray-800">Application Status</CardTitle>
+            <CardDescription className="text-base text-gray-600">Distribution of application stages</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {applications_by_status && applications_by_status.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={applications_by_status}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="count"
+                    nameKey="status"
+                    label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, index }) => {
+                        const RADIAN = Math.PI / 180;
+                        const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+                        const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                        const y = cy + radius * Math.sin(-midAngle * RADIAN);
+                        return (
+                          <text x={x} y={y} fill="white" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central">
+                            {`${(percent * 100).toFixed(0)}%`}
+                          </text>
+                        );
+                      }}
+                  >
+                    {applications_by_status.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-[300px] text-gray-500">
+                No application status data available
               </div>
             )}
           </CardContent>
@@ -261,52 +261,6 @@ const Index = () => {
         </Card>
       </div>
 
-
-
-      {/* Performance Summary */}
-      <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
-        <CardHeader className="pb-6">
-          <CardTitle className="text-2xl font-bold text-gray-800">Performance Summary</CardTitle>
-          <CardDescription className="text-base text-gray-600">Key insights from your recruitment data</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-6 md:grid-cols-3">
-            <div className="space-y-3 p-4 bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg border border-green-200">
-              <h4 className="font-bold text-green-700 flex items-center gap-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                Strong Performance
-              </h4>
-              <ul className="text-sm text-gray-700 space-y-2">
-                <li>• {analytics_data.hire_rate}% hire rate achieved</li>
-                <li>• {analytics_data.total_applications} total applications received</li>
-                <li>• {analytics_data.total_interviews} interviews conducted</li>
-              </ul>
-            </div>
-            <div className="space-y-3 p-4 bg-gradient-to-br from-orange-50 to-amber-50 rounded-lg border border-orange-200">
-              <h4 className="font-bold text-orange-700 flex items-center gap-2">
-                <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                Areas for Improvement
-              </h4>
-              <ul className="text-sm text-gray-700 space-y-2">
-                <li>• Monitor application completion rates</li>
-                <li>• Track candidate engagement patterns</li>
-                <li>• Optimize job posting performance</li>
-              </ul>
-            </div>
-            <div className="space-y-3 p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
-              <h4 className="font-bold text-blue-700 flex items-center gap-2">
-                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                Recommendations
-              </h4>
-              <ul className="text-sm text-gray-700 space-y-2">
-                <li>• Create more jobs to increase reach</li>
-                <li>• Improve application process flow</li>
-                <li>• Analyze top performing job patterns</li>
-              </ul>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 };
