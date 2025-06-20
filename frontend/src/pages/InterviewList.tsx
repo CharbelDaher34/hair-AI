@@ -174,9 +174,6 @@ const InterviewList = () => {
     icon: React.FC<React.SVGProps<SVGSVGElement>>; // Type for Lucide icons
   }
 
-  const statItems: StatItem[] = [
-    { title: "This Week", value: stats.thisWeek, note: "Interviews scheduled", icon: Calendar },
-  ];
 
   if (loading) {
     return (
@@ -405,23 +402,6 @@ const InterviewList = () => {
         </CardContent>
       </Card>
 
-      {/* Interview Statistics */}
-      <div className="grid gap-6 md:grid-cols-3">
-        {statItems.map((stat, index) => (
-          <Card key={stat.title} className="card hover:scale-105 transition-all duration-300 border-0 shadow-lg hover:shadow-xl" style={{animationDelay: `${index * 100}ms`}}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-semibold text-gray-700">{stat.title}</CardTitle>
-              <div className="p-2 bg-gradient-to-br from-blue-100 to-purple-100 rounded-lg">
-                <stat.icon className="h-5 w-5 text-blue-600" />
-              </div>
-          </CardHeader>
-          <CardContent>
-              <div className="text-3xl font-bold text-gray-800 mb-1">{stat.value}</div>
-              <p className="text-xs text-gray-600">{stat.note}</p>
-          </CardContent>
-        </Card>
-        ))}
-      </div>
     </div>
   );
 };

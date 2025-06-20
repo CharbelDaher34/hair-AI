@@ -356,6 +356,12 @@ class ApiService {
     });
   }
 
+  async checkCandidateEmail(email) {
+    return this.request(`/candidates/check-email/${encodeURIComponent(email)}`, {
+      method: 'GET',
+    });
+  }
+
   // Form Key endpoints
   async createFormKey(formKeyData) {
     // Remove employer_id from the data since it's extracted from token on backend

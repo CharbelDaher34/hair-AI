@@ -220,7 +220,9 @@ def run_api_tests():
     }
     match_data_payload = {
         "score": round(random.uniform(0.5, 0.99), 2),
-        "embedding_similarity": round(random.uniform(0.5, 0.99), 3),
+        "overall_embedding_similarity": round(random.uniform(0.5, 0.99), 3),
+        "skills_embedding_similarity": round(random.uniform(0.5, 0.99), 3),
+        "embedding_similarity": round(random.uniform(0.5, 0.99), 3),  # Legacy field
         "match_percentage": fake.random_int(min=30, max=99),
         "matching_skills": [fake.word() for _ in range(fake.random_int(min=1, max=3))],
         "missing_skills": [fake.word() for _ in range(fake.random_int(min=0, max=2))],
@@ -229,6 +231,23 @@ def run_api_tests():
         "matching_skills_count": fake.random_int(min=1, max=3),
         "missing_skills_count": fake.random_int(min=0, max=2),
         "extra_skills_count": fake.random_int(min=0, max=1),
+        "score_breakdown": {
+            "skills_score": round(random.uniform(0.4, 0.9), 3),
+            "overall_embedding_similarity": round(random.uniform(0.4, 0.9), 3),
+        },
+        "weights_used": {
+            "final_score_weights": {
+                "skills_score": 0.6,
+                "overall_embedding_similarity": 0.4,
+            },
+            "skill_score_weights": {
+                "hard_skills": 0.3,
+                "soft_skills": 0.2,
+                "extracted_skills": 0.25,
+                "skills_embedding_similarity": 0.25,
+            },
+        },
+        # Legacy weights for backward compatibility
         "skill_weight": round(random.uniform(0.3, 0.7), 1),
         "embedding_weight": round(random.uniform(0.3, 0.7), 1),
         # application_id will be added dynamically

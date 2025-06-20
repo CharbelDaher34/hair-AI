@@ -467,13 +467,28 @@ def get_interviews(db: Session, skip: int = 0, limit: int = 100) -> List[Intervi
     return db.query(Interview).offset(skip).limit(limit).all()
 
 
+def get_interviews_by_employer_with_application(
+    db: Session, employer_id: int, skip: int = 0, limit: int = 100
+) -> List[Interview]:
+    statement = (
+        select(Interview.id, Interview.date, Interview.type, Interview.status, Interview.notes, Interview.interviewer_id, Interview.application_id, Interview.created_at, Interview.updated_at, Interview.employer_id)
+        .where(Interview.status == InterviewStatus.SCHEDULED)
+        .join(Application)
+        .join(Job)
+        .where(Job.status != Status.CLOSED)
+        .where(Job.employer_id == employer_id)
+        .offset(skip)
+        .limit(limit)
+    )
+    return db.exec(statement).all()
+
 def get_interviews_with_application(
     db: Session, skip: int = 0, limit: int = 100, employer_id: int = None
 ) -> List[Interview]:
     """Get interviews with application details (candidate and job) loaded"""
     statement = (
         select(Interview)
-        .where(Interview.status == InterviewStatus.SCHEDULED)
+        .where(Interview.status.in_(["SCHEDULED", "scheduled"]))
         .join(Application)
         .join(Job)
         .where(Job.status != Status.CLOSED)

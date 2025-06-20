@@ -52,7 +52,7 @@ class Matcher:
             text_two: Second text
 
         Returns:
-            float: Cosine similarity score between 0 and 1
+            float: Cosine similarity score between 0 and 1 (normalized from -1 to 1 range)
         """
         embedding_one = self.get_embedding(text_one)
         embedding_two = self.get_embedding(text_two)
@@ -63,7 +63,12 @@ class Matcher:
         similarity = np.dot(embedding_one, embedding_two) / (
             np.linalg.norm(embedding_one) * np.linalg.norm(embedding_two)
         )
-        return float(similarity)
+        
+        # Normalize cosine similarity from [-1, 1] to [0, 1] to prevent negative scores
+        # This ensures embedding similarity contributes positively to the final score
+        normalized_similarity = (similarity + 1.0) / 2.0
+        
+        return float(max(0.0, min(1.0, normalized_similarity)))
 
 
     def fuzzy_match_skills(self, required_skills: List[str], candidate_skills: List[str], threshold: float = 85.0) -> Dict:
@@ -91,6 +96,8 @@ class Matcher:
         
     
         match_percentage = (len(matching_skills) / len(required_skills) * 100) if required_skills else 0
+        # Ensure match_percentage is never negative
+        match_percentage = max(0.0, match_percentage)
         
         return {
             "matching_skills": matching_skills,
@@ -103,129 +110,198 @@ class Matcher:
         self,
         job: Dict,
         candidates: List[Dict],
-        weights: Optional[Dict[str, float]] = None,
+        weights: Optional[Dict] = None,
         fuzzy_threshold: float = 80.0
     ) -> List[Dict]:
         """
-        Rank candidates against a job using fuzzy skill matching and embedding similarity.
+        Rank candidates against a job using a two-level scoring model.
 
         Args:
             job: Job description dictionary
             candidates: List of candidate dictionaries
-            weights: Optional weights for different scoring components
+            weights: Optional nested dictionary for different scoring components.
+                     Example:
+                     {
+                         "final_score_weights": {
+                             "skills_score": 0.6,
+                             "overall_embedding_similarity": 0.4,
+                         },
+                         "skill_score_weights": {
+                             "hard_skills": 0.30,
+                             "soft_skills": 0.20,
+                             "extracted_skills": 0.25,
+                             "skills_embedding_similarity": 0.25,
+                         }
+                     }
             fuzzy_threshold: Minimum fuzzy match score for skills (0-100)
 
         Returns:
             List of candidate matches with detailed analysis
         """
-
+        
         if not candidates:
             return []
-
-        # ---------- 1. Weight preparation ----------
-        default_weights = {
-            "hard_skills": 0.30,
-            "soft_skills": 0.20,
-            "extracted_skills": 0.25,
-            "embedding_similarity": 0.25,
-        }
-        weights = weights or default_weights
-        # Strip zero-weight keys & renormalise
-        weights = {k: v for k, v in weights.items() if v > 0}
-        total_w = sum(weights.values())
-        weights = {k: v / total_w for k, v in weights.items()}
-
-        # ---------- 2. Job preprocessing ----------
-        job_hard_skills = [s.lower() for s in job.get("skills", {}).get("hard_skills", [])]
-        job_soft_skills = [s.lower() for s in job.get("skills", {}).get("soft_skills", [])]
-        job_extracted_skills = [
-            s.lower()
-            for s in skill_ner.extract_skills(render_model(job))
-        ]
-
-        job_full_text = " ".join([
-            job.get("title", ""),
-            job.get("description", ""),
-            " ".join(job.get("responsibilities", [])),
-            job.get("seniority_level", ""),
-            job.get("job_type", ""),
-        ])
-
-        results = []
-        for cand in candidates:
-            # ---------- 3. Candidate skill extraction ----------
-            cand_hard = [
-                s["name"].lower()
-                for s in cand.get("skills", [])
-                if s.get("type") == "Hard" and s.get("name")
-            ]
-            cand_soft = [
-                s["name"].lower()
-                for s in cand.get("skills", [])
-                if s.get("type") == "Soft" and s.get("name")
-            ]
-            cand_extracted = [
-                s.lower() for s in skill_ner.extract_skills(render_model(cand))
-            ]
-
-            # ---------- 4. Fuzzy skill matching analysis ----------
-            hard_skills_analysis = self.fuzzy_match_skills(job_hard_skills, cand_hard, fuzzy_threshold)
-            soft_skills_analysis = self.fuzzy_match_skills(job_soft_skills, cand_soft, fuzzy_threshold)
-            extracted_skills_analysis = self.fuzzy_match_skills(job_extracted_skills, cand_extracted, fuzzy_threshold)
-            
-            missing_skills = list(set(hard_skills_analysis["missing_skills"] + soft_skills_analysis["missing_skills"] + extracted_skills_analysis["missing_skills"]))
-            extra_skills = list(set(hard_skills_analysis["extra_skills"] + soft_skills_analysis["extra_skills"] + extracted_skills_analysis["extra_skills"]))
-            matching_skills = list(set(hard_skills_analysis["matching_skills"] + soft_skills_analysis["matching_skills"] + extracted_skills_analysis["matching_skills"]))
-            
-            # ---------- 5. Calculate scores ----------
-            hard_score = hard_skills_analysis["match_percentage"] / 100
-            soft_score = soft_skills_analysis["match_percentage"] / 100
-            extracted_score = extracted_skills_analysis["match_percentage"] / 100
-
-            # Embedding similarity
-            cand_full_text = render_model(cand)
-            embedding_similarity = self.calculate_text_similarity(cand_full_text, job_full_text)
-
-            # ---------- 6. Calculate weighted final score ----------
-            score_components = {}
-            final_score = 0
-
-            if "hard_skills" in weights:
-                score_components["hard_skills"] = hard_score
-                final_score += weights["hard_skills"] * hard_score
-
-            if "soft_skills" in weights:
-                score_components["soft_skills"] = soft_score
-                final_score += weights["soft_skills"] * soft_score
-
-            if "extracted_skills" in weights:
-                score_components["extracted_skills"] = extracted_score
-                final_score += weights["extracted_skills"] * extracted_score
-
-            if "embedding_similarity" in weights:
-                score_components["embedding_similarity"] = embedding_similarity
-                final_score += weights["embedding_similarity"] * embedding_similarity
-
-            # ---------- 7. Compile result ----------
-            result = {
-                "candidate": cand.get("candidate_name") or cand.get("full_name"),
-                "score": round(final_score, 3),
-                "score_breakdown": {k: round(v, 3) for k, v in score_components.items()},
-                "missing_skills": missing_skills,
-                "extra_skills": extra_skills,
-                "matching_skills": matching_skills,
-                "embedding_similarity": round(embedding_similarity, 3),
-                "weights_used": weights
+        try:
+            # ---------- 1. Weight preparation ----------
+            default_weights = {
+                "final_score_weights": {
+                    "skills_score": 0.6,
+                    "overall_embedding_similarity": 0.4,
+                },
+                "skill_score_weights": {
+                    "hard_skills": 0.30,
+                    "soft_skills": 0.20,
+                    "extracted_skills": 0.25,
+                    "skills_embedding_similarity": 0.25,
+                }
             }
+            
+            user_final_weights = (weights or {}).get("final_score_weights", {})
+            final_weights = {**default_weights["final_score_weights"], **user_final_weights}
+    
+            user_skill_weights = (weights or {}).get("skill_score_weights", {})
+            skill_weights = {**default_weights["skill_score_weights"], **user_skill_weights}
+    
+            # Strip zero-weight keys & renormalise for final score
+            final_weights = {k: v for k, v in final_weights.items() if v > 0}
+            total_final_w = sum(final_weights.values())
+            if total_final_w > 0:
+                final_weights = {k: v / total_final_w for k, v in final_weights.items()}
+    
+            # Strip zero-weight keys & renormalise for skill score
+            skill_weights = {k: v for k, v in skill_weights.items() if v > 0}
+            total_skill_w = sum(skill_weights.values())
+            if total_skill_w > 0:
+                skill_weights = {k: v / total_skill_w for k, v in skill_weights.items()}
+    
+            # ---------- 2. Job preprocessing ----------
+            job_hard_skills = [s.lower() for s in job.get("skills", {}).get("hard_skills", [])]
+            job_soft_skills = [s.lower() for s in job.get("skills", {}).get("soft_skills", [])]
+            job_extracted_skills = [
+                s.lower()
+                for s in skill_ner.extract_skills(render_model(job))
+            ]
+            job_all_skills_text = " ".join(job_hard_skills + job_soft_skills + job_extracted_skills)
+    
+            job_full_text = " ".join([
+                job.get("title", ""),
+                job.get("description", ""),
+                " ".join(job.get("responsibilities", [])),
+                job.get("seniority_level", ""),
+                job.get("job_type", ""),
+            ])
+    
+            results = []
+            for cand in candidates:
+                # ---------- 3. Candidate skill extraction ----------
+                cand_hard = [
+                    s["name"].lower()
+                    for s in cand.get("skills", [])
+                    if s.get("type") == "Hard" and s.get("name")
+                ]
+                cand_soft = [
+                    s["name"].lower()
+                    for s in cand.get("skills", [])
+                    if s.get("type") == "Soft" and s.get("name")
+                ]
+                cand_extracted = [
+                    s.lower() for s in skill_ner.extract_skills(render_model(cand))
+                ]
+                cand_all_skills_text = " ".join(cand_hard + cand_soft + cand_extracted)
+    
+                # ---------- 4. Fuzzy skill matching analysis ----------
+                hard_skills_analysis = self.fuzzy_match_skills(job_hard_skills, cand_hard, fuzzy_threshold)
+                soft_skills_analysis = self.fuzzy_match_skills(job_soft_skills, cand_soft, fuzzy_threshold)
+                extracted_skills_analysis = self.fuzzy_match_skills(job_extracted_skills, cand_extracted, fuzzy_threshold)
+                
+                missing_skills = list(set(hard_skills_analysis["missing_skills"] + soft_skills_analysis["missing_skills"] + extracted_skills_analysis["missing_skills"]))
+                extra_skills = list(set(hard_skills_analysis["extra_skills"] + soft_skills_analysis["extra_skills"] + extracted_skills_analysis["extra_skills"]))
+                matching_skills = list(set(hard_skills_analysis["matching_skills"] + soft_skills_analysis["matching_skills"] + extracted_skills_analysis["matching_skills"]))
+                
+                # ---------- 5. Calculate component scores ----------
+                hard_score = max(0.0, hard_skills_analysis["match_percentage"] / 100)
+                soft_score = max(0.0, soft_skills_analysis["match_percentage"] / 100)
+                extracted_score = max(0.0, extracted_skills_analysis["match_percentage"] / 100)
+                
+                skills_embedding_similarity = self.calculate_text_similarity(cand_all_skills_text, job_all_skills_text)
+    
+                cand_full_text = render_model(cand)
+                overall_embedding_similarity = self.calculate_text_similarity(cand_full_text, job_full_text)
+    
+                # ---------- 6. Calculate intermediate and final scores ----------
+                # 6a. Calculate the composite "skills_score"
+                skills_score_components = {}
+                skills_score = 0
+    
+                if "hard_skills" in skill_weights:
+                    skills_score_components["hard_skills"] = hard_score
+                    skills_score += skill_weights["hard_skills"] * hard_score
+    
+                if "soft_skills" in skill_weights:
+                    skills_score_components["soft_skills"] = soft_score
+                    skills_score += skill_weights["soft_skills"] * soft_score
+    
+                if "extracted_skills" in skill_weights:
+                    skills_score_components["extracted_skills"] = extracted_score
+                    skills_score += skill_weights["extracted_skills"] * extracted_score
+                    
+                if "skills_embedding_similarity" in skill_weights:
+                    skills_score_components["skills_embedding_similarity"] = skills_embedding_similarity
+                    skills_score += skill_weights["skills_embedding_similarity"] * skills_embedding_similarity
+                
+                # 6b. Calculate the final weighted score
+                final_score_components = {}
+                final_score = 0
+                
+                if "skills_score" in final_weights:
+                    final_score_components["skills_score"] = skills_score
+                    final_score += final_weights["skills_score"] * skills_score
+                
+                if "overall_embedding_similarity" in final_weights:
+                    final_score_components["overall_embedding_similarity"] = overall_embedding_similarity
+                    final_score += final_weights["overall_embedding_similarity"] * overall_embedding_similarity
+    
+                # Debug logging for negative scores
+                if final_score < 0:
+                    logger.warning(f"Negative score detected for candidate {cand.get('candidate_name') or cand.get('full_name')}: {final_score}")
+                    logger.warning(f"Final Score components: {final_score_components}")
+                    logger.warning(f"Skill Score components: {skills_score_components}")
+                    logger.warning(f"Weights: final_weights={final_weights}, skill_weights={skill_weights}")
+    
+                # ---------- 7. Compile result ----------
+                # Ensure final score is never negative
+                final_score = max(0.0, final_score)
+                
+                result = {
+                    "candidate": cand.get("candidate_name") or cand.get("full_name"),
+                    "score": round(final_score, 3),
+                    "score_breakdown": {
+                        "final_score_components": {k: round(v, 3) for k, v in final_score_components.items()},
+                        "skills_score_components": {k: round(v, 3) for k, v in skills_score_components.items()}
+                    },
+                    "missing_skills": missing_skills,
+                    "extra_skills": extra_skills,
+                    "matching_skills": matching_skills,
+                    "skills_embedding_similarity": round(skills_embedding_similarity, 3),
+                    "overall_embedding_similarity": round(overall_embedding_similarity, 3),
+                    "weights_used": {
+                        "final_weights": final_weights,
+                        "skill_weights": skill_weights,
+                    }
+                }
+    
+                results.append(result)
+    
+            return sorted(results, key=lambda x: x["score"], reverse=True)
+        except Exception as e:
+            import traceback
+            print(traceback)
 
-            results.append(result)
-
-        return sorted(results, key=lambda x: x["score"], reverse=True)
-
-
-# Example usage
+    
+    
+# Exampl    e usage
 if __name__ == "__main__":
-    # Initialize the matcher
+    # In  itialize the matcher
     matcher = Matcher()
 
     # Example job description
@@ -292,59 +368,21 @@ if __name__ == "__main__":
     for match in matches:
         print(f"\nCandidate: {match['candidate']}")
         print(f"Final Score: {match['score']:.3f}")
-        print(f"Embedding Similarity: {match['embedding_similarity']:.3f}")
+        print(f"Overall Embedding Similarity: {match['overall_embedding_similarity']:.3f}")
+        print(f"Skills Embedding Similarity: {match['skills_embedding_similarity']:.3f}")
 
         print("\nScore Breakdown:")
-        for component, score in match["score_breakdown"].items():
-            print(f"- {component}: {score}")
+        print("  Final Score Components:")
+        for component, score in match["score_breakdown"]["final_score_components"].items():
+            print(f"  - {component}: {score}")
+            
+        print("\n  Skills Score Components:")
+        for component, score in match["score_breakdown"]["skills_score_components"].items():
+            print(f"  - {component}: {score}")
 
         print("\nSkill Analysis:")
-        print(f"  Hard Skills:")
-        print(f"    Match Percentage: {match['skill_analysis']['hard_skills']['match_percentage']}%")
-        print(
-            f"    Matching Skills: {', '.join(match['skill_analysis']['hard_skills']['matching_skills'])}"
-        )
-        print(
-            f"    Missing Skills: {', '.join(match['skill_analysis']['hard_skills']['missing_skills'])}"
-        )
-        print(f"    Extra Skills: {', '.join(match['skill_analysis']['hard_skills']['extra_skills'])}")
-        print(
-            f"    Total Required: {match['skill_analysis']['hard_skills']['total_required']}"
-        )
-        print(
-            f"    Matching Count: {match['skill_analysis']['hard_skills']['matching_count']}"
-        )
-
-        print(f"\n  Soft Skills:")
-        print(f"    Match Percentage: {match['skill_analysis']['soft_skills']['match_percentage']}%")
-        print(
-            f"    Matching Skills: {', '.join(match['skill_analysis']['soft_skills']['matching_skills'])}"
-        )
-        print(
-            f"    Missing Skills: {', '.join(match['skill_analysis']['soft_skills']['missing_skills'])}"
-        )
-        print(f"    Extra Skills: {', '.join(match['skill_analysis']['soft_skills']['extra_skills'])}")
-        print(
-            f"    Total Required: {match['skill_analysis']['soft_skills']['total_required']}"
-        )
-        print(
-            f"    Matching Count: {match['skill_analysis']['soft_skills']['matching_count']}"
-        )
-
-        print(f"\n  Extracted Skills:")
-        print(f"    Match Percentage: {match['skill_analysis']['extracted_skills']['match_percentage']}%")
-        print(
-            f"    Matching Skills: {', '.join(match['skill_analysis']['extracted_skills']['matching_skills'])}"
-        )
-        print(
-            f"    Missing Skills: {', '.join(match['skill_analysis']['extracted_skills']['missing_skills'])}"
-        )
-        print(f"    Extra Skills: {', '.join(match['skill_analysis']['extracted_skills']['extra_skills'])}")
-        print(
-            f"    Total Required: {match['skill_analysis']['extracted_skills']['total_required']}"
-        )
-        print(
-            f"    Matching Count: {match['skill_analysis']['extracted_skills']['matching_count']}"
-        )
+        print(f"  Matching Skills: {', '.join(match['matching_skills'])}")
+        print(f"  Missing Skills: {', '.join(match['missing_skills'])}")
+        print(f"  Extra Skills: {', '.join(match['extra_skills'])}")
 
         print("\n-" * 80)

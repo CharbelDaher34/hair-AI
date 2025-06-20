@@ -57,6 +57,12 @@ const JobApplicationForm = () => {
   const [otp_code, set_otp_code] = useState("");
   const [otp_expires_in, set_otp_expires_in] = useState(0);
   const [otp_timer, set_otp_timer] = useState<NodeJS.Timeout | null>(null);
+  
+  // Existing candidate states
+  const [existing_candidate, set_existing_candidate] = useState<any>(null);
+  const [is_checking_email, set_is_checking_email] = useState(false);
+  const [is_existing_user, set_is_existing_user] = useState(false);
+  const [show_existing_data, set_show_existing_data] = useState(false);
 
   // Candidate form data
   const [candidate_data, set_candidate_data] = useState({
@@ -130,6 +136,31 @@ const JobApplicationForm = () => {
     }
   };
 
+  const check_candidate_email = async (email: string) => {
+    if (!email.trim() || !email.includes('@')) return;
+    
+    set_is_checking_email(true);
+    try {
+      const response = await apiService.checkCandidateEmail(email);
+      
+      if (response.exists) {
+        set_existing_candidate(response.candidate);
+        set_is_existing_user(true);
+        // Don't pre-fill data until verified
+      } else {
+        set_existing_candidate(null);
+        set_is_existing_user(false);
+      }
+    } catch (error: any) {
+      console.error("Error checking candidate email:", error);
+      // Don't show error to user for this check, just continue as new user
+      set_existing_candidate(null);
+      set_is_existing_user(false);
+    } finally {
+      set_is_checking_email(false);
+    }
+  };
+
   const handle_candidate_change = (field: string, value: string) => {
     set_candidate_data(prev => {
       // Reset email verification if email changes
@@ -138,9 +169,17 @@ const JobApplicationForm = () => {
         set_otp_sent(false);
         set_otp_code("");
         set_otp_expires_in(0);
+        set_existing_candidate(null);
+        set_is_existing_user(false);
+        set_show_existing_data(false);
         if (otp_timer) {
           clearTimeout(otp_timer);
           set_otp_timer(null);
+        }
+        
+        // Check if email exists after a short delay
+        if (value.trim() && value.includes('@')) {
+          setTimeout(() => check_candidate_email(value), 500);
         }
       }
       
@@ -184,14 +223,26 @@ const JobApplicationForm = () => {
 
     set_is_sending_otp(true);
     try {
-      const response = await apiService.sendOTP(candidate_data.email, candidate_data.full_name);
+      // Use the full name from existing candidate if available, otherwise use the form data
+      const full_name = is_existing_user && existing_candidate 
+        ? existing_candidate.full_name 
+        : candidate_data.full_name;
+        
+      const response = await apiService.sendOTP(candidate_data.email, full_name);
       
       if (response.success) {
         set_otp_sent(true);
         set_otp_expires_in(response.expires_in_minutes * 60); // Convert to seconds
-        toast.success("Verification code sent!", {
-          description: `Please check your email at ${candidate_data.email}`,
-        });
+        
+        if (is_existing_user) {
+          toast.success("Verification code sent!", {
+            description: `Welcome back! Please check your email at ${candidate_data.email}`,
+          });
+        } else {
+          toast.success("Verification code sent!", {
+            description: `Please check your email at ${candidate_data.email}`,
+          });
+        }
       } else {
         throw new Error(response.message || "Failed to send OTP");
       }
@@ -223,9 +274,23 @@ const JobApplicationForm = () => {
           clearTimeout(otp_timer);
           set_otp_timer(null);
         }
-        toast.success("Email verified successfully!", {
-          description: "You can now submit your application.",
-        });
+        
+        // If existing user, show their data and pre-fill form after verification
+        if (is_existing_user && existing_candidate) {
+          set_show_existing_data(true);
+          set_candidate_data(prev => ({
+            ...prev,
+            full_name: existing_candidate.full_name || prev.full_name,
+            phone: existing_candidate.phone || prev.phone,
+          }));
+          toast.success("Welcome back!", {
+            description: "Your existing profile has been loaded. You can update your information below.",
+          });
+        } else {
+          toast.success("Email verified successfully!", {
+            description: "You can now submit your application.",
+          });
+        }
       } else {
         throw new Error(response.message || "Invalid verification code");
       }
@@ -264,7 +329,9 @@ const JobApplicationForm = () => {
       toast.error("Email verification is required");
       return false;
     }
-    if (!resume_file) {
+    
+    // For existing users, resume is optional if they already have one
+    if (!resume_file && !(show_existing_data && existing_candidate?.has_resume)) {
       toast.error("Resume is required");
       return false;
     }
@@ -290,7 +357,9 @@ const JobApplicationForm = () => {
       // Step 1: Create candidate with resume
       const candidate_form_data = new FormData();
       candidate_form_data.append('candidate_in', JSON.stringify(candidate_data));
-      candidate_form_data.append('resume', resume_file!);
+      if (resume_file) {
+        candidate_form_data.append('resume', resume_file);
+      }
 
       const candidate_response = await fetch('http://84.16.230.94:8017/api/v1/candidates/', {
         method: 'POST',
@@ -343,6 +412,9 @@ const JobApplicationForm = () => {
       set_email_verified(false);
       set_otp_sent(false);
       set_otp_code("");
+      set_existing_candidate(null);
+      set_is_existing_user(false);
+      set_show_existing_data(false);
 
     } catch (error: any) {
       console.error("Application submission error:", error);
@@ -368,6 +440,18 @@ const JobApplicationForm = () => {
           <Label htmlFor="email" className="text-base font-semibold text-gray-700">
             Email Address *
           </Label>
+          {is_checking_email && (
+            <div className="flex items-center gap-1 text-blue-600">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span className="text-sm font-medium">Checking...</span>
+            </div>
+          )}
+          {is_existing_user && existing_candidate && (
+            <div className="flex items-center gap-1 text-orange-600">
+              <User className="h-4 w-4" />
+              <span className="text-sm font-medium">Existing Account</span>
+            </div>
+          )}
           {email_verified && (
             <div className="flex items-center gap-1 text-green-600">
               <CheckCircle className="h-4 w-4" />
@@ -408,82 +492,198 @@ const JobApplicationForm = () => {
           )}
         </div>
 
-        {otp_sent && !email_verified && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-4">
-            <div className="flex items-center gap-2 text-blue-800">
-              <Shield className="h-5 w-5" />
-              <span className="font-medium">Email Verification Required</span>
+        {is_existing_user && !email_verified && (
+          <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 space-y-3">
+            <div className="flex items-center gap-2 text-orange-800">
+              <User className="h-5 w-5" />
+              <span className="font-medium">Existing Account Detected</span>
             </div>
-            <p className="text-blue-700 text-sm">
-              We've sent a 6-digit verification code to <strong>{candidate_data.email}</strong>. 
-              Please enter it below to verify your email address.
+            <p className="text-orange-700 text-sm">
+              We found an existing account with this email address. Please verify your email address 
+              to continue with your application and access your profile information.
             </p>
+          </div>
+        )}
+
+        {otp_sent && !email_verified && (
+          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-6 space-y-6 shadow-lg">
+            <div className="text-center space-y-2">
+              <div className="flex justify-center">
+                <div className="bg-blue-100 p-3 rounded-full">
+                  <Shield className="h-8 w-8 text-blue-600" />
+                </div>
+              </div>
+              <h3 className="text-xl font-bold text-blue-900">Verify Your Email</h3>
+              <p className="text-blue-700 text-sm max-w-md mx-auto">
+                We've sent a 6-digit verification code to
+              </p>
+              <p className="font-semibold text-blue-900 text-base">{candidate_data.email}</p>
+              {is_existing_user && (
+                <p className="text-orange-600 text-sm font-medium bg-orange-50 px-3 py-1 rounded-full inline-block">
+                  🔐 This will unlock your existing profile
+                </p>
+              )}
+            </div>
             
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label className="text-sm font-medium text-blue-800">Verification Code</Label>
-                <span className="text-sm text-blue-600">
-                  Expires in: {format_time(otp_expires_in)}
-                </span>
+            <div className="space-y-4">
+              <div className="text-center">
+                <Label className="text-sm font-medium text-blue-800 block mb-3">Enter Verification Code</Label>
+                <div className="flex justify-center">
+                  <InputOTP
+                    maxLength={6}
+                    value={otp_code}
+                    onChange={set_otp_code}
+                  >
+                    <InputOTPGroup className="gap-3">
+                      <InputOTPSlot 
+                        index={0} 
+                        className="w-14 h-14 text-xl font-bold border-2 border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg bg-white shadow-sm transition-all duration-200 hover:border-blue-400" 
+                      />
+                      <InputOTPSlot 
+                        index={1} 
+                        className="w-14 h-14 text-xl font-bold border-2 border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg bg-white shadow-sm transition-all duration-200 hover:border-blue-400" 
+                      />
+                      <InputOTPSlot 
+                        index={2} 
+                        className="w-14 h-14 text-xl font-bold border-2 border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg bg-white shadow-sm transition-all duration-200 hover:border-blue-400" 
+                      />
+                      <InputOTPSlot 
+                        index={3} 
+                        className="w-14 h-14 text-xl font-bold border-2 border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg bg-white shadow-sm transition-all duration-200 hover:border-blue-400" 
+                      />
+                      <InputOTPSlot 
+                        index={4} 
+                        className="w-14 h-14 text-xl font-bold border-2 border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg bg-white shadow-sm transition-all duration-200 hover:border-blue-400" 
+                      />
+                      <InputOTPSlot 
+                        index={5} 
+                        className="w-14 h-14 text-xl font-bold border-2 border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg bg-white shadow-sm transition-all duration-200 hover:border-blue-400" 
+                      />
+                    </InputOTPGroup>
+                  </InputOTP>
+                </div>
               </div>
               
-              <div className="flex items-center gap-3">
-                <InputOTP
-                  maxLength={6}
-                  value={otp_code}
-                  onChange={set_otp_code}
-                  className="flex-1"
-                >
-                  <InputOTPGroup className="gap-2">
-                    <InputOTPSlot index={0} className="w-12 h-12 text-lg font-bold border-2 border-blue-300 focus:border-blue-500" />
-                    <InputOTPSlot index={1} className="w-12 h-12 text-lg font-bold border-2 border-blue-300 focus:border-blue-500" />
-                    <InputOTPSlot index={2} className="w-12 h-12 text-lg font-bold border-2 border-blue-300 focus:border-blue-500" />
-                    <InputOTPSlot index={3} className="w-12 h-12 text-lg font-bold border-2 border-blue-300 focus:border-blue-500" />
-                    <InputOTPSlot index={4} className="w-12 h-12 text-lg font-bold border-2 border-blue-300 focus:border-blue-500" />
-                    <InputOTPSlot index={5} className="w-12 h-12 text-lg font-bold border-2 border-blue-300 focus:border-blue-500" />
-                  </InputOTPGroup>
-                </InputOTP>
-                
+              <div className="flex justify-center">
                 <Button
                   type="button"
                   onClick={verify_otp}
                   disabled={is_verifying_otp || otp_code.length !== 6}
-                  className="h-12 px-6 bg-green-600 hover:bg-green-700 text-white font-medium"
+                  className="h-12 px-8 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {is_verifying_otp ? (
                     <>
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      <Loader2 className="h-5 w-5 animate-spin mr-2" />
                       Verifying...
                     </>
                   ) : (
-                    "Verify"
+                    <>
+                      <CheckCircle className="h-5 w-5 mr-2" />
+                      Verify Code
+                    </>
                   )}
                 </Button>
               </div>
             </div>
 
-            <div className="flex items-center justify-between pt-2">
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={send_otp}
-                disabled={is_sending_otp || otp_expires_in > 0}
-                className="text-blue-600 hover:text-blue-700 text-sm"
-              >
-                {is_sending_otp ? "Sending..." : "Resend Code"}
-              </Button>
+            <div className="border-t border-blue-200 pt-4 space-y-3">
+              <div className="flex items-center justify-center gap-2 text-sm text-blue-600">
+                <Clock className="h-4 w-4" />
+                <span>Code expires in: <strong>{format_time(otp_expires_in)}</strong></span>
+              </div>
               
-              <p className="text-xs text-blue-600">
-                Didn't receive the code? Check your spam folder.
-              </p>
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-sm">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={send_otp}
+                  disabled={is_sending_otp || otp_expires_in > 0}
+                  className="text-blue-600 hover:text-blue-700 hover:bg-blue-100 font-medium transition-colors duration-200"
+                >
+                  {is_sending_otp ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <Mail className="h-4 w-4 mr-1" />
+                      Resend Code
+                    </>
+                  )}
+                </Button>
+                
+                <p className="text-xs text-blue-500 text-center">
+                  💡 Didn't receive the code? Check your spam folder
+                </p>
+              </div>
             </div>
           </div>
         )}
 
-        {email_verified && (
+        {email_verified && !show_existing_data && (
           <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-center gap-2">
             <CheckCircle className="h-5 w-5 text-green-600" />
             <span className="text-green-800 font-medium">Email verified successfully!</span>
+          </div>
+        )}
+
+        {email_verified && show_existing_data && existing_candidate && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4 space-y-3">
+            <div className="flex items-center gap-2 text-green-800">
+              <CheckCircle className="h-5 w-5" />
+              <span className="font-medium">Welcome back, {existing_candidate.full_name}!</span>
+            </div>
+            <p className="text-green-700 text-sm">
+              Your existing profile has been loaded. You can update your information below if needed.
+            </p>
+            <div className="bg-white rounded-md p-3 border border-green-200">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="font-medium text-gray-600">Name:</span>
+                  <p className="text-gray-800">{existing_candidate.full_name}</p>
+                </div>
+                <div>
+                  <span className="font-medium text-gray-600">Phone:</span>
+                  <p className="text-gray-800">{existing_candidate.phone || 'Not provided'}</p>
+                </div>
+                <div>
+                  <span className="font-medium text-gray-600">Email:</span>
+                  <p className="text-gray-800">{existing_candidate.email}</p>
+                </div>
+                <div>
+                  <span className="font-medium text-gray-600">Member since:</span>
+                  <p className="text-gray-800">
+                    {existing_candidate.created_at 
+                      ? new Date(existing_candidate.created_at).toLocaleDateString()
+                      : 'Unknown'
+                    }
+                  </p>
+                </div>
+                {existing_candidate.has_resume && (
+                  <div className="col-span-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="font-medium text-gray-600">Resume:</span>
+                        <p className="text-green-600 text-sm">✓ Resume on file</p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.open(`http://84.16.230.94:8017/api/v1/candidates/${existing_candidate.id}/resume`, '_blank')}
+                        className="text-blue-600 hover:text-blue-700"
+                      >
+                        View Current Resume
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+            <p className="text-green-600 text-xs">
+              You can update your information in the form below and optionally upload a new resume for this application.
+            </p>
           </div>
         )}
       </div>
@@ -694,7 +894,6 @@ const JobApplicationForm = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="email" className="text-base font-semibold text-gray-700">Email Address *</Label>
                   {render_email_verification()}
                 </div>
               </div>
@@ -710,7 +909,25 @@ const JobApplicationForm = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="resume" className="text-base font-semibold text-gray-700">Upload Resume *</Label>
+                <Label htmlFor="resume" className="text-base font-semibold text-gray-700">
+                  Upload Resume {(show_existing_data && existing_candidate?.has_resume) ? "(Optional - Update Resume)" : "*"}
+                </Label>
+                {show_existing_data && existing_candidate?.has_resume && (
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-green-600">
+                      ✓ You already have a resume on file. You can optionally upload a new one for this application.
+                    </p>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => window.open(`http://84.16.230.94:8017/api/v1/candidates/${existing_candidate.id}/resume`, '_blank')}
+                      className="text-blue-600 hover:text-blue-700 text-sm"
+                    >
+                      View Current Resume
+                    </Button>
+                  </div>
+                )}
                 <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md bg-white hover:border-purple-400 transition-colors duration-200">
                   <div className="space-y-1 text-center">
                     <Upload className="mx-auto h-12 w-12 text-gray-400" />

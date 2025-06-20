@@ -63,6 +63,19 @@ HR_ROLES = [
     "Chief People Officer",
 ]
 
+DEPARTMENTS = [
+    "Human Resources",
+    "Recruitment",
+    "Talent Acquisition",
+    "Accounting",
+    "Legal",
+    "Marketing",
+    "Sales",
+    "Engineering",
+    "Product",
+    "Customer Support",
+]
+
 # Form field types for company forms
 FORM_FIELD_NAMES = [
     "Years of Experience",
@@ -165,6 +178,7 @@ def create_hr_data(company_id: int) -> Dict:
         "full_name": full_name,
         "employer_id": company_id,
         "role": random.choice(HR_ROLES),
+        "department": random.choice(DEPARTMENTS),
     }
 
     return hr_data

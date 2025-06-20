@@ -122,6 +122,7 @@ def update_interview_status(
     *,
     db: Session = Depends(get_session),
     interview_id: int,
+    reason: Optional[str] = None,
     interview_in: InterviewUpdate,
 ) -> Any:
     """
@@ -131,9 +132,14 @@ def update_interview_status(
     if not interview:
         raise HTTPException(status_code=404, detail="Interview not found")
     interview_in = InterviewUpdate(status=interview_in.status,updated_at=datetime.now())
-    interview = crud_interview.update_interview(
-        db=db, db_obj=interview, obj_in=interview_in
-    )
+    if interview_in.status in ["cancelled", "canceled","Canceled","Cancelled"]:
+        interview = crud_interview.update_interview(
+            db=db, db_obj=interview, obj_in=interview_in, notify=True, reason=reason
+        )
+    else:
+        interview = crud_interview.update_interview(
+            db=db, db_obj=interview, obj_in=interview_in, notify=True
+        )
     return interview
 
 @router.delete("/{interview_id}", response_model=InterviewRead)

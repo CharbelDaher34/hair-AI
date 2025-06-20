@@ -96,12 +96,12 @@ const Candidates = () => {
     }
   };
 
-  const handle_view_match = async (application: any) => {
-    if (!application.match) {
+  const handle_view_match = async (match: any) => {
+    if (!match) {
       alert('No match data available for this application.');
       return;
     }
-    set_selected_match(application.match);
+    set_selected_match(match);
     set_match_dialog_open(true);
   };
 
@@ -491,11 +491,11 @@ const Candidates = () => {
                                 <p className="text-sm text-gray-600">
                                   Applied on {new Date(application.created_at).toLocaleDateString()}
                                 </p>
-                                {application.match && (
+                                {application.matches && application.matches.length > 0 && (
                                   <div className="mt-2">
                                     <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
                                       <Star className="h-3 w-3 mr-1" />
-                                      Match: {(application.match.score * 100).toFixed(1)}%
+                                      Match: {(application.matches[0].score * 100).toFixed(1)}%
                                     </Badge>
                                   </div>
                                 )}
@@ -504,11 +504,11 @@ const Candidates = () => {
                                 <Badge variant="outline" className="capitalize">
                                   {application.status}
                                 </Badge>
-                                {application.match && (
+                                {application.matches && application.matches.length > 0 && (
                                   <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => handle_view_match(application)}
+                                    onClick={() => handle_view_match(application.matches[0])}
                                     className="button-outline shadow-sm hover:shadow-md transition-all duration-300"
                                   >
                                     <Star className="h-4 w-4 mr-1" />
@@ -664,11 +664,18 @@ const Candidates = () => {
                 <Badge variant="outline" className="font-bold text-2xl text-green-600 border-green-300 bg-green-50 px-4 py-2">
                   {selected_match.score ? (selected_match.score * 100).toFixed(1) : 'N/A'}%
                 </Badge>
-                {selected_match.embedding_similarity && (
-                  <p className="text-sm text-gray-600 mt-2">
-                    Embedding Similarity: {(selected_match.embedding_similarity * 100).toFixed(1)}%
-                  </p>
-                )}
+                <div className="text-sm text-gray-600 mt-2 space-x-4">
+                  {selected_match.overall_embedding_similarity && (
+                    <span>
+                      Overall Similarity: {(selected_match.overall_embedding_similarity * 100).toFixed(1)}%
+                    </span>
+                  )}
+                   {selected_match.skills_embedding_similarity && (
+                    <span>
+                      Skills Similarity: {(selected_match.skills_embedding_similarity * 100).toFixed(1)}%
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* Skills Analysis */}
@@ -726,17 +733,41 @@ const Candidates = () => {
               {selected_match.score_breakdown && (
                 <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
                   <Label className="text-sm font-semibold text-gray-700 block mb-3">Score Breakdown</Label>
-                  <div className="grid gap-2 md:grid-cols-2">
-                    {Object.entries(selected_match.score_breakdown).map(([key, value]: [string, any]) => (
-                      <div key={key} className="flex justify-between items-center p-2 bg-white rounded border">
-                        <span className="text-sm font-medium text-gray-700 capitalize">
-                          {key.replace(/_/g, ' ')}
-                        </span>
-                        <span className="text-sm font-bold text-gray-800">
-                          {typeof value === 'number' ? (value * 100).toFixed(1) + '%' : String(value)}
-                        </span>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {selected_match.score_breakdown.final_score_components && (
+                      <div>
+                        <h4 className="font-medium text-gray-800 mb-2">Final Score Components</h4>
+                        <div className="space-y-1">
+                          {Object.entries(selected_match.score_breakdown.final_score_components).map(([key, value]: [string, any]) => (
+                            <div key={key} className="flex justify-between items-center p-2 bg-white rounded border">
+                              <span className="text-sm font-medium text-gray-700 capitalize">
+                                {key.replace(/_/g, ' ')}
+                              </span>
+                              <span className="text-sm font-bold text-gray-800">
+                                {typeof value === 'number' ? (value * 100).toFixed(1) + '%' : String(value)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    ))}
+                    )}
+                    {selected_match.score_breakdown.skills_score_components && (
+                      <div>
+                        <h4 className="font-medium text-gray-800 mb-2">Skills Score Components</h4>
+                        <div className="space-y-1">
+                          {Object.entries(selected_match.score_breakdown.skills_score_components).map(([key, value]: [string, any]) => (
+                            <div key={key} className="flex justify-between items-center p-2 bg-white rounded border">
+                              <span className="text-sm font-medium text-gray-700 capitalize">
+                                {key.replace(/_/g, ' ')}
+                              </span>
+                              <span className="text-sm font-bold text-gray-800">
+                                {typeof value === 'number' ? (value * 100).toFixed(1) + '%' : String(value)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -745,17 +776,41 @@ const Candidates = () => {
               {selected_match.weights_used && (
                 <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
                   <Label className="text-sm font-semibold text-yellow-700 block mb-3">Matching Weights</Label>
-                  <div className="grid gap-2 md:grid-cols-2">
-                    {Object.entries(selected_match.weights_used).map(([key, value]: [string, any]) => (
-                      <div key={key} className="flex justify-between items-center p-2 bg-white rounded border">
-                        <span className="text-sm font-medium text-gray-700 capitalize">
-                          {key.replace(/_/g, ' ')}
-                        </span>
-                        <span className="text-sm font-bold text-gray-800">
-                          {typeof value === 'number' ? value.toFixed(2) : String(value)}
-                        </span>
+                   <div className="grid gap-4 md:grid-cols-2">
+                    {selected_match.weights_used.final_weights && (
+                      <div>
+                        <h4 className="font-medium text-yellow-800 mb-2">Final Weights</h4>
+                        <div className="space-y-1">
+                          {Object.entries(selected_match.weights_used.final_weights).map(([key, value]: [string, any]) => (
+                            <div key={key} className="flex justify-between items-center p-2 bg-white rounded border">
+                              <span className="text-sm font-medium text-gray-700 capitalize">
+                                {key.replace(/_/g, ' ')}
+                              </span>
+                              <span className="text-sm font-bold text-gray-800">
+                                {typeof value === 'number' ? value.toFixed(2) : String(value)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    ))}
+                    )}
+                    {selected_match.weights_used.skill_weights && (
+                       <div>
+                        <h4 className="font-medium text-yellow-800 mb-2">Skill Weights</h4>
+                        <div className="space-y-1">
+                          {Object.entries(selected_match.weights_used.skill_weights).map(([key, value]: [string, any]) => (
+                            <div key={key} className="flex justify-between items-center p-2 bg-white rounded border">
+                              <span className="text-sm font-medium text-gray-700 capitalize">
+                                {key.replace(/_/g, ' ')}
+                              </span>
+                              <span className="text-sm font-bold text-gray-800">
+                                {typeof value === 'number' ? value.toFixed(2) : String(value)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -776,15 +831,6 @@ const Candidates = () => {
                 </div>
               )}
 
-              {/* Legacy Match Percentage (if available) */}
-              {selected_match.match_percentage && selected_match.match_percentage !== selected_match.score && (
-                <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                  <Label className="text-sm font-semibold text-gray-600 block mb-1">Legacy Match Percentage</Label>
-                  <span className="text-sm text-gray-700">
-                    {(selected_match.match_percentage * 100).toFixed(1)}%
-                  </span>
-                </div>
-              )}
             </div>
           )}
         </DialogContent>
