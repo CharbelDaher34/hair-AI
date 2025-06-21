@@ -1,0 +1,110 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-configmap
+  namespace: recruitment-app
+data:
+  # This will be used by the frontend to know where the backend API is.
+  # The frontend code needs to be adapted to use this env var.
+  # Example: VITE_API_BASE_URL or REACT_APP_API_BASE_URL
+  # The value should be the path to your backend service, potentially through an Ingress.
+  # If accessed directly via backend service (not recommended for prod external access):
+  # VITE_API_BASE_URL: "http://backend-service.recruitment-app.svc.cluster.local:8017/api/v1"
+  # If accessed via an Ingress (preferred):
+  VITE_API_BASE_URL: "/api/v1" # Assuming Ingress routes /api/v1 to backend
+  VITE_DOCKER: "false" # Set to false as it's not running in Docker compose directly
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend-deployment
+  namespace: recruitment-app
+  labels:
+    app: frontend-service
+spec:
+  replicas: 1 # Adjust as needed
+  selector:
+    matchLabels:
+      app: frontend-service
+  template:
+    metadata:
+      labels:
+        app: frontend-service
+    spec:
+      containers:
+        - name: frontend-container
+          image: frontend-image # IMPORTANT: Replace with your actual built image name/tag
+          # If using a private registry, add imagePullSecrets
+          ports:
+            - containerPort: 8080 # As per Dockercompose, assuming this is what the frontend server runs on
+          envFrom:
+            - configMapRef:
+                name: frontend-configmap
+          # No volume mounts for ./frontend/public were explicitly defined as critical
+          # If these static files are built into the image, no mount is needed.
+          livenessProbe:
+            httpGet:
+              path: / # Root path, assuming it serves index.html
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-service
+  namespace: recruitment-app
+spec:
+  ports:
+    - port: 80 # Standard HTTP port for external access
+      targetPort: 8080 # Port on the frontend container
+      # nodePort: 30000 # Optional: if type is NodePort
+  selector:
+    app: frontend-service
+  type: LoadBalancer # Exposes the service externally using a cloud provider's load balancer
+# Consider Ingress for frontend for more sophisticated routing, SSL, and path-based routing:
+# ---
+# apiVersion: networking.k8s.io/v1
+# kind: Ingress
+# metadata:
+#   name: recruitment-ingress
+#   namespace: recruitment-app
+#   annotations:
+#     # kubernetes.io/ingress.class: "nginx" or your specific ingress controller
+#     # nginx.ingress.kubernetes.io/rewrite-target: /
+#     # cert-manager.io/cluster-issuer: "letsencrypt-prod" # If using cert-manager for SSL
+# spec:
+#   rules:
+#   - http:
+#       paths:
+#       - path: /
+#         pathType: Prefix
+#         backend:
+#           service:
+#             name: frontend-service
+#             port:
+#               number: 8080 # Target port of the frontend service
+#       - path: /api/v1 # Assuming your backend API is under /api/v1
+#         pathType: Prefix
+#         backend:
+#           service:
+#             name: backend-service
+#             port:
+#               number: 8017 # Target port of the backend service
+  # tls: # Optional: for HTTPS
+  # - hosts:
+  #   - yourdomain.com
+  #   secretName: yourdomain-tls-secret # Secret containing your TLS cert and key

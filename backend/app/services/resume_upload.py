@@ -42,39 +42,18 @@ def get_content_type(file_extension):
     }
     return content_types.get(file_extension)
 
+# Define AI Service URL from environment variable
+# The environment variable `AI_SERVICE_URL` should be set in the environment (e.g., Docker Compose, Kubernetes).
+# Example: AI_SERVICE_URL=http://ai-service:8011
+AI_SERVICE_BASE_URL = os.getenv("AI_SERVICE_URL")
+if not AI_SERVICE_BASE_URL:
+    print("⚠️ WARNING: AI_SERVICE_URL environment variable not set. Falling back to default 'http://ai:8011'.")
+    AI_SERVICE_BASE_URL = "http://ai:8011" # Default fallback for local Docker Compose
 
-def _get_matcher_url():
-    """
-    Determines the correct matcher URL by checking health endpoints of potential hosts.
-    """
-    matcher_url = os.getenv("ai_url")
-    if matcher_url:
-        return f"{matcher_url}/parser/parse"
-    hosts = [os.getenv("AI_HOST", "ai"), "localhost"]
-    port = os.getenv("AI_PORT", "8011")
+PARSER_ENDPOINT = "/parser/parse"
+PARSER_URL = f"{AI_SERVICE_BASE_URL.rstrip('/')}{PARSER_ENDPOINT}"
 
-    for host in hosts:
-        base_url = f"http://{host}:{port}"
-        health_url = f"{base_url}/health"
-        try:
-            print(f"Trying to connect to {health_url}")
-            response = requests.get(health_url, timeout=5)
-            response.raise_for_status()
-            print(f"✅ AI service is running at {base_url}")
-            return f"{base_url}/parser/parse"
-        except requests.exceptions.RequestException as e:
-            print(f"❌ Could not connect to {health_url}: {e}")
-
-    print("❌ AI service is ndot running or not accessible.")
-    return ""
-
-
-try:
-    PARSER_URL = _get_matcher_url()
-except Exception as e:
-    print(f"❌ Could not get parser URL: {e}")
-    PARSER_URL = ""
-
+print(f"ℹ️ AI Parser Service URL configured to: {PARSER_URL}")
 
 class AgentClient:
     def __init__(

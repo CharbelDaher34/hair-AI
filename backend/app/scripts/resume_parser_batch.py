@@ -12,6 +12,7 @@ Usage:
 import os
 import sys
 import time
+import random
 from datetime import datetime
 from typing import List
 
@@ -41,6 +42,7 @@ def parse_resume_for_candidate(
     Returns:
         bool: True if successful, False otherwise
     """
+    initial_delay = 5  # seconds
     for attempt in range(max_retries):
         try:
             print(
@@ -76,8 +78,9 @@ def parse_resume_for_candidate(
                     f"[Batch] Parsing returned None for candidate {candidate_id} - API may have failed"
                 )
                 if attempt < max_retries - 1:
-                    print(f"[Batch] Retrying in 5 seconds...")
-                    time.sleep(5)
+                    delay = initial_delay * (2**attempt) + random.uniform(0, 1)
+                    print(f"[Batch] Retrying in {delay:.2f} seconds...")
+                    time.sleep(delay)
                     continue
                 else:
                     print(f"[Batch] Max retries reached for candidate {candidate_id}")

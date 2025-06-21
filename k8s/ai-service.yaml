@@ -1,0 +1,105 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ai-secret
+  namespace: recruitment-app
+type: Opaque
+data:
+  # This should be the actual API key for the AI provider (e.g., Gemini)
+  # base64 encoded value of "AIzaSyDp8n_AmYsspADJBaNpkJvBdlch1-9vkhw"
+  AI_PROVIDER_API_KEY:QUl6YVN5RHA4bl9BbVlzc3BBREpCYU5wa0p2QmRsY2gxLTl2a2h3
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-deployment
+  namespace: recruitment-app
+  labels:
+    app: ai-service
+spec:
+  replicas: 1 # Adjust as needed, consider HPA
+  selector:
+    matchLabels:
+      app: ai-service
+  template:
+    metadata:
+      labels:
+        app: ai-service
+    spec:
+      containers:
+        - name: ai-container
+          image: ai-image # IMPORTANT: Replace with your actual built image name/tag for the AI service
+          # If using a private registry, add imagePullSecrets
+          ports:
+            - containerPort: 8011
+          env:
+            - name: API_KEY # As expected by the AI service's current code
+              valueFrom:
+                secretKeyRef:
+                  name: ai-secret
+                  key: AI_PROVIDER_API_KEY
+            # Add any other necessary environment variables for the AI service
+            # e.g. - name: MODEL_NAME
+            #        value: "gemini-2.0-flash"
+          # No volume mounts for ./ai/app/static were explicitly defined as critical
+          # If these static files are built into the image, no mount is needed.
+          # If they need to be mounted from a ConfigMap or PVC, define that here.
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8011
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8011
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "2Gi" # AI models can be memory intensive
+              cpu: "1000m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-service # This is the service name the backend will use
+  namespace: recruitment-app
+spec:
+  ports:
+    - port: 8011 # Port the service listens on
+      targetPort: 8011 # Port on the pod
+  selector:
+    app: ai-service
+  type: ClusterIP # Internal service, only accessible within the cluster
+# HorizontalPodAutoscaler (Optional)
+# ---
+# apiVersion: autoscaling/v2
+# kind: HorizontalPodAutoscaler
+# metadata:
+#   name: ai-hpa
+#   namespace: recruitment-app
+# spec:
+#   scaleTargetRef:
+#     apiVersion: apps/v1
+#     kind: Deployment
+#     name: ai-deployment
+#   minReplicas: 1
+#   maxReplicas: 3
+#   metrics:
+#   - type: Resource
+#     resource:
+#       name: cpu
+#       target:
+#         type: Utilization
+#         averageUtilization: 80
+#   - type: Resource
+#     resource:
+#       name: memory
+#       target:
+#         type: Utilization
+#         averageUtilization: 80

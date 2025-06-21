@@ -12,6 +12,7 @@ Usage:
 import os
 import sys
 import time
+import random
 from datetime import datetime
 from typing import List
 
@@ -53,6 +54,7 @@ def create_match_for_application(application_id: int, max_retries: int = 3) -> b
     Returns:
         bool: True if successful, False otherwise
     """
+    initial_delay = 5  # seconds
     for attempt in range(max_retries):
         try:
             print(
@@ -106,7 +108,10 @@ def create_match_for_application(application_id: int, max_retries: int = 3) -> b
                     print(
                         f"[Matcher] Failed to create match for application {application_id}"
                     )
-                    return False
+                    # This path might indicate a non-exception failure within create_match,
+                    # so retry might also be appropriate here if it's a transient issue.
+                    # For now, aligning with previous logic of retrying on exceptions.
+                    return False # Or consider retrying if it could be transient
 
         except Exception as match_err:
             print(
@@ -115,8 +120,9 @@ def create_match_for_application(application_id: int, max_retries: int = 3) -> b
             print(f"[Matcher] Error type: {type(match_err)}")
 
             if attempt < max_retries - 1:
-                print(f"[Matcher] Retrying in 5 seconds...")
-                time.sleep(5)
+                delay = initial_delay * (2**attempt) + random.uniform(0, 1)
+                print(f"[Matcher] Retrying in {delay:.2f} seconds...")
+                time.sleep(delay)
             else:
                 print(f"[Matcher] Max retries reached for application {application_id}")
                 import traceback
