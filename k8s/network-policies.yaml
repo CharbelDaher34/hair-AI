@@ -1,0 +1,243 @@
+# Default deny all traffic in the namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: recruitment-app
+spec:
+  podSelector: {} # Selects all pods in the namespace
+  policyTypes:
+    - Ingress
+    - Egress
+---
+# Allow Backend to talk to Postgres DB
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: backend-to-db
+  namespace: recruitment-app
+spec:
+  podSelector:
+    matchLabels:
+      app: backend-service
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: postgres-db
+      ports:
+        - protocol: TCP
+          port: 5432
+    - to: # Allow DNS resolution
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# Allow Backend to talk to AI Service
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: backend-to-ai
+  namespace: recruitment-app
+spec:
+  podSelector:
+    matchLabels:
+      app: backend-service
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: ai-service
+      ports:
+        - protocol: TCP
+          port: 8011
+    - to: # Allow DNS resolution (duplicate but ensures it if policies are applied piecemeal)
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# Allow Frontend to talk to Backend Service
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: frontend-to-backend
+  namespace: recruitment-app
+spec:
+  podSelector:
+    matchLabels:
+      app: frontend-service
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: backend-service
+      ports:
+        - protocol: TCP
+          port: 8017 # Port of the backend service container
+    - to: # Allow DNS resolution
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# Allow Ingress traffic to Frontend (if using an Ingress Controller)
+# This policy depends on your Ingress controller's labels.
+# Example for Nginx Ingress Controller:
+# apiVersion: networking.k8s.io/v1
+# kind: NetworkPolicy
+# metadata:
+#   name: allow-ingress-to-frontend
+#   namespace: recruitment-app
+# spec:
+#   podSelector:
+#     matchLabels:
+#       app: frontend-service
+#   policyTypes:
+#     - Ingress
+#   ingress:
+#     - from:
+#       - namespaceSelector:
+#           matchLabels:
+#             # Adjust this label to match your Ingress controller's namespace
+#             name: ingress-nginx
+#         podSelector:
+#           matchLabels:
+#             # Adjust this label to match your Ingress controller's pods
+#             app.kubernetes.io/name: ingress-nginx
+#       ports:
+#         - protocol: TCP
+#           port: 8080 # Frontend container port
+---
+# Allow Ingress traffic to Backend (if using an Ingress Controller for /api/v1)
+# apiVersion: networking.k8s.io/v1
+# kind: NetworkPolicy
+# metadata:
+#   name: allow-ingress-to-backend
+#   namespace: recruitment-app
+# spec:
+#   podSelector:
+#     matchLabels:
+#       app: backend-service
+#   policyTypes:
+#     - Ingress
+#   ingress:
+#     - from:
+#       - namespaceSelector:
+#           matchLabels:
+#             name: ingress-nginx # Adjust as above
+#         podSelector:
+#           matchLabels:
+#             app.kubernetes.io/name: ingress-nginx # Adjust as above
+#       ports:
+#         - protocol: TCP
+#           port: 8017 # Backend container port
+---
+# Allow pgAdmin to be accessed (e.g., by LoadBalancer or Ingress)
+# If pgAdmin Service is LoadBalancer, you might need to allow traffic from all sources
+# or specific IP ranges if your cloud provider supports it in NetworkPolicy.
+# For simplicity, if pgAdmin is LoadBalancer, this policy allows all ingress to it.
+# If using Ingress, a policy similar to frontend/backend would be used.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-pgadmin
+  namespace: recruitment-app
+spec:
+  podSelector:
+    matchLabels:
+      app: pgadmin
+  policyTypes:
+    - Ingress
+  ingress:
+    - {} # Allows all ingress traffic to pgAdmin pods on port 80. BE CAREFUL with this.
+         # Restrict 'from' if possible, e.g., specific IPs or Ingress controller.
+      # ports:
+      #   - protocol: TCP
+      #     port: 80 # pgAdmin container port
+
+# Note: Egress for external services (like SMTP or AI Provider APIs)
+# If your cluster has egress restrictions, you'll need to add policies
+# to allow backend/ai services to talk to external IPs/domains.
+# Example: Allow backend to talk to smtp.gmail.com (IPs can change, so DNS name is better if supported)
+# apiVersion: networking.k8s.io/v1
+# kind: NetworkPolicy
+# metadata:
+#   name: backend-to-external-smtp
+#   namespace: recruitment-app
+# spec:
+#   podSelector:
+#     matchLabels:
+#       app: backend-service
+#   policyTypes:
+#     - Egress
+#   egress:
+#   - to:
+#     - ipBlock:
+#         cidr: 0.0.0.0/0 # Allows all outbound, then rely on port.
+#                         # For specific FQDN, a service entry or more advanced CNI is needed.
+#     ports:
+#     - protocol: TCP
+#       port: 587 # SMTP port for Gmail
+#   - to: # DNS
+#       - namespaceSelector: {}
+#         podSelector:
+#           matchLabels:
+#             k8s-app: kube-dns
+#     ports:
+#       - protocol: UDP
+#         port: 53
+#       - protocol: TCP
+#         port: 53
+
+# Example: Allow AI service to talk to its provider
+# apiVersion: networking.k8s.io/v1
+# kind: NetworkPolicy
+# metadata:
+#   name: ai-to-external-provider
+#   namespace: recruitment-app
+# spec:
+#   podSelector:
+#     matchLabels:
+#       app: ai-service
+#   policyTypes:
+#     - Egress
+#   egress:
+#   - to:
+#     - ipBlock:
+#         cidr: 0.0.0.0/0 # Allows all outbound.
+#     ports:
+#     - protocol: TCP
+#       port: 443 # Typically HTTPS for AI APIs
+#   - to: # DNS
+#       - namespaceSelector: {}
+#         podSelector:
+#           matchLabels:
+#             k8s-app: kube-dns
+#     ports:
+#       - protocol: UDP
+#         port: 53
+#       - protocol: TCP
+#         port: 53

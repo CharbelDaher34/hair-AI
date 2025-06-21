@@ -92,10 +92,10 @@ class agent:
                 if hasattr(e, "status_code"):
                     if e.status_code == 503:
                         print("503 error, retrying...")
-                        time.sleep(10)
+                        await asyncio.sleep(10)
                     elif e.status_code == 429:
                         print("429 error, retrying...")
-                        time.sleep(10)
+                        await asyncio.sleep(10)
                 print(e)
                 print(traceback.format_exc())
 

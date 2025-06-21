@@ -140,4 +140,4 @@ You can easily customize the system by:
 
 ## License
 
-This is a demonstration project showcasing pydantic_ai capabilities. 
+This is a demonstration project showcasing pydantic_ai capabilities.

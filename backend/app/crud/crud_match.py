@@ -220,15 +220,21 @@ def create_match(db: Session, *, match_in: MatchCreate) -> Match:
     # Add flags to match data
     match_data["flags"] = flags if flags else None
 
-    # Remove any existing match for this application
-    existing_match = db.exec(
+    # Defer deletion of existing match until after AI success and before new match commit
+    existing_match_to_delete = db.exec(
         select(Match).where(Match.application_id == match_in.application_id)
     ).first()
-    if existing_match:
-        db.delete(existing_match)
-        db.flush()
 
     db_match = Match.model_validate(match_data)
+
+    if existing_match_to_delete:
+        print(f"Deleting existing match {existing_match_to_delete.id} for application {match_in.application_id}")
+        db.delete(existing_match_to_delete)
+        # Flush is not strictly necessary here if commit handles everything,
+        # but can be useful to ensure delete statement is issued before insert if there are constraints.
+        # However, for atomicity, the critical part is that delete and insert are in the same transaction.
+        # db.flush()
+
     db.add(db_match)
     db.commit()
     db.refresh(db_match)
