@@ -179,7 +179,7 @@ class skills_base(SQLModel):
 
 
 class compensation_base(SQLModel):
-    base_salary: int = Field(default=None)
+    base_salary: int = Field(default=None,description="The monthly base salary of the job in USD")
     benefits: list[str] = Field(default=[])
 
 
