@@ -8,6 +8,7 @@ from sqlmodel import select
 from models.models import Interview, Application, Job, Status, InterviewStatus
 from schemas import InterviewCreate, InterviewUpdate
 from services.email_service import email_service
+from utils.file_utils import get_resume_file_path, create_temp_text_file, cleanup_temp_file
 
 
 async def _send_interview_email(interview: Interview, action: str, db: Session) -> None:
@@ -56,7 +57,7 @@ async def _send_interview_email(interview: Interview, action: str, db: Session) 
 
 async def _send_candidate_interview_email(interview: Interview, action: str, candidate, job, interview_date: str) -> None:
     """Send interview notification email to the candidate."""
-    subject = f"Interview {action.title()} - {job.title}"
+    subject = f"Interview {action.title()} - {job.title} at {job.employer.name if job.employer else 'Company'}"
     
     # Create HTML content for candidate
     html_content = f"""
@@ -194,6 +195,20 @@ async def _send_candidate_interview_email(interview: Interview, action: str, can
                 {"<div class='detail-row'><span class='detail-label'>Notes:</span><span class='detail-value'>" + interview.notes + "</span></div>" if interview.notes else ""}
             </div>
 
+            <div class="interview-details">
+                <h3 style="margin-top: 0; color: #374151;">📋 Interview Preparation Tips</h3>
+                <ul style="margin: 0; padding-left: 20px; color: #4b5563;">
+                    <li>Review the job description and requirements</li>
+                    <li>Prepare examples of your relevant experience</li>
+                    <li>Research the company and its values</li>
+                    <li>Prepare thoughtful questions about the role and team</li>
+                    <li>Test your technology if it's a virtual interview</li>
+                </ul>
+                <p style="font-size: 14px; color: #6b7280; margin-top: 15px;">
+                    <strong>Good luck!</strong> We look forward to speaking with you.
+                </p>
+            </div>
+
             <div class="footer">
                 <p>This is an automated message. Please contact HR if you have any questions.</p>
                 <p>© 2025 HR Platform. All rights reserved.</p>
@@ -220,6 +235,15 @@ async def _send_candidate_interview_email(interview: Interview, action: str, can
     {"- Interviewer: " + interview.interviewer.full_name if interview.interviewer else ""}
     {"- Notes: " + interview.notes if interview.notes else ""}
 
+    INTERVIEW PREPARATION TIPS:
+    • Review the job description and requirements
+    • Prepare examples of your relevant experience
+    • Research the company and its values
+    • Prepare thoughtful questions about the role and team
+    • Test your technology if it's a virtual interview
+
+    Good luck! We look forward to speaking with you.
+
     Please contact HR if you have any questions.
 
     ---
@@ -238,7 +262,7 @@ async def _send_candidate_interview_email(interview: Interview, action: str, can
 
 async def _send_interviewer_interview_email(interview: Interview, action: str, candidate, job, interview_date: str) -> None:
     """Send interview notification email to the interviewer."""
-    subject = f"Interview {action.title()} - {job.title} with {candidate.full_name}"
+    subject = f"Interview {action.title()} - {job.title} with {candidate.full_name} (Resume & Job Details Attached)"
     
     # Create HTML content for interviewer
     html_content = f"""
@@ -384,6 +408,21 @@ async def _send_interviewer_interview_email(interview: Interview, action: str, c
                 {"<div class='detail-row'><span class='detail-label'>Notes:</span><span class='detail-value'>" + interview.notes + "</span></div>" if interview.notes else ""}
             </div>
 
+            <div class="interview-details">
+                <h3 style="margin-top: 0; color: #374151;">📎 Attachments Included</h3>
+                <div class="detail-row">
+                    <span class="detail-label">Candidate Resume:</span>
+                    <span class="detail-value">{candidate.full_name}_Resume.pdf</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Job Details:</span>
+                    <span class="detail-value">{job.title.replace(' ', '_')}_Job_Details.txt</span>
+                </div>
+                <p style="font-size: 14px; color: #6b7280; margin-top: 15px;">
+                    Please review the attached documents before the interview.
+                </p>
+            </div>
+
             <div class="footer">
                 <p>This is an automated message from the HR Platform.</p>
                 <p>© 2025 HR Platform. All rights reserved.</p>
@@ -412,18 +451,57 @@ async def _send_interviewer_interview_email(interview: Interview, action: str, c
     - Status: {interview.status.replace('_', ' ').title()}
     {"- Notes: " + interview.notes if interview.notes else ""}
 
+    ATTACHMENTS INCLUDED:
+    - Candidate Resume: {candidate.full_name}_Resume.pdf
+    - Job Details: {job.title.replace(' ', '_')}_Job_Details.txt
+    
+    Please review the attached documents before the interview.
+
     ---
     HR Platform
     This is an automated message.
     """
 
-    # Send email to interviewer
-    await email_service.send_email(
-        to_email=interview.interviewer.email,
-        subject=subject,
-        html_content=html_content,
-        text_content=text_content
-    )
+    # Prepare attachments for interviewer
+    attachments = []
+    temp_files_to_cleanup = []
+    
+    try:
+        # Add candidate's resume if available
+        resume_path = get_resume_file_path(candidate.id)
+        if resume_path:
+            attachments.append({
+                "file_path": resume_path,
+                "filename": f"{candidate.full_name.replace(' ', '_')}_Resume.pdf"
+            })
+        
+        # Add job data as text file
+        job_data_content = job.get_job_data()
+        job_data_file = create_temp_text_file(
+            content=job_data_content,
+            filename_prefix=f"job_data_{job.title.replace(' ', '_')}",
+            extension="txt"
+        )
+        if job_data_file:
+            attachments.append({
+                "file_path": job_data_file,
+                "filename": f"{job.title.replace(' ', '_')}_Job_Details.txt"
+            })
+            temp_files_to_cleanup.append(job_data_file)
+        
+        # Send email to interviewer with attachments
+        await email_service.send_email(
+            to_email=interview.interviewer.email,
+            subject=subject,
+            html_content=html_content,
+            text_content=text_content,
+            attachments=attachments
+        )
+    
+    finally:
+        # Clean up temporary files
+        for temp_file in temp_files_to_cleanup:
+            cleanup_temp_file(temp_file)
 
 
 def create_interview(db: Session, *, obj_in: InterviewCreate) -> Interview:
