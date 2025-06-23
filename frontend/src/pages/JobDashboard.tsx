@@ -19,6 +19,8 @@ const JobDashboard = () => {
   const [error, setError] = useState(null);
   const [jobToClose, setJobToClose] = useState(null);
   const [isClosingJob, setIsClosingJob] = useState(false);
+  const [jobToDelete, setJobToDelete] = useState(null);
+  const [isDeletingJob, setIsDeletingJob] = useState(false);
 
   // Fetch jobs on component mount
   useEffect(() => {
@@ -183,6 +185,33 @@ const JobDashboard = () => {
         description: `Please copy manually: ${url}`,
         duration: 10000, // Show longer so user can copy
       });
+    }
+  };
+
+  const handleDeleteJob = (job) => {
+    setJobToDelete(job);
+  };
+
+  const confirmDeleteJob = async () => {
+    if (!jobToDelete) return;
+
+    setIsDeletingJob(true);
+    try {
+      await apiService.deleteJob(jobToDelete.id);
+      
+      setJobs(prev_jobs => prev_jobs.filter(job => job.id !== jobToDelete.id));
+      
+      toast.success("Job deleted successfully", {
+        description: `"${getJobTitle(jobToDelete)}" has been permanently deleted.`,
+      });
+    } catch (error) {
+      console.error('Failed to delete job:', error);
+      toast.error("Failed to delete job", {
+        description: error.message || "An unexpected error occurred.",
+      });
+    } finally {
+      setIsDeletingJob(false);
+      setJobToDelete(null);
     }
   };
 
@@ -374,7 +403,7 @@ const JobDashboard = () => {
                               Analytics
                             </Link>
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive">
+                          <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteJob(job)}>
                             <Trash2 className="mr-2 h-4 w-4" />
                             Delete
                           </DropdownMenuItem>
@@ -415,6 +444,37 @@ const JobDashboard = () => {
                 </>
               ) : (
                 'Close Job'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Confirmation Dialog for Deleting Jobs */}
+      <AlertDialog open={!!jobToDelete} onOpenChange={() => setJobToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Job?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to permanently delete "{jobToDelete ? getJobTitle(jobToDelete) : 'this job'}"? 
+              All associated applications and data will be lost.
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingJob}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteJob}
+              disabled={isDeletingJob}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isDeletingJob ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                'Delete Job'
               )}
             </AlertDialogAction>
           </AlertDialogFooter>
