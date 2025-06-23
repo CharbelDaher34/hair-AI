@@ -1,5 +1,6 @@
 import os
 import shutil
+import tempfile
 from pathlib import Path
 from typing import Optional
 from core.config import RESUME_STORAGE_DIR
@@ -88,3 +89,52 @@ def get_resume_file_size(candidate_id: int) -> Optional[int]:
             return None
 
     return None
+
+
+def create_temp_text_file(content: str, filename_prefix: str, extension: str = 'txt') -> Optional[str]:
+    """
+    Create a temporary text file with the given content.
+
+    Args:
+        content: Text content to write to the file
+        filename_prefix: Prefix for the temporary filename
+        extension: File extension (without dot)
+
+    Returns:
+        Path to the temporary file if successful, None otherwise
+    """
+    try:
+        # Create a temporary file
+        temp_fd, temp_path = tempfile.mkstemp(suffix=f'.{extension}', prefix=f'{filename_prefix}_')
+        
+        # Write content to the temporary file
+        with os.fdopen(temp_fd, 'w', encoding='utf-8') as temp_file:
+            temp_file.write(content)
+        
+        print(f"[File Utils] Created temp file: {temp_path}")
+        return temp_path
+        
+    except Exception as e:
+        print(f"[File Utils] Failed to create temp file: {str(e)}")
+        return None
+
+
+def cleanup_temp_file(file_path: str) -> bool:
+    """
+    Clean up a temporary file.
+
+    Args:
+        file_path: Path to the file to delete
+
+    Returns:
+        True if file was deleted successfully, False otherwise
+    """
+    try:
+        if file_path and os.path.exists(file_path):
+            os.remove(file_path)
+            print(f"[File Utils] Cleaned up temp file: {file_path}")
+            return True
+        return True  # File didn't exist, so cleanup was successful
+    except Exception as e:
+        print(f"[File Utils] Failed to cleanup temp file {file_path}: {str(e)}")
+        return False
