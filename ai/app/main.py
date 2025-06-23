@@ -8,7 +8,7 @@ app.include_router(matcher_router, prefix="/matcher", tags=["matcher"])
 # app.include_router(skills_router, prefix="/skills", tags=["skills"])
 
 
-@app.get("/health")
+@app.get("/")
 def health():
     return {"status": "ok"}
 
