@@ -13,8 +13,8 @@ class TimeBase(SQLModel):
 
 
 class CandidateEmployerLink(SQLModel, table=True):
-    candidate_id: int = Field(foreign_key="candidate.id", primary_key=True)
-    employer_id: int = Field(foreign_key="company.id", primary_key=True)
+    candidate_id: int = Field(foreign_key="candidate.id", primary_key=True, ondelete="CASCADE")
+    employer_id: int = Field(foreign_key="company.id", primary_key=True, ondelete="CASCADE")
 
 
 class CompanyBase(TimeBase):
@@ -66,7 +66,7 @@ class HRBase(TimeBase):
     email: str = Field(index=True, unique=True)
     password: str
     full_name: str
-    employer_id: int = Field(foreign_key="company.id")
+    employer_id: int = Field(foreign_key="company.id", ondelete="CASCADE")
     role: str
     department: Optional[str] = Field(default=None)
 
@@ -79,8 +79,8 @@ class HR(HRBase, table=True):
 
 
 class RecruiterCompanyLinkBase(TimeBase):
-    recruiter_id: int = Field(foreign_key="company.id")
-    target_employer_id: int = Field(foreign_key="company.id")
+    recruiter_id: int = Field(foreign_key="company.id", ondelete="CASCADE")
+    target_employer_id: int = Field(foreign_key="company.id", ondelete="CASCADE")
 
 
 class RecruiterCompanyLink(RecruiterCompanyLinkBase, table=True):
@@ -109,7 +109,7 @@ class FieldType(str, Enum):
 
 
 class FormKeyBase(TimeBase):
-    employer_id: int = Field(default=None, foreign_key="company.id")
+    employer_id: int = Field(default=None, foreign_key="company.id", ondelete="CASCADE")
     name: str
     enum_values: Optional[List[str]] = Field(default=None, sa_column=Column(JSON))
     required: bool = Field(default=False)
@@ -131,8 +131,8 @@ class FormKey(FormKeyBase, table=True):
 
 
 class JobFormKeyConstraintBase(TimeBase):
-    job_id: int = Field(foreign_key="job.id")
-    form_key_id: int = Field(foreign_key="formkey.id")
+    job_id: int = Field(foreign_key="job.id", ondelete="CASCADE")
+    form_key_id: int = Field(foreign_key="formkey.id", ondelete="CASCADE")
     constraints: Dict = Field(sa_column=Column(JSON))
 
     __table_args__ = (UniqueConstraint("job_id", "form_key_id", name="uq_job_formkey"),)
@@ -184,9 +184,9 @@ class compensation_base(SQLModel):
 
 
 class JobBase(TimeBase):
-    employer_id: int = Field(foreign_key="company.id")
-    recruited_to_id: Optional[int] = Field(default=None, foreign_key="company.id")
-    created_by_hr_id: int = Field(foreign_key="hr.id")
+    employer_id: int = Field(foreign_key="company.id", ondelete="CASCADE")
+    recruited_to_id: Optional[int] = Field(default=None, foreign_key="company.id", ondelete="CASCADE")
+    created_by_hr_id: int = Field(foreign_key="hr.id", ondelete="SET NULL", nullable=True)
     status: Status = Field(
         default=Status.DRAFT,
         sa_column=Column(SQLAlchemyEnum(Status, name="status_enum", create_type=True)),
@@ -305,8 +305,8 @@ class ApplicationStatus(str, Enum):
 
 
 class ApplicationBase(TimeBase):
-    candidate_id: int = Field(foreign_key="candidate.id")
-    job_id: int = Field(foreign_key="job.id")
+    candidate_id: int = Field(foreign_key="candidate.id", ondelete="CASCADE")
+    job_id: int = Field(foreign_key="job.id", ondelete="CASCADE")
     form_responses: Dict = Field(default=None, sa_column=Column(JSON))
     status: ApplicationStatus = Field(
         default=ApplicationStatus.PENDING,
@@ -342,14 +342,14 @@ class InterviewStatus(str, Enum):
 
 
 class InterviewBase(TimeBase):
-    application_id: int = Field(foreign_key="application.id")
+    application_id: int = Field(foreign_key="application.id", ondelete="CASCADE")
     date: datetime
     type: str
     # type: InterviewType = Field(default=InterviewType.PHONE, sa_column=Column(SQLAlchemyEnum(InterviewType, name="interviewtype_enum", create_type=True)))
     status: str
     # status: InterviewStatus = Field(default=InterviewStatus.SCHEDULED, sa_column=Column(SQLAlchemyEnum(InterviewStatus, name="interviewstatus_enum", create_type=True)))
     notes: Optional[str] = None
-    interviewer_id: Optional[int] = Field(default=None, foreign_key="hr.id")
+    interviewer_id: Optional[int] = Field(default=None, foreign_key="hr.id", ondelete="SET NULL", nullable=True)
     category: Optional[str] = Field(default=None)
     
 
@@ -363,7 +363,7 @@ class Interview(InterviewBase, table=True):
 
 
 class MatchBase(TimeBase):
-    application_id: int = Field(foreign_key="application.id")
+    application_id: int = Field(foreign_key="application.id", unique=True, ondelete="CASCADE")
 
     # Main match result fields
     score: Optional[float] = Field(default=None)
