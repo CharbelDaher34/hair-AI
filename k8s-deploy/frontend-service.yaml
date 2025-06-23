@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-service
+  namespace: recruitment-app
+  labels:
+    app: frontend-service
+spec:
+  ports:
+    - name: frontend
+      port: 8080
+      targetPort: 8080
+  selector:
+    app: frontend-service
+  type: LoadBalancer # This will expose the frontend externally

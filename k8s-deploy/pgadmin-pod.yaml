@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pgadmin-deployment
+  namespace: recruitment-app
+  labels:
+    app: pgadmin-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pgadmin-service
+  template:
+    metadata:
+      labels:
+        app: pgadmin-service
+    spec:
+      containers:
+        - name: pgadmin-container
+          image: dpage/pgadmin4
+          ports:
+            - containerPort: 80
+          env:
+            - name: PGADMIN_DEFAULT_EMAIL
+              valueFrom:
+                secretKeyRef:
+                  name: pgadmin-secret
+                  key: PGADMIN_DEFAULT_EMAIL
+            - name: PGADMIN_DEFAULT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: pgadmin-secret
+                  key: PGADMIN_DEFAULT_PASSWORD
+          volumeMounts:
+            - mountPath: /var/lib/pgadmin
+              name: pgadmin-storage
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+      volumes:
+        - name: pgadmin-storage
+          persistentVolumeClaim:
+            claimName: pgadmin-pvc

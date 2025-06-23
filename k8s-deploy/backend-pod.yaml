@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-deployment
+  namespace: recruitment-app
+  labels:
+    app: backend-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend-service
+  template:
+    metadata:
+      labels:
+        app: backend-service
+    spec:
+      containers:
+        - name: backend-container
+          image: matching-backend:local # Update with your actual image
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8017
+          envFrom:
+            - configMapRef:
+                name: backend-configmap
+            - secretRef:
+                name: backend-secret
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: APP_DB_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: APP_DB_PASS
+          volumeMounts:
+            - mountPath: /app/static
+              name: backend-storage
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8017
+            initialDelaySeconds: 45
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8017
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+      volumes:
+        - name: backend-storage
+          persistentVolumeClaim:
+            claimName: backend-pvc
