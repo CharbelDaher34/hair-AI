@@ -2,15 +2,19 @@ import { toast } from "sonner";
 
 // Determine the API base URL based on environment
 const get_api_base_url = () => {
-  // Check if we're running in Docker (set via environment variable)
-  const is_docker = import.meta.env.VITE_DOCKER === 'true';
-  
-  if (is_docker) {
-    // In Docker, use the server IP since the browser runs on the host
-    return "http://84.16.230.94:8017/api/v1";
-  } else {
-    // For local development, use localhost
+  // Use the VITE_API_URL from environment variables if it exists.
+  // This gives us flexibility to set it in different environments (local, Docker, K8s).
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+
+  // For Kubernetes deployment, use relative URL since nginx will proxy
+  // For local development, use localhost
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
     return "http://localhost:8017/api/v1";
+  } else {
+    // In Kubernetes, nginx will proxy /api/ to the backend service
+    return "/api/v1";
   }
 };
 
