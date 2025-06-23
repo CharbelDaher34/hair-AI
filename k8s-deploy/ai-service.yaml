@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-service
+  namespace: recruitment-app
+  labels:
+    app: ai-service
+spec:
+  ports:
+    - name: ai
+      port: 8011
+      targetPort: 8011
+  selector:
+    app: ai-service
+  type: ClusterIP
