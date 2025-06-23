@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Eye, Edit, Trash2, Plus, Search, MoreHorizontal, Filter, Loader2, Calendar, Clock, Users, ChevronDown } from "lucide-react";
 import { Link } from "react-router-dom";
 import apiService from "@/services/api";
@@ -53,6 +54,10 @@ const ApplicationDashboard = () => {
   const [interviews_loading, set_interviews_loading] = useState(false);
   const [interviews_dialog_open, set_interviews_dialog_open] = useState(false);
 
+  // Delete application state
+  const [application_to_delete, set_application_to_delete] = useState<Application | null>(null);
+  const [is_deleting_application, set_is_deleting_application] = useState(false);
+
   const handle_status_update = async (application_id: number, status: string) => {
     try {
       await apiService.updateApplicationStatus(application_id, status);
@@ -65,6 +70,36 @@ const ApplicationDashboard = () => {
     } catch (error) {
       console.error("Failed to update application status:", error);
       toast.error("Failed to update application status.");
+    }
+  };
+
+  const handle_delete_application = (application: Application) => {
+    set_application_to_delete(application);
+  };
+
+  const confirm_delete_application = async () => {
+    if (!application_to_delete) return;
+
+    set_is_deleting_application(true);
+    try {
+      await apiService.deleteApplication(application_to_delete.id);
+      
+      set_applications(prev_applications => 
+        prev_applications.filter(app => app.id !== application_to_delete.id)
+      );
+      set_total(prev_total => prev_total - 1);
+      
+      toast.success("Application deleted successfully", {
+        description: `Application from ${application_to_delete.candidate?.full_name} has been permanently deleted.`,
+      });
+    } catch (error) {
+      console.error('Failed to delete application:', error);
+      toast.error("Failed to delete application", {
+        description: error.message || "An unexpected error occurred.",
+      });
+    } finally {
+      set_is_deleting_application(false);
+      set_application_to_delete(null);
     }
   };
 
@@ -320,7 +355,10 @@ const ApplicationDashboard = () => {
                               <Calendar className="mr-2 h-4 w-4" />
                               Interviews
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive">
+                            <DropdownMenuItem 
+                              className="text-destructive"
+                              onClick={() => handle_delete_application(application)}
+                            >
                               <Trash2 className="mr-2 h-4 w-4" />
                               Delete
                             </DropdownMenuItem>
@@ -446,6 +484,37 @@ const ApplicationDashboard = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Confirmation Dialog for Deleting Applications */}
+      <AlertDialog open={!!application_to_delete} onOpenChange={() => set_application_to_delete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Application?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to permanently delete the application from "{application_to_delete?.candidate?.full_name}" for the position "{application_to_delete?.job?.title}"? 
+              All associated data including interviews will be lost.
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={is_deleting_application}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirm_delete_application}
+              disabled={is_deleting_application}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {is_deleting_application ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                'Delete Application'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
