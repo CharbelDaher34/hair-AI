@@ -451,8 +451,6 @@ class MatchBase(TimeBase):
     # Main match result fields
     score: Optional[float] = Field(default=None)
     score_breakdown: Optional[Dict] = Field(default=None, sa_column=Column(JSON))
-    overall_embedding_similarity: Optional[float] = Field(default=None)
-    skills_embedding_similarity: Optional[float] = Field(default=None)
 
     # Direct skill fields from matcher
     matching_skills: Optional[List[str]] = Field(default=None, sa_column=Column(JSON))
@@ -461,17 +459,6 @@ class MatchBase(TimeBase):
 
     # Weights used in matching
     weights_used: Optional[Dict] = Field(default=None, sa_column=Column(JSON))
-
-    # Legacy fields (kept for backward compatibility but will be deprecated)
-    embedding_similarity: Optional[float] = Field(
-        default=None, description="Legacy field, use overall_embedding_similarity"
-    )
-    match_percentage: Optional[float] = Field(default=None)
-    total_required_skills: Optional[int] = Field(default=None)
-    matching_skills_count: Optional[int] = Field(default=None)
-    missing_skills_count: Optional[int] = Field(default=None)
-    extra_skills_count: Optional[int] = Field(default=None)
-    weights: Optional[Dict] = Field(default=None, sa_column=Column(JSON))
 
     # Flags
     flags: Optional[Dict] = Field(default=None, sa_column=Column(JSON))
