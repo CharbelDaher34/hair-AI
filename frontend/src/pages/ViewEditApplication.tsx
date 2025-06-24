@@ -425,18 +425,6 @@ const ViewApplication = () => {
                   <Badge variant="outline" className="font-bold text-2xl text-green-600 border-green-300 bg-green-50 px-4 py-2">
                     {application_data.match.score ? (application_data.match.score * 100).toFixed(1) : 'N/A'}%
                   </Badge>
-                  <div className="text-sm text-gray-600 mt-2 space-x-4">
-                    {application_data.match.overall_embedding_similarity && (
-                      <span>
-                        Overall Similarity: {(application_data.match.overall_embedding_similarity * 100).toFixed(1)}%
-                      </span>
-                    )}
-                    {application_data.match.skills_embedding_similarity && (
-                      <span>
-                        Skills Similarity: {(application_data.match.skills_embedding_similarity * 100).toFixed(1)}%
-                      </span>
-                    )}
-                  </div>
                 </div>
 
                 {/* Skills Analysis */}
@@ -494,41 +482,15 @@ const ViewApplication = () => {
                 {application_data.match.score_breakdown && (
                   <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
                     <Label className="text-sm font-semibold text-gray-700 block mb-3">Score Breakdown</Label>
-                    <div className="grid gap-4 md:grid-cols-2">
-                       {application_data.match.score_breakdown.final_score_components && (
-                        <div>
-                          <h4 className="font-medium text-gray-800 mb-2">Final Score Components</h4>
-                          <div className="space-y-1">
-                            {Object.entries(application_data.match.score_breakdown.final_score_components).map(([key, value]: [string, any]) => (
-                              <div key={key} className="flex justify-between items-center p-2 bg-white rounded border">
-                                <span className="text-sm font-medium text-gray-700 capitalize">
-                                  {key.replace(/_/g, ' ')}
-                                </span>
-                                <span className="text-sm font-bold text-gray-800">
-                                  {typeof value === 'number' ? (value * 100).toFixed(1) + '%' : String(value)}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
+                    <div className="space-y-2">
+                      {Object.entries(application_data.match.score_breakdown).map(([key, value]: [string, any]) => (
+                        <div key={key} className="flex justify-between items-center p-3 bg-white rounded border">
+                          <span className="text-sm font-medium text-gray-700">{key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>
+                          <span className="text-sm font-bold text-gray-800">
+                            {typeof value === 'number' ? (value * 100).toFixed(1) + '%' : String(value)}
+                          </span>
                         </div>
-                      )}
-                      {application_data.match.score_breakdown.skills_score_components && (
-                        <div>
-                          <h4 className="font-medium text-gray-800 mb-2">Skills Score Components</h4>
-                          <div className="space-y-1">
-                            {Object.entries(application_data.match.score_breakdown.skills_score_components).map(([key, value]: [string, any]) => (
-                              <div key={key} className="flex justify-between items-center p-2 bg-white rounded border">
-                                <span className="text-sm font-medium text-gray-700 capitalize">
-                                  {key.replace(/_/g, ' ')}
-                                </span>
-                                <span className="text-sm font-bold text-gray-800">
-                                  {typeof value === 'number' ? (value * 100).toFixed(1) + '%' : String(value)}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                      ))}
                     </div>
                   </div>
                 )}
@@ -537,41 +499,33 @@ const ViewApplication = () => {
                 {application_data.match.weights_used && (
                   <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
                     <Label className="text-sm font-semibold text-yellow-700 block mb-3">Matching Weights</Label>
-                    <div className="grid gap-4 md:grid-cols-2">
-                       {application_data.match.weights_used.final_weights && (
-                          <div>
-                            <h4 className="font-medium text-yellow-800 mb-2">Final Weights</h4>
-                            <div className="space-y-1">
-                              {Object.entries(application_data.match.weights_used.final_weights).map(([key, value]: [string, any]) => (
-                                <div key={key} className="flex justify-between items-center p-2 bg-white rounded border">
-                                  <span className="text-sm font-medium text-gray-700 capitalize">
-                                    {key.replace(/_/g, ' ')}
-                                  </span>
-                                  <span className="text-sm font-bold text-gray-800">
-                                    {typeof value === 'number' ? value.toFixed(2) : String(value)}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
+                    <div className="space-y-3">
+                      {application_data.match.weights_used.final_weights && (
+                        <div>
+                          <span className="text-sm font-medium text-gray-700">Final Weights:</span>
+                          <div className="mt-1 space-y-1">
+                            {Object.entries(application_data.match.weights_used.final_weights).map(([key, value]: [string, any]) => (
+                              <div key={key} className="flex justify-between items-center p-2 bg-white rounded border">
+                                <span className="text-xs text-gray-600">{key.replace(/_/g, ' ').toUpperCase()}</span>
+                                <span className="text-xs font-bold text-gray-800">{(value * 100).toFixed(0)}%</span>
+                              </div>
+                            ))}
                           </div>
-                       )}
-                       {application_data.match.weights_used.skill_weights && (
-                          <div>
-                            <h4 className="font-medium text-yellow-800 mb-2">Skill Weights</h4>
-                            <div className="space-y-1">
-                              {Object.entries(application_data.match.weights_used.skill_weights).map(([key, value]: [string, any]) => (
-                                <div key={key} className="flex justify-between items-center p-2 bg-white rounded border">
-                                  <span className="text-sm font-medium text-gray-700 capitalize">
-                                    {key.replace(/_/g, ' ')}
-                                  </span>
-                                  <span className="text-sm font-bold text-gray-800">
-                                    {typeof value === 'number' ? value.toFixed(2) : String(value)}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
+                        </div>
+                      )}
+                      {application_data.match.weights_used.skill_weights && (
+                        <div>
+                          <span className="text-sm font-medium text-gray-700">Skill Weights:</span>
+                          <div className="mt-1 space-y-1">
+                            {Object.entries(application_data.match.weights_used.skill_weights).map(([key, value]: [string, any]) => (
+                              <div key={key} className="flex justify-between items-center p-2 bg-white rounded border">
+                                <span className="text-xs text-gray-600">{key.replace(/_/g, ' ').toUpperCase()}</span>
+                                <span className="text-xs font-bold text-gray-800">{(value * 100).toFixed(0)}%</span>
+                              </div>
+                            ))}
                           </div>
-                       )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -580,8 +534,21 @@ const ViewApplication = () => {
                 {application_data.match.flags && Object.keys(application_data.match.flags).length > 0 && (
                   <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
                     <Label className="text-sm font-semibold text-purple-700 block mb-3">Match Flags</Label>
-                    <div className="flex flex-wrap gap-2">
-                      {Object.entries(application_data.match.flags).map(([key, value]: [string, any]) => (
+                    <div className="space-y-2">
+                      {application_data.match.flags.constraint_violations && Object.keys(application_data.match.flags.constraint_violations).length > 0 && (
+                        <div>
+                          <span className="text-sm font-medium text-red-700">Constraint Violations:</span>
+                          <div className="mt-1 space-y-1">
+                            {Object.entries(application_data.match.flags.constraint_violations).map(([key, value]: [string, any]) => (
+                              <div key={key} className="p-2 bg-red-50 rounded border border-red-200">
+                                <div className="font-medium text-red-800 text-xs">{key}</div>
+                                <div className="text-red-600 text-xs mt-1">{String(value)}</div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {Object.entries(application_data.match.flags).filter(([key]) => key !== 'constraint_violations').map(([key, value]: [string, any]) => (
                         <Badge key={key} variant="outline" className={`text-xs ${
                           value ? 'bg-purple-100 text-purple-700 border-purple-200' : 'bg-gray-100 text-gray-600 border-gray-200'
                         }`}>
