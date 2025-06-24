@@ -61,59 +61,56 @@ scheduler = None
 # Global OTP cleanup task
 otp_cleanup_task = None
 
+# Dedicated loggers for specific parts of main.py
+scheduler_logger = logging.getLogger("api.scheduler")
+lifespan_logger = logging.getLogger("api.lifespan")
+
 
 def safe_process_all_candidates():
     """Wrapper function for resume parsing with error handling"""
     try:
-        print(
-            f"[Scheduler] Starting scheduled resume parsing at {os.getenv('TZ', 'UTC')} time"
+        scheduler_logger.info(
+            f"Starting scheduled resume parsing (Scheduler configured to UTC)."
         )
         result = process_all_candidates()
-        print(f"[Scheduler] Resume parsing completed: {result}")
+        scheduler_logger.info(f"Resume parsing completed: {result}")
     except Exception as e:
-        print(f"[Scheduler] Resume parsing failed: {str(e)}")
-        import traceback
-
-        print(f"[Scheduler] Full traceback: {traceback.format_exc()}")
+        scheduler_logger.error(f"Resume parsing failed: {str(e)}", exc_info=True)
 
 
 def safe_process_all_applications():
     """Wrapper function for application matching with error handling"""
     try:
-        print(
-            f"[Scheduler] Starting scheduled application matching at {os.getenv('TZ', 'UTC')} time"
+        scheduler_logger.info(
+            f"Starting scheduled application matching (Scheduler configured to UTC)."
         )
         result = process_all_applications()
-        print(f"[Scheduler] Application matching completed: {result}")
+        scheduler_logger.info(f"Application matching completed: {result}")
     except Exception as e:
-        print(f"[Scheduler] Application matching failed: {str(e)}")
-        import traceback
-
-        print(f"[Scheduler] Full traceback: {traceback.format_exc()}")
+        scheduler_logger.error(f"Application matching failed: {str(e)}", exc_info=True)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global scheduler, otp_cleanup_task
+    lifespan_logger.info("Application lifespan startup sequence initiated.")
 
     # Startup logic
     create_db_and_tables(drop=False)
+    lifespan_logger.info("Database tables checked/created.")
 
     # Start OTP cleanup background task
-    print("[OTP] Starting OTP cleanup background task")
+    lifespan_logger.info("Starting OTP cleanup background task.")
     otp_cleanup_task = asyncio.create_task(cleanup_expired_otps_task())
 
     # Set up APScheduler if enabled
     if ENABLE_BATCH_SCHEDULER:
-        print(f"[Scheduler] Setting up batch processing scheduler")
-        print(
-            f"[Scheduler] Resume parser interval: {RESUME_PARSER_INTERVAL_MINUTES} minutes"
-        )
-        print(
-            f"[Scheduler] Application matcher interval: {APPLICATION_MATCHER_INTERVAL_MINUTES} minutes"
-        )
+        lifespan_logger.info("Setting up batch processing scheduler as ENABLE_BATCH_SCHEDULER is true.")
+        lifespan_logger.info(f"Resume parser interval: {RESUME_PARSER_INTERVAL_MINUTES} minutes")
+        lifespan_logger.info(f"Application matcher interval: {APPLICATION_MATCHER_INTERVAL_MINUTES} minutes")
 
-        scheduler = BackgroundScheduler()
+        scheduler = BackgroundScheduler(timezone='utc') # Explicitly set timezone to UTC
+        lifespan_logger.info("APScheduler initialized with UTC timezone.")
 
         # Add resume parsing job
         scheduler.add_job(
@@ -138,25 +135,33 @@ async def lifespan(app: FastAPI):
         )
 
         scheduler.start()
-        print(f"[Scheduler] Batch processing scheduler started successfully")
+        lifespan_logger.info("Batch processing scheduler started successfully.")
     else:
-        print(f"[Scheduler] Batch processing scheduler is disabled")
+        lifespan_logger.info("Batch processing scheduler is disabled (ENABLE_BATCH_SCHEDULER is false).")
 
     yield  # Control passes to the application here
 
     # Shutdown logic
+    lifespan_logger.info("Application lifespan shutdown sequence initiated.")
     if otp_cleanup_task and not otp_cleanup_task.done():
-        print("[OTP] Shutting down OTP cleanup task")
+        lifespan_logger.info("Shutting down OTP cleanup task.")
         otp_cleanup_task.cancel()
         try:
             await otp_cleanup_task
         except asyncio.CancelledError:
-            print("[OTP] OTP cleanup task cancelled successfully")
+            lifespan_logger.info("OTP cleanup task cancelled successfully.")
+        except Exception as e:
+            lifespan_logger.error(f"Error during OTP cleanup task shutdown: {e}", exc_info=True)
+
 
     if scheduler and scheduler.running:
-        print(f"[Scheduler] Shutting down batch processing scheduler")
-        scheduler.shutdown(wait=True)
-        print(f"[Scheduler] Scheduler shutdown complete")
+        lifespan_logger.info("Shutting down batch processing scheduler.")
+        try:
+            scheduler.shutdown(wait=True)
+            lifespan_logger.info("Scheduler shutdown complete.")
+        except Exception as e:
+            lifespan_logger.error(f"Error during scheduler shutdown: {e}", exc_info=True)
+    lifespan_logger.info("Application shutdown complete.")
 
 
 app = FastAPI(
@@ -169,47 +174,82 @@ app = FastAPI(
 # Create a router for all API v1 endpoints that need bearer auth for Swagger
 api_v1_router = APIRouter(dependencies=[Depends(swagger_ui_bearer_scheme)])
 
+# CORS Configuration
+raw_allowed_origins = os.getenv("CORS_ALLOWED_ORIGINS")
+if raw_allowed_origins:
+    allowed_origins = [origin.strip() for origin in raw_allowed_origins.split(",")]
+elif DEBUG_MODE:
+    allowed_origins = ["*"]
+    lifespan_logger.warning("CORS allow_origins set to '*' because DEBUG_MODE is true and CORS_ALLOWED_ORIGINS is not set.")
+else:
+    allowed_origins = [] # Default to no origins allowed in non-debug mode if not specified
+    lifespan_logger.info("CORS allow_origins is empty (most restrictive) because DEBUG_MODE is false and CORS_ALLOWED_ORIGINS is not set.")
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=allowed_origins,
+    allow_credentials=True, # Adjust as needed, often True for JWT/cookie auth
+    allow_methods=["*"],    # Or specify methods: ["GET", "POST", "PUT", "DELETE"]
+    allow_headers=["*"],    # Or specify headers
 )
 # Add AuthMiddleware - this should generally be after CORS but before most route-specific logic
 app.add_middleware(AuthMiddleware)
 
-# # Add error traceback middleware
-# app.add_middleware(
-#     ErrorTracebackMiddleware,
-#     include_traceback=True,
-#     debug_mode=DEBUG_MODE
-# # )
-# @app.exception_handler(RequestValidationError)
-# async def validation_exception_handler(request: Request, exc: RequestValidationError):
-#     tb = traceback.format_exc()
-#     print(f"\n=== Validation Error ===\nRequest: {request.method} {request.url}\nErrors: {exc.errors()}\nTraceback:\n{tb}\n========================\n")
-#     content = {
-#         "detail": exc.errors(),
-#         "status_code": 422,
-#         "path": str(request.url),
-#         "traceback": tb.split("\n") if DEBUG_MODE else "Traceback available in debug mode."
-#     }
-#     return JSONResponse(status_code=422, content=content)
+# --- Logging Setup for FastAPI app ---
+# Using uvicorn's default logging for now, which is configured via uvicorn.run()
+# For more advanced logging, one might integrate structlog or custom logging middleware.
+# The batch scripts have their own loggers.
+import logging # Added
+logger = logging.getLogger("api") # General API logger
+if DEBUG_MODE:
+    logger.setLevel(logging.DEBUG)
+else:
+    logger.setLevel(logging.INFO)
+# Ensure uvicorn loggers also respect this level if needed, though uvicorn.run controls its own.
 
+# --- Custom Exception Handlers ---
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    # Log the detailed error for server-side debugging
+    logger.error(
+        f"Validation error for request: {request.method} {request.url}\n"
+        f"Details: {exc.errors()}",
+        exc_info=True  # Includes traceback
+    )
+    # Return a Pydantic-like error response
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors()},
+    )
 
-# @app.exception_handler(HTTPException)
-# async def http_exception_handler(request: Request, exc: HTTPException):
-#     tb = traceback.format_exc()
-#     print(f"\n=== HTTP Exception ===\nRequest: {request.method} {request.url}\nError: {exc.detail}\nStatus Code: {exc.status_code}\nTraceback:\n{tb}\n======================\n")
-#     content = {
-#         "detail": exc.detail,
-#         "status_code": exc.status_code,
-#         "path": str(request.url),
-#         "traceback": tb.split("\n") if DEBUG_MODE else "Traceback available in debug mode."
-#     }
-#     return JSONResponse(status_code=exc.status_code, content=content)
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    logger.error(
+        f"HTTP exception for request: {request.method} {request.url}\n"
+        f"Status Code: {exc.status_code}, Detail: {exc.detail}",
+        exc_info=True # Includes traceback for unexpected HTTPExceptions
+    )
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+    )
 
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    # This will catch any unhandled exceptions (500 errors)
+    error_id = os.urandom(8).hex() # Generate a unique error ID
+    logger.critical(
+        f"Unhandled exception (Error ID: {error_id}) for request: {request.method} {request.url}",
+        exc_info=True # Includes traceback
+    )
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "Internal Server Error. Please contact support.",
+            "error_id": error_id # Client can provide this ID for faster debugging
+        },
+    )
 
 # Include routers
 api_v1_router.include_router(auth.router, prefix="/auth", tags=["auth"])
@@ -267,10 +307,20 @@ async def root():
 
 
 if __name__ == "__main__":
+    # Setup basic logging for the main module if run directly
+    # This is mostly for uvicorn's server messages if not configured elsewhere.
+    # The actual application logging (API requests, batch jobs) should use their specific loggers.
+    if DEBUG_MODE:
+        uvicorn_log_level = "debug"
+    else:
+        uvicorn_log_level = "info"
+
+    # The logger for 'api' and batch scripts are configured separately.
+    # uvicorn.run controls its own server logging.
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
         port=8017,
-        log_level="debug" if DEBUG_MODE else "info",
-        # reload=DEBUG_MODE
+        log_level=uvicorn_log_level, # For Uvicorn's own server logs
+        # reload=DEBUG_MODE # Reload can be useful in dev, but ensure it's False in prod
     )

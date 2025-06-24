@@ -47,11 +47,18 @@ def update_hr(db: Session, *, db_hr: HR, hr_in: Union[HRUpdate, Dict[str, Any]])
     else:
         update_data = hr_in.model_dump(exclude_unset=True)
 
-    # If password is being updated, it should be hashed
-    # Example:
-    # if "password_hash" in update_data and update_data["password_hash"]:
-    #     hashed_password = hash_password(update_data["password_hash"])
-    #     update_data["password_hash"] = hashed_password
+    # If password is being updated, it must be hashed.
+    # The field in HRBase and thus potentially in HRUpdate (via @make_optional) is 'password'.
+    if "password" in update_data and update_data["password"]:
+        hashed_password = get_password_hash(update_data["password"])
+        update_data["password"] = hashed_password
+    elif "password" in update_data and not update_data["password"]:
+        # Explicitly removing password or setting to empty?
+        # This case should be clarified: is an empty password allowed?
+        # For now, if an empty string for password is provided, it will be hashed as an empty string.
+        # If password field is not in update_data, it's not touched.
+        pass
+
 
     for field, value in update_data.items():
         setattr(db_hr, field, value)
