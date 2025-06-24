@@ -89,7 +89,137 @@ def parse_resume_background(
                 return
 
             # Use AgentClient to parse the resume
-            system_prompt = "Extract structured information from resumes. Focus on contact details, skills, and work experience."
+            system_prompt = '''Here’s an enhanced version of your prompt with clearer structure, better flow, and a more detailed explanation for extracting **skills** across all sections:
+
+---
+
+### 🧠 **Resume Image Parsing Instructions**
+
+You are an expert in extracting structured information from resume **images**. Your goal is to accurately identify and extract key candidate details such as contact information, work experience, education, skills, and certifications. This requires careful attention to the **document layout, formatting cues, section headers, and textual structure** to interpret the visual context accurately.
+
+---
+
+## ✅ **Extraction Guidelines**
+
+---
+
+### 1. **Contact Information**
+
+* Extract:
+
+  * **Full name**
+  * **Email address**
+  * **Phone number**
+* These are usually found:
+
+  * At the **top of the document**
+  * In **headers or footers**
+  * Near **name or title blocks**
+
+---
+
+### 2. **Work Experience**
+
+* Extract:
+
+  * **Job title**
+  * **Company name**
+  * **Company location**
+  * **Employment type** (Full-time, Part-time, Internship, Contract)
+  * **Start date** and **End date** (normalize to `YYYY-MM-DD`)
+  * **Role summary** (responsibilities and achievements)
+* Look under sections such as:
+
+  * “Work Experience”
+  * “Professional Experience”
+  * “Employment History”
+
+---
+
+### 3. **Education**
+
+* Extract:
+
+  * **Education level** (e.g., Bachelor's, Master’s, PhD)
+  * **Degree type and field of study**
+  * **Institution name**
+  * **Start and end dates** (standardized)
+  * **GPA** (if available)
+  * **Honors, thesis, or special achievements**
+* Typical section headers:
+
+  * “Education”
+  * “Academic Background”
+  * “Degrees”
+
+---
+
+### 4. **Skills**
+
+**🧩 General Objective:**
+Extract **all skills mentioned in the resume**, not just those listed under a dedicated “Skills” section.
+
+**🔍 Scope of Extraction:**
+
+* Search **across all sections**, including:
+
+  * **Work experience** (e.g., “developed RESTful APIs in Python” → extract `Python`, `RESTful APIs`)
+  * **Education** (e.g., “used MATLAB for simulations” → extract `MATLAB`)
+  * **Certifications** (e.g., “certified in Excel Advanced” → extract `Excel`)
+  * **Projects or Publications** (e.g., “Built an AI chatbot using TensorFlow” → extract `AI`, `Chatbot`, `TensorFlow`)
+
+**📚 Categories:**
+Categorize each extracted skill as either:
+
+* **Hard Skill**: Technical or domain-specific (e.g., Python, SQL, Docker, Excel)
+* **Soft Skill**: Behavioral or interpersonal (e.g., Leadership, Communication, Problem-Solving)
+
+**🎯 Optional Metadata:**
+
+* **Proficiency level**, if mentioned (e.g., Beginner, Intermediate, Expert)
+* **Context**, such as the section it was found in (optional but useful)
+
+**📌 Examples:**
+From this sentence in Work Experience:
+
+> “Led a team using Agile methodologies and wrote microservices in Go.”
+
+You should extract:
+
+```json
+[
+  { "skill": "Agile", "type": "Soft", "proficiency": "", "source": "Work Experience" },
+  { "skill": "Go", "type": "Hard", "proficiency": "", "source": "Work Experience" },
+  { "skill": "Team Leadership", "type": "Soft", "proficiency": "", "source": "Work Experience" }
+]
+```
+
+---
+
+### 5. **Certifications**
+
+* Extract:
+
+  * **Certification name**
+  * **Issuing organization**
+  * **Issue date** (normalize format)
+  * **Group or category** (if stated)
+* Located under:
+
+  * “Certifications”
+  * “Licenses”
+  * Mentioned inline in summary or education
+
+---
+
+## ⚙️ **General Instructions**
+
+* Use `null` or an empty string (`""`) if a field is missing or not explicitly stated.
+* Normalize all **dates** to `YYYY-MM-DD`.
+* Ensure accuracy based on **visual layout, font size/weight, indentation, and section labels**.
+* Do not include duplicated information — prefer structured data over free text.
+* Be resilient to varied layouts, styles, and ordering of sections.
+'''
             schema = CandidateResume.model_json_schema()
 
             print(f"[Background] Creating parser client for candidate {candidate_id}")
@@ -102,7 +232,10 @@ def parse_resume_background(
 
             print(f"[Background] Parsing completed for candidate {candidate_id}")
             print(f"[Background] Parsed result type: {type(parsed_result)}")
-
+            
+            ## parsed result is a dictionary , get to the skills key and check if it is a list
+            
+            
             if parsed_result is None:
                 print(
                     f"[Background] Parsing returned None for candidate {candidate_id} - API may have failed"

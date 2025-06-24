@@ -36,10 +36,10 @@ DEBUG_MODE = os.getenv("DEBUG_MODE", "True").lower() == "true"
 
 # Get scheduler configuration from environment variables
 RESUME_PARSER_INTERVAL_MINUTES = int(
-    os.getenv("RESUME_PARSER_INTERVAL_MINUTES", "10")
+    os.getenv("RESUME_PARSER_INTERVAL_MINUTES", "1")
 )  # Default: 30 minutes
 APPLICATION_MATCHER_INTERVAL_MINUTES = int(
-    os.getenv("APPLICATION_MATCHER_INTERVAL_MINUTES", "10")
+    os.getenv("APPLICATION_MATCHER_INTERVAL_MINUTES", "1")
 )  # Default: 30 minutes
 ENABLE_BATCH_SCHEDULER = os.getenv("ENABLE_BATCH_SCHEDULER", "True").lower() == "true"
 

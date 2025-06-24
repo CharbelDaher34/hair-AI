@@ -1,121 +1,206 @@
-import spacy
-from skillNer.skill_extractor_class import SkillExtractor
-from spacy.matcher import PhraseMatcher
-from skillNer.general_params import SKILL_DB
-from typing import Dict, List, Set, Tuple
+import re
 import logging
-from typing import Optional
-from rapidfuzz import fuzz, process
+from typing import Dict, List, Optional, Tuple
+
+import numpy as np
+import spacy
+from rapidfuzz import fuzz
+from sklearn.metrics.pairwise import cosine_similarity
+from skillNer.skill_extractor_class import SkillExtractor
+from skillNer.general_params import SKILL_DB
+from spacy.matcher import PhraseMatcher
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 class skill_ner:
-    # Class variables
-    _nlp = None  # Initialize _nlp
+    # — spaCy + SkillNer setup — #
+    _nlp = None
     try:
+        _nlp = spacy.load("en_core_web_trf")
+    except OSError:
         _nlp = spacy.load("en_core_web_lg")
-        logger.info("Successfully loaded en_core_web_lg model.")
-    except OSError as e_os:  # Catch OSError specifically for "model not found" (E050)
-        logger.warning(
-            f"Spacy model 'en_core_web_lg' not found (Original Error: {e_os}). Attempting to download..."
-        )
-        try:
-            spacy.cli.download("en_core_web_lg")
-            logger.info("Model 'en_core_web_lg' downloaded. Attempting to load again.")
-            _nlp = spacy.load("en_core_web_lg")  # Load after download
-            logger.info("Successfully loaded 'en_core_web_lg' after download.")
-        except SystemExit as se:  # spacy.cli.download can cause SystemExit
-            logger.error(
-                f"Spacy download CLI exited with code {se.code}. This may be due to permissions, network issues, or model incompatibility. Model 'en_core_web_lg' may not be loaded."
-            )
-            # Re-raise a comprehensive error indicating failure to load the model
-            raise RuntimeError(
-                f"Failed to initialize spaCy model 'en_core_web_lg'. Download command exited (code: {se.code}). Original OSError: {e_os}"
-            ) from se
-        except Exception as e_after_download:
-            logger.error(
-                f"Failed to load 'en_core_web_lg' even after download attempt: {e_after_download}"
-            )
-            # Propagate this new error, including context from the original OSError
-            raise RuntimeError(
-                f"Failed to initialize spaCy model 'en_core_web_lg' after download attempt. Load error: {e_after_download}. Original OSError: {e_os}"
-            ) from e_after_download
-    except Exception as e_initial_load:
-        # Catch any other unexpected errors during the initial load
-        logger.error(
-            f"An unexpected error occurred during initial load of 'en_core_web_lg': {e_initial_load}"
-        )
-        raise RuntimeError(
-            f"Unexpected error loading spaCy model 'en_core_web_lg': {e_initial_load}"
-        ) from e_initial_load
-
-    if _nlp is None:
-        # This state indicates a failure to load the model through all attempts.
-        # This should ideally be caught by the exceptions above, but serves as a final check.
-        critical_msg = "CRITICAL: SpaCy model 'en_core_web_lg' could not be loaded and _nlp is None. Application cannot proceed."
-        logger.critical(critical_msg)
-        raise RuntimeError(critical_msg)
 
     _skill_extractor = SkillExtractor(_nlp, SKILL_DB, PhraseMatcher)
+    _VEC_CACHE: Dict[str, np.ndarray] = {}
 
     @classmethod
-    def extract_skills(cls, text: str) -> Set[str]:
-        """Extract skills using the current SkillNER output format"""
-        annotations = cls._skill_extractor.annotate(text)
-        skills = set()
+    def _clean(cls, phrase: str) -> str:
+        try:
+            if not phrase or phrase is None:
+                return ""
+            
+            s = str(phrase).lower()
+            s = re.sub(r"[,&\-\/]", " ", s)
+            s = re.sub(r"\s+", " ", s).strip()
+            
+            # Process with spaCy safely
+            doc = cls._nlp(s)
+            cleaned_tokens = []
+            for tok in doc:
+                if tok.lemma_ and tok.lemma_.strip():
+                    cleaned_tokens.append(tok.lemma_)
+            
+            return " ".join(cleaned_tokens) if cleaned_tokens else s
+        except Exception as e:
+            logger.warning(f"Error cleaning phrase '{phrase}': {e}")
+            return str(phrase).lower().strip() if phrase else ""
 
-        # Handle full matches
-        for match in annotations["results"]["full_matches"]:
-            skills.add(match["doc_node_value"].strip())
+    @classmethod
+    def _vec(cls, phrase: str) -> np.ndarray:
+        try:
+            key = cls._clean(phrase)
+            if not key or not key.strip():
+                # Return a zero vector for empty phrases
+                return np.zeros(cls._nlp.vocab.vectors_length)
+                
+            if key in cls._VEC_CACHE:
+                return cls._VEC_CACHE[key]
+            
+            doc = cls._nlp(key)
+            vec = doc.vector
+            
+            # Handle case where vector is all zeros or invalid
+            if vec is None or not hasattr(vec, 'shape') or vec.shape[0] == 0:
+                vec = np.zeros(cls._nlp.vocab.vectors_length)
+            
+            norm = np.linalg.norm(vec) + 1e-9
+            vec = vec / norm
+            cls._VEC_CACHE[key] = vec
+            return vec
+        except Exception as e:
+            logger.warning(f"Error creating vector for phrase '{phrase}': {e}")
+            # Return a zero vector as fallback
+            try:
+                return np.zeros(cls._nlp.vocab.vectors_length)
+            except:
+                return np.zeros(300)  # Default vector size fallback
 
-        # Handle ngram matches (new format)
-        for ngram in annotations["results"]["ngram_scored"]:
-            if "skill_id" in ngram:
-                skills.add(ngram["doc_node_value"].strip())
-            else:
-                skills.add(ngram["doc_node_value"].strip())
+    @classmethod
+    def extract_skills(cls, text: str) -> List[str]:
+        try:
+            if not text or not isinstance(text, str):
+                return []
+            
+            anns = cls._skill_extractor.annotate(text)
+            if not anns or "results" not in anns:
+                return []
+                
+            out = set()
+            
+            # Safely extract full matches
+            if "full_matches" in anns["results"] and anns["results"]["full_matches"]:
+                for m in anns["results"]["full_matches"]:
+                    if m and "doc_node_value" in m and m["doc_node_value"]:
+                        out.add(m["doc_node_value"].strip())
+            
+            # Safely extract ngram scored matches
+            if "ngram_scored" in anns["results"] and anns["results"]["ngram_scored"]:
+                for ng in anns["results"]["ngram_scored"]:
+                    if ng and "doc_node_value" in ng and ng["doc_node_value"]:
+                        out.add(ng["doc_node_value"].strip())
+            
+            return sorted(out)
+        except Exception as e:
+            logger.error(f"Error extracting skills from text: {e}")
+            return []
 
-        return sorted(skills)
-
+    @classmethod
     def match_skills(
-        job_skills: list[str], candidate_skills: list[str], threshold: float = 85.0
-    ):
-        job_skills_set = set([x.lower() for x in job_skills])
-        candidate_skills_set = set([x.lower() for x in candidate_skills])
+        cls,
+        job_skills: List[str],
+        candidate_skills: List[str],
+        threshold: float = 0.60,
+    ) -> Dict[str, List]:
+        try:
+            # Safety checks for input parameters
+            if not job_skills:
+                job_skills = []
+            if not candidate_skills:
+                candidate_skills = []
+            
+            # Filter out None values and ensure all items are strings
+            job_skills = [str(s) for s in job_skills if s is not None]
+            candidate_skills = [str(s) for s in candidate_skills if s is not None]
+            
+            # If no job skills, return empty result
+            if not job_skills:
+                return {
+                    "matching_skills": [],
+                    "missing_skills": [],
+                    "extra_skills": candidate_skills,
+                }
+            
+            # normalize
+            job_norm = [cls._clean(s) for s in job_skills]
+            cand_norm = [cls._clean(s) for s in candidate_skills]
 
-        matched = set()
-        missing = set(job_skills_set)
-        matched_candidate_skills = set()
+            matched, missing = [], []
+            used_cand_idxs = set()
 
-        # If no candidate skills, all job skills are missing
-        if not candidate_skills_set:
+            # 1. Exact (cleaned) matches upfront
+            for j_raw, j in zip(job_skills, job_norm):
+                for idx, c in enumerate(cand_norm):
+                    if j == c:
+                        matched.append({"job": j_raw, "candidate": candidate_skills[idx], "score": 1.0})
+                        used_cand_idxs.add(idx)
+                        break
+                else:
+                    missing.append((j_raw, j))  # keep cleaned form for next step
+
+            # 2. Hybrid match for the still-missing ones
+            true_missing = []
+            for j_raw, j in missing:
+                try:
+                    v_j = cls._vec(j)
+                    best = {"idx": None, "score": 0.0}
+                    for idx, c in enumerate(cand_norm):
+                        if idx in used_cand_idxs:
+                            continue
+                        try:
+                            v_c = cls._vec(c)
+                            sem = float(cosine_similarity(v_j.reshape(1,-1), v_c.reshape(1,-1))[0,0])
+                            fuz = fuzz.token_set_ratio(j, c) / 100.0
+                            comp = 0.6 * sem + 0.4 * fuz
+                            if comp > best["score"]:
+                                best = {"idx": idx, "score": comp}
+                        except Exception as e:
+                            logger.warning(f"Error computing similarity for '{j}' and '{c}': {e}")
+                            continue
+                    
+                    if best["idx"] is not None and best["score"] >= threshold:
+                        matched.append({
+                            "job": j_raw,
+                            "candidate": candidate_skills[best["idx"]],
+                            "score": round(best["score"], 2)
+                        })
+                        used_cand_idxs.add(best["idx"])
+                    else:
+                        true_missing.append(j_raw)
+                except Exception as e:
+                    logger.warning(f"Error processing skill '{j_raw}': {e}")
+                    true_missing.append(j_raw)
+
+            # 3. Extras = candidate skills NOT used and NOT required
+            req_set = set(job_norm)
+            extra = [
+                cs for idx, cs in enumerate(candidate_skills)
+                if idx not in used_cand_idxs and cls._clean(cs) not in req_set
+            ]
+
             return {
                 "matching_skills": matched,
-                "missing_skills": missing,
-                "extra_skills": set(),
+                "missing_skills": true_missing,
+                "extra_skills": extra,
             }
-
-        for job_skill in job_skills_set:
-            result = process.extractOne(
-                job_skill,
-                candidate_skills_set,
-                scorer=fuzz.ratio,
-            )
-            if result is not None:
-                best_match, score, match_index = result
-                if score >= threshold:
-                    matched.add(job_skill)
-                    missing.discard(job_skill)
-                    matched_candidate_skills.add(best_match)
-
-        extra = candidate_skills_set - matched_candidate_skills
-
-        return {
-            "matching_skills": matched,
-            "missing_skills": missing,
-            "extra_skills": extra,
-        }
+        except Exception as e:
+            logger.error(f"Error in match_skills: {e}")
+            return {
+                "matching_skills": [],
+                "missing_skills": job_skills or [],
+                "extra_skills": candidate_skills or [],
+            }
 
     @classmethod
     def analyze_skills(
@@ -124,75 +209,34 @@ class skill_ner:
         candidate_text: str,
         candidate_skills: Optional[List[str]] = None,
     ) -> Dict:
-        """
-        Analyze skills between job description and candidate profile.
-        Returns detailed analysis including matching, missing, and extra skills.
-        """
-        job_skills = cls.extract_skills(job_text)
-
-        resume_skills = cls.extract_skills(candidate_text)
-        try:
-            candidate_skills = candidate_skills if candidate_skills else []
-            candidate_skills.extend(resume_skills)
-        except Exception as e:
-            print(f"Error: {e}")
-            candidate_skills = resume_skills
-
-        match_skills = cls.match_skills(job_skills, candidate_skills)
-        # matching_skills = job_skills & candidate_skills
-        # missing_skills = job_skills - candidate_skills
-        # extra_skills = candidate_skills - job_skills
-
+        job = cls.extract_skills(job_text)
+        resum = cls.extract_skills(candidate_text)
+        all_cand = (candidate_skills or []) + resum
+        res = cls.match_skills(job, all_cand)
         return {
-            "matching_skills": list(match_skills["matching_skills"]),
-            "missing_skills": list(match_skills["missing_skills"]),
-            "extra_skills": list(match_skills["extra_skills"]),
-            "total_job_skills": len(job_skills),
-            "total_candidate_skills": len(candidate_skills),
-            "matching_skills_count": len(match_skills["matching_skills"]),
-            "missing_skills_count": len(match_skills["missing_skills"]),
-            "extra_skills_count": len(match_skills["extra_skills"]),
+            "matching_skills": res["matching_skills"],
+            "missing_skills": res["missing_skills"],
+            "extra_skills": res["extra_skills"],
+            "total_job_skills": len(job),
+            "total_candidate_skills": len(all_cand),
+            "matching_skills_count": len(res["matching_skills"]),
+            "missing_skills_count": len(res["missing_skills"]),
+            "extra_skills_count": len(res["extra_skills"]),
         }
 
     @classmethod
     def calculate_skills_resemblance_rate(
         cls, text_one: str, text_two: str
     ) -> Tuple[float, Dict]:
-        """
-        Calculate the rate of resemblance between skills in two texts with detailed analysis.
-        Returns both the resemblance rate and detailed skill analysis.
-        """
-        skills_one = set(cls.extract_skills(text_one))
-        skills_two = set(cls.extract_skills(text_two))
-
-        if not skills_one and not skills_two:
-            return 1.0, {
-                "matching_skills": [],
-                "missing_skills": [],
-                "extra_skills": [],
-            }
-        if not skills_one or not skills_two:
-            return 0.0, {
-                "matching_skills": [],
-                "missing_skills": [],
-                "extra_skills": [],
-            }
-
-        intersection_count = len(skills_one & skills_two)
-        union_count = len(skills_one | skills_two)
-        resemblance_rate = intersection_count / union_count
-
-        # Calculate skill analysis
+        s1, s2 = set(cls.extract_skills(text_one)), set(cls.extract_skills(text_two))
+        if not s1 and not s2:
+            return 1.0, {"matching_skills": [], "missing_skills": [], "extra_skills": []}
+        if not s1 or not s2:
+            return 0.0, {"matching_skills": [], "missing_skills": [], "extra_skills": []}
+        rate = len(s1 & s2) / len(s1 | s2)
         analysis = cls.analyze_skills(text_one, text_two)
-
-        # Log detailed analysis
-        logger.info(f"Skill Analysis:")
-        logger.info(f"Matching Skills: {analysis['matching_skills']}")
-        logger.info(f"Missing Skills: {analysis['missing_skills']}")
-        logger.info(f"Extra Skills: {analysis['extra_skills']}")
-        logger.info(f"Resemblance Rate: {resemblance_rate:.2f}")
-
-        return resemblance_rate, analysis
+        logger.info(f"Resemblance Rate: {rate:.2f}")
+        return rate, analysis
 
     @classmethod
     def get_skill_match_details(
@@ -201,74 +245,35 @@ class skill_ner:
         candidate_text: str,
         candidate_skills: Optional[List[str]] = None,
     ) -> Dict:
-        """
-        Get detailed skill matching information between job and candidate.
-        Includes skill categories and match percentages.
-        """
         analysis = cls.analyze_skills(job_text, candidate_text, candidate_skills)
-
-        # Calculate match percentages
-        total_required = analysis["total_job_skills"]
-        if total_required > 0:
-            match_percentage = (
-                analysis["matching_skills_count"] / total_required
-            ) * 100
-        else:
-            match_percentage = 0
-
+        total = analysis["total_job_skills"]
+        pct = (analysis["matching_skills_count"] / total * 100) if total else 0.0
         return {
-            "match_percentage": round(match_percentage, 2),
+            "match_percentage": round(pct, 2),
             "skill_analysis": analysis,
             "summary": {
-                "total_required_skills": total_required,
+                "total_required_skills": total,
                 "matching_skills_count": analysis["matching_skills_count"],
                 "missing_skills_count": analysis["missing_skills_count"],
                 "extra_skills_count": analysis["extra_skills_count"],
             },
         }
-
-
-# Example usage
 if __name__ == "__main__":
-    skills_ner = skill_ner()
+    job = ["Python", "Machine Learning", "Deep Learning",
+           "Cloud Computing", "Data Engineering", "Communication", "Teamwork"]
+    cand = ["python", "ml", "deep learn",
+            "aws cloud", "data engineer", "communicate", "team collaboration", "extra skill"]
 
-    # Example job description
-    job_text = """
-    Required Skills:
-    - Python programming
-    - Machine Learning
-    - Deep Learning
-    - TensorFlow
-    - PyTorch
-    - Natural Language Processing
-    - Data Analysis
-    - Cloud Computing
-    """
-
-    # Example candidate profile
-    candidate_text = """
-    Skills:
-    - Python
-    - Machine Learning
-    - Deep Learning
-    - TensorFlow
-    - Data Analysis
-    - SQL
-    - Docker
-    """
-
-    # Get detailed skill analysis
-    match_details = skills_ner.get_skill_match_details(job_text, candidate_text)
-
-    print("\nSkill Match Analysis:")
-    print("=" * 50)
-    print(f"Match Percentage: {match_details['match_percentage']}%")
-    print("\nMatching Skills:")
-    for skill in match_details["skill_analysis"]["matching_skills"]:
-        print(f"✓ {skill}")
-    print("\nMissing Skills:")
-    for skill in match_details["skill_analysis"]["missing_skills"]:
-        print(f"✗ {skill}")
-    print("\nExtra Skills:")
-    for skill in match_details["skill_analysis"]["extra_skills"]:
-        print(f"+ {skill}")
+    print("Scores for each job⇄candidate pair:\n")
+    for j in job:
+        for c in cand:
+            # clean & embed
+            j_cl = skill_ner._clean(j)
+            c_cl = skill_ner._clean(c)
+            vj = skill_ner._vec(j_cl)
+            vc = skill_ner._vec(c_cl)
+            sem = float(cosine_similarity(vj.reshape(1,-1), vc.reshape(1,-1))[0,0])
+            fuz = fuzz.token_set_ratio(j_cl, c_cl) / 100.0
+            comp = 0.6 * sem + 0.4 * fuz
+            print(f"{j:17s} ↔ {c:17s}  |  sem={sem:.2f}, fuzz={fuz:.2f}, comp={comp:.2f}")
+    print("\nNow run get_skill_match_details to see which pairs exceed your threshold.")

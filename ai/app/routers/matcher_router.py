@@ -22,7 +22,7 @@ class MatchRequest(BaseModel):
         example={
             "final_score_weights": {
                 "skills_score": 0.6,
-                "overall_embedding_similarity": 0.4,
+                "overall_similarity": 0.4,
             },
             "skill_score_weights": {
                 "hard_skills": 0.30,
@@ -41,8 +41,8 @@ class MatchRequest(BaseModel):
 
 
 class ScoreBreakdown(BaseModel):
-    final_score_components: Dict[str, float]
-    skills_score_components: Dict[str, float]
+    skills_score: float
+    overall_similarity: float
 
 
 class WeightsUsed(BaseModel):
@@ -57,8 +57,6 @@ class MatchResult(BaseModel):
     missing_skills: List[str] = Field(..., description="Missing skills")
     extra_skills: List[str] = Field(..., description="Extra skills")
     matching_skills: List[str] = Field(..., description="Matching skills")
-    overall_embedding_similarity: float = Field(..., description="Overall embedding similarity between job and candidate profiles")
-    skills_embedding_similarity: float = Field(..., description="Embedding similarity between job and candidate skills")
     weights_used: WeightsUsed = Field(..., description="Weights used in calculation")
 
 
@@ -107,8 +105,6 @@ async def match_candidates_endpoint(request: MatchRequest):
                 missing_skills=result["missing_skills"],
                 extra_skills=result["extra_skills"],
                 matching_skills=result["matching_skills"],
-                overall_embedding_similarity=result["overall_embedding_similarity"],
-                skills_embedding_similarity=result["skills_embedding_similarity"],
                 weights_used=result["weights_used"]
             )
 

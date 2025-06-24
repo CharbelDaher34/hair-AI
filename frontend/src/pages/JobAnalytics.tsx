@@ -38,15 +38,13 @@ interface MatchCandidate {
   application_id: number;
   score: number;
   score_breakdown?: {
-    final_score_components: Record<string, number>;
-    skills_score_components: Record<string, number>;
+    skills_score?: number;
+    [key: string]: any;
   };
   weights_used?: {
-    final_weights: Record<string, number>;
-    skill_weights: Record<string, number>;
+    final_weights?: Record<string, number>;
+    skill_weights?: Record<string, number>;
   };
-  overall_embedding_similarity?: number;
-  skills_embedding_similarity?: number;
   matching_skills?: string[];
   missing_skills?: string[];
   extra_skills?: string[];
@@ -84,7 +82,7 @@ interface ChartData {
   color?: string;
 }
 
-type SortField = 'score' | 'overall_embedding_similarity' | 'skills_embedding_similarity' | 'full_name';
+type SortField = 'score' | 'full_name';
 type SortDirection = 'asc' | 'desc';
 
 const JobAnalytics = () => {
@@ -345,24 +343,7 @@ const JobAnalytics = () => {
                         Overall Score {getSortIcon('score')}
                       </Button>
                     </TableHead>
-                    <TableHead>
-                      <Button
-                        variant="ghost"
-                        onClick={() => handleSort('overall_embedding_similarity')}
-                        className="h-auto p-2 font-semibold text-gray-700 hover:bg-gray-200 transition-colors duration-200"
-                      >
-                        Overall Similarity {getSortIcon('overall_embedding_similarity')}
-                      </Button>
-                    </TableHead>
-                    <TableHead>
-                      <Button
-                        variant="ghost"
-                        onClick={() => handleSort('skills_embedding_similarity')}
-                        className="h-auto p-2 font-semibold text-gray-700 hover:bg-gray-200 transition-colors duration-200"
-                      >
-                        Skills Similarity {getSortIcon('skills_embedding_similarity')}
-                      </Button>
-                    </TableHead>
+                    <TableHead className="font-semibold text-gray-700">Score Breakdown</TableHead>
                     <TableHead className="font-semibold text-gray-700">Matching Skills</TableHead>
                     <TableHead className="font-semibold text-gray-700">Status</TableHead>
                   </TableRow>
@@ -380,21 +361,22 @@ const JobAnalytics = () => {
                         <div className={`font-bold text-lg ${getScoreColor(match.score)}`}>
                           {(match.score * 100).toFixed(1)}%
                         </div>
-                        {match.score_breakdown && (
-                          <div className="text-xs text-gray-500 mt-1">
-                            View breakdown for details
+                      </TableCell>
+                      <TableCell>
+                        {match.score_breakdown ? (
+                          <div className="text-xs space-y-1">
+                            {Object.entries(match.score_breakdown).slice(0, 2).map(([key, value]) => (
+                              <div key={key} className="text-gray-600">
+                                {key.replace(/_/g, ' ')}: {typeof value === 'number' ? (value * 100).toFixed(1) + '%' : String(value)}
+                              </div>
+                            ))}
+                            {Object.keys(match.score_breakdown).length > 2 && (
+                              <div className="text-gray-500 italic">+{Object.keys(match.score_breakdown).length - 2} more</div>
+                            )}
                           </div>
+                        ) : (
+                          <span className="text-xs text-gray-500 italic">No breakdown</span>
                         )}
-                      </TableCell>
-                      <TableCell>
-                        <div className={`font-medium ${getSimilarityColor(match.overall_embedding_similarity || 0)}`}>
-                          {match.overall_embedding_similarity ? (match.overall_embedding_similarity * 100).toFixed(1) + '%' : 'N/A'}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className={`font-medium ${getSimilarityColor(match.skills_embedding_similarity || 0)}`}>
-                          {match.skills_embedding_similarity ? (match.skills_embedding_similarity * 100).toFixed(1) + '%' : 'N/A'}
-                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1 max-w-xs">

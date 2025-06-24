@@ -41,8 +41,6 @@ class WorkHistoryItem(BaseModel):
     employment_type: EmploymentType = Field(
         ..., description="Type of employment (e.g., Full-time, Part-time)."
     )
-    # naics_code: Optional[str] = Field(None, description="Industry classification code (NAICS).")
-    # naics_industry_name: Optional[str] = Field(None, description="Industry name from NAICS code.")
     start_date: date | str = Field(..., description="Job start date.")
     end_date: Optional[date | str] = Field(
         None, description="Job end date, null if currently employed."
@@ -73,7 +71,7 @@ class skill_type(str, Enum):
     soft = "Soft"
 
 class SkillItem(BaseModel):
-    name: str = Field(..., description="Name of the skill (e.g., Python).")
+    name: str = Field(..., description="Name of the skill, 1 skill per item")
     category: str = Field(
         ..., description="Category of the skill (e.g., Programming Language)."
     )
@@ -81,7 +79,7 @@ class SkillItem(BaseModel):
         ..., description="Proficiency level (e.g., Beginner, Intermediate, Expert)."
     )
     type: skill_type = Field(
-        ..., description="Type of the skill (e.g., Hard, Soft)."
+        ..., description="Type of the skill (Hard, Soft)."
     )
 
 
@@ -113,7 +111,7 @@ class CandidateResume(BaseModel):
         None, description="List of education history entries."
     )
     skills: Optional[List[SkillItem]] = Field(
-        None, description="List of skills the candidate possesses."
+        None, description="List of skills the candidate possesses, this is extracted from all the resume sections."
     )
     certifications: Optional[List[CertificationItem]] = Field(
         None, description="List of certifications held by the candidate."
