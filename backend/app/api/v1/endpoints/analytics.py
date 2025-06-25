@@ -77,7 +77,7 @@ def get_company_analytics(request: Request, db: Session = Depends(get_session)):
         # 1. Total Jobs and Open Jobs
         total_jobs_query = select(
             func.count(Job.id),
-            func.count(case((Job.status == Status.PUBLISHED, Job.id), else_=None)),
+            func.count(case((Job.status != Status.CLOSED, Job.id), else_=None)),
         ).where(Job.employer_id == employer_id)
         total_jobs, total_open_jobs = db.exec(total_jobs_query).one()
 
