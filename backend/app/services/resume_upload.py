@@ -5,7 +5,7 @@ from pathlib import Path
 from pydantic import BaseModel
 from enum import Enum
 from typing import List, Any
-
+import time
 
 # --- Define schema models (or import if available) ---
 class Skills(BaseModel):
@@ -43,72 +43,97 @@ def get_content_type(file_extension):
     return content_types.get(file_extension)
 
 
-def _get_matcher_url():
-    """
-    Determines the correct matcher URL by checking health endpoints of potential hosts.
-    """
-    matcher_url = os.getenv("ai_url")
-    if matcher_url:
-        return f"{matcher_url}/parser/parse"
-    hosts = [os.getenv("AI_HOST", "ai"), "localhost"]
-    port = os.getenv("AI_PORT", "8011")
+from typing import List, Any, Dict, Optional # Added Dict, Optional
 
-    for host in hosts:
-        base_url = f"http://{host}:{port}"
-        health_url = f"{base_url}/health"
+# Helper Pydantic model for batch items, not strictly necessary for AgentClient but good for structure
+class BatchParseItemData(BaseModel):
+    candidate_id: int # To map results back
+    resume_texts: Optional[List[str]] = None
+    resume_files: Optional[List[str]] = [] # List of filenames (basenames) associated with this candidate
+    schema_definition: str
+    system_prompt: Optional[str] = None
+
+
+def _get_ai_base_url():
+    """
+    Determines the correct base AI service URL by checking health endpoints of potential hosts.
+    """
+    ai_url_env = os.getenv("ai_url") # Full base URL if provided
+    if ai_url_env:
+        return ai_url_env.rstrip('/')
+        # Check health of the provided URL
+        health_url = f"{ai_url_env.rstrip('/')}/health"
         try:
-            print(f"Trying to connect to {health_url}")
+            print(f"Trying to connect to provided AI URL: {health_url}")
             response = requests.get(health_url, timeout=5)
             response.raise_for_status()
-            print(f"✅ AI service is running at {base_url}")
-            return f"{base_url}/parser/parse"
+            print(f"✅ AI service is running at {ai_url_env}")
+            return ai_url_env.rstrip('/')
         except requests.exceptions.RequestException as e:
-            print(f"❌ Could not connect to {health_url}: {e}")
+            print(f"❌ Could not connect to provided AI URL {health_url}: {e}. Falling back to host/port discovery.")
 
-    print("❌ AI service is ndot running or not accessible.")
-    return ""
+    hosts = [os.getenv("AI_HOST", "ai"), "localhost"]
+    port = os.getenv("AI_PORT", "8011")
+    retries = 3
+    for host in hosts:
+        i = 0
+        while i < retries:
+            i += 1
+            base_url = f"http://{host}:{port}"
+            health_url = f"{base_url}/health"
+            try:
+                print(f"Trying to connect to discovered AI URL: {health_url}")
+                response = requests.get(health_url, timeout=5)
+                response.raise_for_status()
+                print(f"✅ AI service is running at {base_url}")
+                return base_url
+            except requests.exceptions.RequestException as e:
+                time.sleep(2)
+                print(f"❌ Could not connect to {health_url}: {e}")
+
+    print("❌ AI service is not running or not accessible.")
+    return None # Return None if no service found
 
 
-try:
-    PARSER_URL = _get_matcher_url()
-except Exception as e:
-    print(f"❌ Could not get parser URL: {e}")
-    PARSER_URL = ""
+AI_BASE_URL = _get_ai_base_url()
 
 
 class AgentClient:
-    def __init__(
-        self,
-        system_prompt: str,
-        schema: Any,
-        inputs: List[Any],
-        url: str = PARSER_URL,
-    ):
+    def __init__(self):
         """
-        :param system_prompt: The system prompt string for the LLM
-        :param schema: The Pydantic model or JSON schema dict/string
-        :param inputs: List of text strings or file paths
-        :param url: Endpoint URL
+        Initializes the AgentClient.
+        The base URL for the AI service is determined once when the module is loaded.
         """
-        self.system_prompt = system_prompt
-        # Accept either a Pydantic model, dict, or JSON string for schema
-        print(type(schema))
+        self.base_url = AI_BASE_URL
+
+    def parse(self, system_prompt: str, schema: Any, inputs: List[Any]):
+        """
+        Parses a single resume item (can be text or file path, or list of these for one resume)
+        by calling the AI service's /parser/parse endpoint.
+
+        :param system_prompt: The system prompt string for the LLM.
+        :param schema: The Pydantic model or JSON schema dict/string for the expected output.
+        :param inputs: List of text strings or file paths for a single resume.
+        """
+        if self.base_url is None:
+            print("❌ AI service is not available - cannot parse resume")
+            return None
+            
+        parser_url = f"{self.base_url}/parser/parse"
+
         if isinstance(schema, BaseModel):
-            self.schema = json.dumps(schema.model_json_schema())
+            schema_str = json.dumps(schema.model_json_schema())
         elif isinstance(schema, dict):
-            self.schema = json.dumps(schema)
+            schema_str = json.dumps(schema)
         elif isinstance(schema, str):
-            self.schema = schema
+            schema_str = schema
         else:
             raise ValueError("Schema must be a Pydantic model, dict, or JSON string.")
-        self.inputs = inputs
-        self.url = url
 
-    def parse(self):
-        form_data = {"schema": self.schema, "system_prompt": self.system_prompt}
+        form_data = {"schema": schema_str, "system_prompt": system_prompt}
         files_data = []
         opened_files = []
-        for input_item in self.inputs:
+        for input_item in inputs:
             if isinstance(input_item, str) and (
                 input_item.startswith("/") or "\\" in input_item
             ):
@@ -133,24 +158,108 @@ class AgentClient:
                 files_data.append(("inputs", (None, input_item, "text/plain")))
                 print(f"✅ Added text input: {str(input_item)[:50]}...")
         if not files_data:
-            print("❌ No valid inputs to process")
+            print("❌ No valid inputs to process for single parse.")
             return None
         try:
-            print(f"\n🚀 Sending request with {len(files_data)} inputs...")
-            response = requests.post(self.url, data=form_data, files=files_data)
-            print(f"Status Code: {response.status_code}")
+            print(f"\n🚀 Sending single parse request with {len(files_data)} inputs to {parser_url}...")
+            response = requests.post(parser_url, data=form_data, files=files_data)
+            print(f"Single Parse Status Code: {response.status_code}")
             if response.status_code == 200:
-                result = response.json()
-               
-                return result
+                return response.json()
             else:
-                print(f"❌ Error: {response.text}")
+                print(f"❌ Single Parse Error: {response.text}")
                 return None
         except requests.exceptions.RequestException as e:
-            print(f"❌ Request failed: {e}")
+            print(f"❌ Single Parse Request failed: {e}")
             return None
         except json.JSONDecodeError:
-            print(f"❌ Invalid JSON response: {response.text}")
+            print(f"❌ Single Parse Invalid JSON response: {response.text}")
+            return None
+        finally:
+            for file_obj in opened_files:
+                file_obj.close()
+
+    def parse_batch(self, batch_metadata_payload: List[Dict[str, Any]], all_file_paths: List[str]):
+        """
+        Parses a batch of resumes by calling the AI service's /parser/batch_parse endpoint.
+
+        :param batch_metadata_payload: A list of dictionaries. Each dictionary is an item for
+                                       the 'batch_metadata' form field. It should conform to what
+                                       the AI's /batch_parse endpoint expects for each item,
+                                       e.g., {"resume_texts": [], "resume_files": ["filename.pdf"],
+                                              "schema": "...", "system_prompt": "..."}.
+                                       The "resume_files" should contain basenames of files.
+        :param all_file_paths: A list of absolute paths to all unique resume files that need to be uploaded.
+                               The basenames of these paths should correspond to what's listed in
+                               `resume_files` within `batch_metadata_payload` items.
+        """
+        if self.base_url is None:
+            print("❌ AI service is not available - cannot parse resume batch")
+            return None
+            
+        batch_parser_url = f"{self.base_url}/parser/batch_parse"
+
+        form_data = {"batch_metadata": json.dumps(batch_metadata_payload)}
+
+        files_data = []
+        opened_files = []
+
+        # Deduplicate file paths to avoid opening/sending the same file multiple times
+        # if it's referenced by multiple items in the batch, though AI endpoint expects flat list of unique files.
+        # For simplicity here, we assume all_file_paths contains unique paths if needed,
+        # or that the calling script manages this. The AI endpoint expects all files listed in batch_metadata
+        # to be present in the 'resume_files' part of the form.
+
+        unique_file_paths = sorted(list(set(all_file_paths)))
+
+        for file_path_str in unique_file_paths:
+            file_path_obj = Path(file_path_str)
+            if not file_path_obj.exists():
+                print(f"⚠️  File not found for batch: {file_path_str}")
+                continue # Or raise error, depending on desired strictness
+
+            content_type = get_content_type(file_path_obj.suffix.lower())
+            if not content_type:
+                print(f"⚠️  Unsupported file type for batch: {file_path_str}")
+                continue
+
+            try:
+                file_obj = open(file_path_obj, "rb")
+                opened_files.append(file_obj)
+                # The AI /batch_parse endpoint expects files under 'resume_files' key
+                files_data.append(("resume_files", (file_path_obj.name, file_obj, content_type)))
+                print(f"✅ Added file for batch: {file_path_obj.name}")
+            except Exception as e:
+                print(f"❌ Error opening file {file_path_str} for batch: {e}")
+
+        if not batch_metadata_payload:
+            print("❌ No batch metadata to process.")
+            # Close any opened files if we're returning early
+            for file_obj in opened_files:
+                file_obj.close()
+            return None
+
+        # It's possible to have metadata but no files if all inputs are text-based
+        # if not files_data and any(item.get("resume_files") for item in batch_metadata_payload):
+        #     print("❌ Some batch items reference files, but no valid files could be prepared for upload.")
+        #     for file_obj in opened_files:
+        #         file_obj.close()
+        #     return None
+
+        try:
+            print(f"\n🚀 Sending batch parse request with {len(batch_metadata_payload)} items and {len(files_data)} files to {batch_parser_url}...")
+            response = requests.post(batch_parser_url, data=form_data, files=files_data)
+            print(f"Batch Parse Status Code: {response.status_code}")
+            if response.status_code == 200:
+                return response.json() # Expected to be a list of results
+            else:
+                print(f"❌ Batch Parse Error: {response.text}")
+                return None
+        except requests.exceptions.RequestException as e:
+            print(f"❌ Batch Parse Request failed: {e}")
+            return None
+        except json.JSONDecodeError:
+            print(f"❌ Batch Parse Invalid JSON response: {response.text}")
             return None
         finally:
             for file_obj in opened_files:
@@ -158,18 +267,81 @@ class AgentClient:
 
 
 if __name__ == "__main__":
-    print("Testing AgentClient")
-    print("=" * 40)
-    # Example usage
-    system_prompt = "Extract structured information from resumes. Focus on contact details, skills, and work experience."
-    schema = Candidates
-    inputs = [
-        # "Charbel daher/ charbeldaher34@gmail.com: Skills: Python, FastAPI, Machine Learning\n\n"
-        # "John Doe\njohn.doe@email.com\n(555) 123-4567",
-        "/storage/hussein/matching/ai/app/services/llm/Charbel_Daher_Resume.pdf",
-        # "Jane Smith\njane.smith@company.com\n(555) 987-6543\nSkills: React, Node.js, TypeScript",
-        "/storage/hussein/matching/ai/app/services/llm/images.jpeg",
-        # "Alice Johnson\nalice@example.com\nExpertise: Java, Spring Boot, AWS"
-    ]
-    client = AgentClient(system_prompt, schema.model_json_schema(), inputs)
-    client.parse()
+    print("Testing AgentClient...")
+    if not True:
+        print("AI_BASE_URL not determined. Cannot run tests.")
+    else:
+        client = AgentClient() # Initialize without specific task details
+
+        # --- Test single parse (legacy behavior) ---
+        print("\n--- Testing single parse ---")
+        single_system_prompt = "Extract structured information for a single resume."
+        # Assuming Candidate schema is defined elsewhere or use a generic dict
+        # from models.candidate_pydantic import CandidateResume # Example
+        # single_schema = CandidateResume.model_json_schema()
+        single_schema = {"type": "object", "properties": {"name": {"type": "string"}, "email": {"type": "string"}}}
+
+
+        # Create dummy files for testing if they don't exist
+        Path("dummy_resume.pdf").write_text("This is a dummy PDF content.")
+        Path("dummy_image.jpeg").write_text("This is dummy image content.")
+
+        single_inputs = [
+            "John Doe\njohn.doe@email.com\nSkills: Test, Debug",
+            "dummy_resume.pdf"
+        ]
+        try:
+            single_result = client.parse(single_system_prompt, single_schema, single_inputs)
+            if single_result:
+                print("✅ Single parse successful:", json.dumps(single_result, indent=2))
+            else:
+                print("❌ Single parse failed or returned None.")
+        except Exception as e:
+            print(f"Error during single parse test: {e}")
+
+
+        # --- Test batch parse ---
+        print("\n--- Testing batch parse ---")
+        batch_meta_items = [
+            {
+                "candidate_id": 1, # Custom field to help map results back
+                "resume_texts": ["Text for resume 1: Jane Doe, jane@example.com"],
+                "resume_files": ["dummy_resume.pdf"], # Basename
+                "schema": json.dumps(single_schema), # Reusing schema for simplicity
+                "system_prompt": "Parse Jane's resume."
+            },
+            {
+                "candidate_id": 2,
+                "resume_texts": ["Text for resume 2: Peter Pan, peter@neverland.com"],
+                "resume_files": ["dummy_image.jpeg"], # Basename
+                "schema": json.dumps(single_schema),
+                "system_prompt": "Parse Peter's resume."
+            },
+            {
+                "candidate_id": 3, # Text-only item
+                "resume_texts": ["Text for resume 3: Alice Wonderland, alice@rabbit_hole.com"],
+                "resume_files": [],
+                "schema": json.dumps(single_schema),
+                "system_prompt": "Parse Alice's resume."
+            }
+        ]
+        all_files_for_batch = ["dummy_resume.pdf", "dummy_image.jpeg"] # List of actual paths
+
+        try:
+            batch_results = client.parse_batch(batch_meta_items, all_files_for_batch)
+            if batch_results:
+                print("✅ Batch parse successful:", json.dumps(batch_results, indent=2))
+                # Example: Map results back if candidate_id was part of the response or by order
+                for i, result in enumerate(batch_results):
+                    original_request = batch_meta_items[i]
+                    print(f"Result for candidate_id {original_request.get('candidate_id')}: {result}")
+            else:
+                print("❌ Batch parse failed or returned None.")
+        except Exception as e:
+            print(f"Error during batch parse test: {e}")
+
+        # Clean up dummy files
+        Path("dummy_resume.pdf").unlink(missing_ok=True)
+        Path("dummy_image.jpeg").unlink(missing_ok=True)
+
+    # else: 
