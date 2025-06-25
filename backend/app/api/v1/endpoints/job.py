@@ -306,8 +306,8 @@ def generate_description(
     Company data: {company_data}
     Job data: {request_data.data}
     """
-    client = AgentClient(
-        system_prompt="""You are an expert in writing and creating job descriptions for companies. You are given company data and job requirements as input text. Generate comprehensive job data based on this information.
+    client = AgentClient()
+    system_prompt = """You are an expert in writing and creating job descriptions for companies. You are given company data and job requirements as input text. Generate comprehensive job data based on this information.
 
 IMPORTANT: You must provide ALL fields in the exact JSON structure specified. Do not leave any field empty or null.
 
@@ -331,8 +331,6 @@ Required JSON structure:
   "job_category": "string - Job category (e.g., Software Engineering, Marketing, etc.)"
 }
 
-Generate realistic and appropriate values for all fields. If specific information is not provided, infer reasonable values based on the job context and company information.""",
-        schema=JobGeneratedData.model_json_schema(),
-        inputs=[input],
-    )
-    return client.parse()
+Generate realistic and appropriate values for all fields. If specific information is not provided, infer reasonable values based on the job context and company information."""
+    
+    return client.parse(system_prompt, JobGeneratedData.model_json_schema(), [input])
