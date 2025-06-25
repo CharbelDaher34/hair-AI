@@ -36,6 +36,39 @@ const SignUp = () => {
   const [show_password, set_show_password] = useState(false);
   const [show_confirm_password, set_show_confirm_password] = useState(false);
 
+  const validate_password = (password: string) => {
+    const min_length = password.length >= 8;
+    const has_uppercase = /[A-Z]/.test(password);
+    const has_lowercase = /[a-z]/.test(password);
+    const has_number = /\d/.test(password);
+    const has_special = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+
+    return {
+      min_length,
+      has_uppercase,
+      has_lowercase,
+      has_number,
+      has_special,
+      is_valid: min_length && has_uppercase && has_lowercase && has_number && has_special
+    };
+  };
+
+  const get_password_validation_message = (password: string) => {
+    if (!password) return "";
+    
+    const validation = validate_password(password);
+    const missing_requirements = [];
+    
+    if (!validation.min_length) missing_requirements.push("8+ characters");
+    if (!validation.has_uppercase) missing_requirements.push("uppercase letter");
+    if (!validation.has_lowercase) missing_requirements.push("lowercase letter");
+    if (!validation.has_number) missing_requirements.push("number");
+    if (!validation.has_special) missing_requirements.push("special character");
+    
+    if (missing_requirements.length === 0) return "";
+    return `Password must contain: ${missing_requirements.join(", ")}`;
+  };
+
   const handle_company_data_change = (field: string, value: string) => {
     set_company_data(prev => ({ ...prev, [field]: value }));
   };
@@ -82,6 +115,14 @@ const SignUp = () => {
     // Validation
     if (!hr_data.full_name.trim() || !hr_data.email.trim() || !hr_data.password) {
       toast.error("All fields are required");
+      return;
+    }
+
+    const password_validation = validate_password(hr_data.password);
+    if (!password_validation.is_valid) {
+      toast.error("Password doesn't meet requirements", {
+        description: get_password_validation_message(hr_data.password),
+      });
       return;
     }
 
@@ -302,6 +343,33 @@ const SignUp = () => {
               )}
             </Button>
           </div>
+          {hr_data.password && (
+            <div className="mt-2 space-y-1">
+              <div className="text-xs text-gray-600 mb-1">Password requirements:</div>
+              <div className="grid grid-cols-2 gap-1 text-xs">
+                <div className={`flex items-center gap-1 ${validate_password(hr_data.password).min_length ? 'text-green-600' : 'text-red-500'}`}>
+                  <Check className={`h-3 w-3 ${validate_password(hr_data.password).min_length ? '' : 'opacity-30'}`} />
+                  8+ characters
+                </div>
+                <div className={`flex items-center gap-1 ${validate_password(hr_data.password).has_uppercase ? 'text-green-600' : 'text-red-500'}`}>
+                  <Check className={`h-3 w-3 ${validate_password(hr_data.password).has_uppercase ? '' : 'opacity-30'}`} />
+                  Uppercase
+                </div>
+                <div className={`flex items-center gap-1 ${validate_password(hr_data.password).has_lowercase ? 'text-green-600' : 'text-red-500'}`}>
+                  <Check className={`h-3 w-3 ${validate_password(hr_data.password).has_lowercase ? '' : 'opacity-30'}`} />
+                  Lowercase
+                </div>
+                <div className={`flex items-center gap-1 ${validate_password(hr_data.password).has_number ? 'text-green-600' : 'text-red-500'}`}>
+                  <Check className={`h-3 w-3 ${validate_password(hr_data.password).has_number ? '' : 'opacity-30'}`} />
+                  Number
+                </div>
+                <div className={`flex items-center gap-1 ${validate_password(hr_data.password).has_special ? 'text-green-600' : 'text-red-500'}`}>
+                  <Check className={`h-3 w-3 ${validate_password(hr_data.password).has_special ? '' : 'opacity-30'}`} />
+                  Special char
+                </div>
+              </div>
+            </div>
+          )}
         </div>
         <div className="space-y-2">
           <Label htmlFor="confirm_password" className="text-sm font-semibold">Confirm Password *</Label>

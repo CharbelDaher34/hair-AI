@@ -62,11 +62,7 @@ const Profile = () => {
   // Form states
   const [company_form, set_company_form] = useState<Partial<CompanyData>>({});
   const [personal_form, set_personal_form] = useState<Partial<HRData>>({});
-  const [password_form, set_password_form] = useState({
-    current_password: "",
-    new_password: "",
-    confirm_password: "",
-  });
+
   const [new_company_form, set_new_company_form] = useState({
     name: "",
     domain: "",
@@ -82,11 +78,7 @@ const Profile = () => {
     department: "",
     password: "",
   });
-  const [show_passwords, set_show_passwords] = useState({
-    current: false,
-    new: false,
-    confirm: false,
-  });
+
 
   useEffect(() => {
     load_profile_data();
@@ -165,9 +157,7 @@ const Profile = () => {
     set_personal_form(prev => ({ ...prev, [field]: value }));
   };
 
-  const handle_password_form_change = (field: string, value: string) => {
-    set_password_form(prev => ({ ...prev, [field]: value }));
-  };
+
 
   const handle_new_company_form_change = (field: string, value: string) => {
     set_new_company_form(prev => ({ ...prev, [field]: value }));
@@ -214,35 +204,7 @@ const Profile = () => {
     }
   };
 
-  const change_password = async () => {
-    if (!password_form.current_password || !password_form.new_password) {
-      toast.error("Please fill in all password fields");
-      return;
-    }
 
-    if (password_form.new_password !== password_form.confirm_password) {
-      toast.error("New passwords don't match");
-      return;
-    }
-
-    set_is_saving(true);
-    try {
-      // Note: You'll need to implement a change password endpoint
-      // await apiService.changePassword(password_form);
-      toast.success("Password changed successfully!");
-      set_password_form({
-        current_password: "",
-        new_password: "",
-        confirm_password: "",
-      });
-    } catch (error: any) {
-      toast.error("Failed to change password", {
-        description: error?.message || "An unexpected error occurred.",
-      });
-    } finally {
-      set_is_saving(false);
-    }
-  };
 
   const add_recruitable_company = async () => {
     if (!new_company_form.name.trim()) {
@@ -405,7 +367,7 @@ const Profile = () => {
         </div>
 
         <Tabs defaultValue="company" className="space-y-8 max-w-full">
-          <TabsList className="grid w-full grid-cols-5 bg-white shadow-lg rounded-xl p-2 border-0">
+          <TabsList className="grid w-full grid-cols-4 bg-white shadow-lg rounded-xl p-2 border-0">
             <TabsTrigger value="company" className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-500 data-[state=active]:text-white rounded-lg transition-all duration-300">
               <Building2 className="h-4 w-4" />
               Company
@@ -419,7 +381,6 @@ const Profile = () => {
               Employees
             </TabsTrigger>
             <TabsTrigger value="recruitable" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-500 data-[state=active]:text-white rounded-lg transition-all duration-300">Companies you recruit to</TabsTrigger>
-            <TabsTrigger value="security" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-500 data-[state=active]:text-white rounded-lg transition-all duration-300">Security</TabsTrigger>
           </TabsList>
 
           <TabsContent value="company">
@@ -983,105 +944,7 @@ const Profile = () => {
             </Card>
           </TabsContent>
 
-          <TabsContent value="security">
-            <Card className="card shadow-xl hover:shadow-2xl transition-all duration-300 border-0">
-              <CardHeader className="pb-6">
-                <CardTitle className="text-2xl font-bold text-gray-800">Security Settings</CardTitle>
-                <CardDescription className="text-base text-gray-600">
-                  Change your password and manage security preferences
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-2">
-                  <Label htmlFor="current_password" className="text-sm font-semibold text-gray-700">Current Password</Label>
-                  <div className="relative">
-                    <Input
-                      id="current_password"
-                      type={show_passwords.current ? "text" : "password"}
-                      value={password_form.current_password}
-                      onChange={(e) => handle_password_form_change("current_password", e.target.value)}
-                      placeholder="Enter your current password"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                      onClick={() => set_show_passwords(prev => ({ ...prev, current: !prev.current }))}
-                    >
-                      {show_passwords.current ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                </div>
 
-                <Separator />
-
-                <div className="space-y-2">
-                  <Label htmlFor="new_password" className="text-sm font-semibold text-gray-700">New Password</Label>
-                  <div className="relative">
-                    <Input
-                      id="new_password"
-                      type={show_passwords.new ? "text" : "password"}
-                      value={password_form.new_password}
-                      onChange={(e) => handle_password_form_change("new_password", e.target.value)}
-                      placeholder="Enter your new password"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                      onClick={() => set_show_passwords(prev => ({ ...prev, new: !prev.new }))}
-                    >
-                      {show_passwords.new ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="confirm_password" className="text-sm font-semibold text-gray-700">Confirm New Password</Label>
-                  <div className="relative">
-                    <Input
-                      id="confirm_password"
-                      type={show_passwords.confirm ? "text" : "password"}
-                      value={password_form.confirm_password}
-                      onChange={(e) => handle_password_form_change("confirm_password", e.target.value)}
-                      placeholder="Confirm your new password"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                      onClick={() => set_show_passwords(prev => ({ ...prev, confirm: !prev.confirm }))}
-                    >
-                      {show_passwords.confirm ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                </div>
-
-                <Button
-                  onClick={change_password}
-                  disabled={is_saving}
-                  className="mt-4 button shadow-lg hover:shadow-xl transition-all duration-300"
-                >
-                  {is_saving ? "Changing Password..." : "Change Password"}
-                </Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
         </Tabs>
       </div>
     </div>
