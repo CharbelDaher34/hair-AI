@@ -9,7 +9,7 @@ from scripts.resume_parser_batch import (
 )
 from scripts.application_matcher_batch import (
     process_all_applications,
-    get_applications_without_matches,
+    get_applications_needing_match_grouped_by_job,
 )
 
 router = APIRouter()
@@ -100,11 +100,13 @@ async def get_batch_matching_status():
     Get the current status of applications that need matching.
     """
     try:
-        applications = get_applications_without_matches()
+        applications_by_job = get_applications_needing_match_grouped_by_job()
+        total_applications = sum(len(apps) for apps in applications_by_job.values())
 
         return {
-            "applications_needing_matching": len(applications),
-            "status": "ready" if applications else "all_processed",
+            "applications_needing_matching": total_applications,
+            "jobs_with_applications": len(applications_by_job),
+            "status": "ready" if total_applications > 0 else "all_processed",
         }
     except Exception as e:
         raise HTTPException(

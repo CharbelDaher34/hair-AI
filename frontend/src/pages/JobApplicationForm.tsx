@@ -361,6 +361,10 @@ const JobApplicationForm = () => {
       if (resume_file) {
         candidate_form_data.append('resume', resume_file);
       }
+      // Add job_id to automatically associate candidate with job's employer
+      if (job_id) {
+        candidate_form_data.append('job_id', job_id);
+      }
 
       const candidate_response = await fetch('http://84.16.230.94:8017/api/v1/candidates/', {
         method: 'POST',

@@ -21,7 +21,7 @@ import time
 import json
 from typing import Optional
 from pydantic import BaseModel, EmailStr
-from crud import crud_interview, crud_application
+from crud import crud_interview, crud_application, crud_job
 from schemas import ApplicationRead
 from schemas import InterviewRead
 from core.auth_middleware import TokenData
@@ -223,12 +223,19 @@ You should extract:
             schema = CandidateResume.model_json_schema()
 
             print(f"[Background] Creating parser client for candidate {candidate_id}")
-            parser_client = AgentClient(
-                system_prompt, schema, [absolute_resume_file_path]
-            )
+            try:
+                parser_client = AgentClient()
+                if parser_client.base_url is None:
+                    print(f"[Background] AI service is not available for candidate {candidate_id} - skipping resume parsing")
+                    return
+            except Exception as client_err:
+                print(f"[Background] Failed to create AgentClient for candidate {candidate_id}: {str(client_err)}")
+                return
 
             print(f"[Background] Starting parsing for candidate {candidate_id}")
-            parsed_result = parser_client.parse()
+            parsed_result = parser_client.parse(
+                system_prompt, schema, [absolute_resume_file_path]
+            )
 
             print(f"[Background] Parsing completed for candidate {candidate_id}")
             print(f"[Background] Parsed result type: {type(parsed_result)}")
@@ -462,6 +469,7 @@ def create_candidate(
     db: Session = Depends(get_session),
     candidate_in: Annotated[str, Form()],
     resume: Optional[UploadFile] = File(None),
+    job_id: Optional[int] = Form(None),
     request: Request,
     background_tasks: BackgroundTasks,
 ) -> CandidateRead:
@@ -531,12 +539,37 @@ def create_candidate(
             )
             print(f"[Candidate API] Created new candidate with ID: {candidate.id}")
         
-        # If user is authenticated, associate candidate with their employer
-        if token_data and token_data.employer_id:
-            crud_candidate.add_candidate_to_employer(
-                db=db, candidate_id=candidate.id, employer_id=token_data.employer_id
-            )
-            print(f"[Candidate API] Associated candidate {candidate.id} with employer {token_data.employer_id}")
+        # Associate candidate with employer based on job_id or authenticated user
+        employer_id_to_associate = None
+        
+        # If job_id is provided, get the employer from the job
+        if job_id:
+            try:
+                job = crud_job.get_job(db=db, job_id=job_id)
+                if job and job.employer_id:
+                    employer_id_to_associate = job.employer_id
+                    print(f"[Candidate API] Found employer {job.employer_id} from job {job_id}")
+                else:
+                    print(f"[Candidate API] Job {job_id} not found or has no employer")
+            except Exception as job_err:
+                print(f"[Candidate API] Error getting job {job_id}: {str(job_err)}")
+        
+        # If user is authenticated and no job_id employer found, use their employer
+        if not employer_id_to_associate and token_data and token_data.employer_id:
+            employer_id_to_associate = token_data.employer_id
+            print(f"[Candidate API] Using authenticated user's employer {token_data.employer_id}")
+        
+        # Associate candidate with the determined employer
+        if employer_id_to_associate:
+            try:
+                crud_candidate.add_candidate_to_employer(
+                    db=db, candidate_id=candidate.id, employer_id=employer_id_to_associate
+                )
+                print(f"[Candidate API] Associated candidate {candidate.id} with employer {employer_id_to_associate}")
+            except Exception as assoc_err:
+                print(f"[Candidate API] Error associating candidate {candidate.id} with employer {employer_id_to_associate}: {str(assoc_err)}")
+                # Don't fail the operation if association fails
+        
         print(f"[Candidate API] Created candidate with ID: {candidate.id}")
 
         # If resume was uploaded, save it permanently with candidate ID as filename
@@ -561,12 +594,16 @@ def create_candidate(
                 )
 
                 # Schedule resume parsing as background task
-                background_tasks.add_task(
-                    parse_resume_background, candidate.id, permanent_resume_path
-                )
-                print(
-                    f"[Candidate API] Scheduled background resume parsing for candidate {candidate.id}"
-                )
+                try:
+                    background_tasks.add_task(
+                        parse_resume_background, candidate.id, permanent_resume_path
+                    )
+                    print(
+                        f"[Candidate API] Scheduled background resume parsing for candidate {candidate.id}"
+                    )
+                except Exception as bg_task_err:
+                    print(f"[Candidate API] Error scheduling background resume parsing for candidate {candidate.id}: {str(bg_task_err)}")
+                    # Don't fail the entire operation if background task scheduling fails
 
             except Exception as save_err:
                 print(f"[Candidate API] Error saving resume: {str(save_err)}")
