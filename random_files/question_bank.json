@@ -1,0 +1,28 @@
+[
+  {
+    "question": "Explain the difference between a Python list and tuple.",
+    "ideal_answer": "A list is mutable and typically used for homogenous items, while a tuple is immutable and often used for heterogeneous data or as dictionary keys.",
+    "tags": [
+      "python",
+      "data-structures",
+      "basics"
+    ]
+  },
+  {
+    "question": "What is the Big-O complexity of quicksort in the average case?",
+    "ideal_answer": "O(n log n)",
+    "tags": [
+      "algorithms",
+      "time-complexity"
+    ]
+  },
+  {
+    "question": "Describe how REST differs from GraphQL.",
+    "ideal_answer": "REST exposes multiple endpoints each returning fixed structures, whereas GraphQL provides a single endpoint where clients specify the exact fields they need, reducing over/under-fetching.",
+    "tags": [
+      "web",
+      "api",
+      "architecture"
+    ]
+  }
+]
