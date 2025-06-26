@@ -5,7 +5,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Eye, Trash2, Plus, Search, Settings, Loader2, RefreshCw, Copy, ExternalLink } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Eye, Trash2, Plus, Search, Settings, Loader2, RefreshCw, Copy, ExternalLink, ChevronDown } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "@/components/ui/sonner";
 import apiService from "@/services/api";
@@ -338,20 +339,40 @@ const JobDashboard = () => {
                       <TableCell className="font-semibold text-gray-800">{getJobTitle(job)}</TableCell>
                       <TableCell className="text-gray-600">{formatDate(job.created_at)}</TableCell>
                     <TableCell>
-                      <Badge variant={getStatusColor(job.status) as any} className="font-medium">
-                        {job.status ? job.status.charAt(0).toUpperCase() + job.status.slice(1) : 'Unknown'}
-                      </Badge>
-                      {job.status === JobStatus.PUBLISHED && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => copyJobUrl(job.id)}
-                          className="h-7 px-2 text-xs ml-2"
-                        >
-                          <Copy className="h-3 w-3 mr-1" />
-                          Copy URL
-                        </Button>
-                      )}
+                      <div onClick={(e) => e.stopPropagation()} className="flex items-center gap-2">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" className="flex items-center gap-2 capitalize h-8">
+                              <Badge variant={getStatusColor(job.status) as any} className="font-medium">
+                                {job.status ? job.status.charAt(0).toUpperCase() + job.status.slice(1) : 'Unknown'}
+                              </Badge>
+                              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent>
+                            {getStatusOptions(job.status).map(status => (
+                              <DropdownMenuItem 
+                                key={status} 
+                                onSelect={() => handleStatusUpdate(job.id, status)}
+                                className="capitalize"
+                              >
+                                {status.charAt(0).toUpperCase() + status.slice(1)}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                        {job.status === JobStatus.PUBLISHED && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => copyJobUrl(job.id)}
+                            className="h-7 px-2 text-xs"
+                          >
+                            <Copy className="h-3 w-3 mr-1" />
+                            Copy URL
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                       <TableCell>
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
@@ -360,7 +381,7 @@ const JobDashboard = () => {
                       </TableCell>
                       <TableCell className="text-gray-600">{job.recruited_to_name || 'N/A'}</TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                         <Button variant="destructive" size="sm" onClick={() => handleDeleteJob(job)} className="job-delete-btn">
                           <Trash2 className="mr-2 h-4 w-4" />
                           Delete
