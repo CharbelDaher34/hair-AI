@@ -88,10 +88,10 @@ const ChatBot = () => {
   }, [messages]);
 
   const quickQuestions = [
-    "Show me this month's application trends",
-    "Which jobs have the highest conversion rates?",
-    "What are the top candidate drop-off points?",
-    "Compare interview success rates by position",
+    "How many applications do we have for each job?",
+    "Show me all candidates with pending applications",
+    "Which companies have the most job postings?",
+    "List all scheduled interviews for this week",
   ];
 
   const handleSendMessage = async () => {
@@ -298,7 +298,7 @@ const ChatBot = () => {
         <div className="space-y-6">
           <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
             <CardHeader className="pb-4">
-              <CardTitle className="text-lg font-bold text-gray-800">Quick Questions</CardTitle>
+              <CardTitle className="text-lg font-bold text-gray-800">Sample Questions</CardTitle>
               <CardDescription className="text-sm text-gray-600">Try these sample queries</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">

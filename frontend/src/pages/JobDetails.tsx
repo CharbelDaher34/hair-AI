@@ -269,7 +269,7 @@ const JobDetails = () => {
             <CardContent className="space-y-4">
               <div className="flex justify-between items-center text-gray-700">
                 <span className="font-semibold">Salary</span>
-                <Badge variant="success" className="text-base">{format_salary(job.compensation)}</Badge>
+                <Badge variant="default" className="text-base">{format_salary(job.compensation)}</Badge>
               </div>
               <Separator />
               <div className="flex justify-between items-center text-gray-700">
