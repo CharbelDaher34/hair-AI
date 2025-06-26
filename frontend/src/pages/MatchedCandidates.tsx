@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CheckCircle, XCircle, Eye, Star, Filter, Users, Briefcase, Search, ChevronDown, Loader2, Info, AlertTriangle, Flag } from "lucide-react";
+import { CheckCircle, XCircle, Eye, Star, Filter, Users, Briefcase, Search, ChevronDown, Loader2, Info, AlertTriangle, Flag, Calendar, FileText } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import apiService from "@/services/api";
@@ -53,6 +53,7 @@ interface MatchedCandidateData {
   flags?: {
     constraint_violations?: Record<string, string>;
   };
+  analysis?: string;
   created_at: string;
   updated_at: string;
   // Candidate fields
@@ -338,7 +339,7 @@ const MatchedCandidatesPage = () => {
                               <div><strong className="font-semibold text-red-600">Missing Skills:</strong> {mc.missing_skills.join(", ")}</div>
                             }
                             {mc.extra_skills && mc.extra_skills.length > 0 && 
-                              <div><strong className="font-semibold text-blue-600">Extra Skills:</strong> {mc.extra_skills.join(", ")}</div>
+                              <div><strong className="font-semibold text-blue-600">Additional Skills:</strong> {mc.extra_skills.join(", ")}</div>
                             }
                           </PopoverContent>
                         </Popover>
@@ -393,6 +394,44 @@ const MatchedCandidatesPage = () => {
                         title="View Application"
                       >
                         <Eye className="h-5 w-5" />
+                      </Button>
+                      {mc.analysis && (
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="text-purple-600 hover:text-purple-800 hover:bg-purple-100 rounded-full p-2 transition-all duration-150"
+                              title="View AI Analysis"
+                            >
+                              <FileText className="h-5 w-5" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-96 max-h-80 overflow-y-auto p-4 bg-white shadow-xl rounded-lg border border-purple-200">
+                            <div className="space-y-3">
+                              <div className="flex items-center gap-2">
+                                <Star className="h-5 w-5 text-purple-600" />
+                                <h4 className="font-semibold text-purple-800">AI Match Analysis</h4>
+                              </div>
+                              <Separator />
+                              <div className="prose prose-sm max-w-none">
+                                <div className="text-gray-700 text-sm leading-relaxed whitespace-pre-wrap">
+                                  {mc.analysis}
+                                </div>
+                              </div>
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                      )}
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="text-green-600 hover:text-green-800 hover:bg-green-100 rounded-full p-2 transition-all duration-150"
+                        onClick={() => navigate(`/interviews/create?application_id=${mc.application_id}`)}
+                        disabled={!mc.application_id}
+                        title="Schedule Interview"
+                      >
+                        <Calendar className="h-5 w-5" />
                       </Button>
                     </TableCell>
                   </TableRow>

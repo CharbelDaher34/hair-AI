@@ -80,10 +80,10 @@ const Index = () => {
           </p>
         </div>
         <div className="flex gap-3">
-          <Button asChild className="button shadow-lg hover:shadow-xl transition-all duration-300">
+          <Button variant="outline" asChild className="shadow-lg hover:shadow-xl transition-all duration-300">
             <Link to="/jobs/create">Create Job</Link>
           </Button>
-          <Button variant="outline" asChild className="shadow-md hover:shadow-lg transition-all duration-300">
+          <Button variant="outline" asChild className="shadow-lg hover:shadow-xl transition-all duration-300">
             <Link to="/profile">Profile</Link>
           </Button>
         </div>
@@ -204,16 +204,16 @@ const Index = () => {
             {recent_jobs.length > 0 ? (
               <div className="space-y-4">
                 {recent_jobs.map((job, index) => (
-                  <div key={index} className="flex items-center justify-between p-4 bg-gradient-to-r from-gray-50 to-blue-50 rounded-lg hover:from-blue-50 hover:to-purple-50 transition-all duration-300">
+                  <div key={index} className="flex items-center justify-between p-4 bg-gradient-to-r from-blue-100 to-purple-100 rounded-lg hover:from-blue-200 hover:to-purple-200 transition-all duration-300 border border-blue-200">
                     <div>
-                      <p className="font-semibold text-gray-800">{job.title}</p>
-                      <p className="text-sm text-gray-600">
+                      <p className="font-semibold text-blue-900">{job.title}</p>
+                      <p className="text-sm text-blue-700 font-medium">
                         {job.applications} applications
                       </p>
                     </div>
                     <Badge 
                       variant={job.status === "published" ? "default" : "secondary"}
-                      className={job.status === "published" ? "bg-green-100 text-green-800 hover:bg-green-200" : ""}
+                      className={job.status === "published" ? "bg-green-500 text-white hover:bg-green-600 font-semibold" : "bg-gray-500 text-white font-semibold"}
                     >
                       {job.status}
                     </Badge>
@@ -231,7 +231,7 @@ const Index = () => {
         {/* Job Performance */}
         <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
           <CardHeader className="pb-4">
-            <CardTitle className="text-xl font-bold text-gray-800">Top Performing Jobs</CardTitle>
+            <CardTitle className="text-xl font-bold text-gray-800">Popular Jobs</CardTitle>
             <CardDescription className="text-base text-gray-600">Jobs with highest application counts</CardDescription>
           </CardHeader>
           <CardContent>

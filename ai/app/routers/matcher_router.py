@@ -58,6 +58,7 @@ class MatchResult(BaseModel):
     extra_skills: List[str] = Field(..., description="Extra skills")
     matching_skills: List[str] = Field(..., description="Matching skills")
     weights_used: WeightsUsed = Field(..., description="Weights used in calculation")
+    analysis: str = Field(..., description="Analysis of the match")
 
 
 class MatchResponse(BaseModel):
@@ -88,7 +89,7 @@ async def match_candidates_endpoint(request: MatchRequest):
         candidates_dicts = request.candidates
 
         # Call the matcher with the new fuzzy matching implementation
-        matched_results = matcher_instance.match_candidates(
+        matched_results = await matcher_instance.match_candidates(
             job=job_dict,
             candidates=candidates_dicts,
             weights=request.weights,
@@ -105,9 +106,10 @@ async def match_candidates_endpoint(request: MatchRequest):
                 missing_skills=result["missing_skills"],
                 extra_skills=result["extra_skills"],
                 matching_skills=result["matching_skills"],
-                weights_used=result["weights_used"]
+                weights_used=result["weights_used"],
+                analysis=result["analysis"]
             )
-
+            print(f"\n\n\n\nMatch result: {match_result}")
             response_results.append(match_result)
 
         return MatchResponse(

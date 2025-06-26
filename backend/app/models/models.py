@@ -432,6 +432,7 @@ class InterviewBase(TimeBase):
     status: str
     # status: InterviewStatus = Field(default=InterviewStatus.SCHEDULED, sa_column=Column(SQLAlchemyEnum(InterviewStatus, name="interviewstatus_enum", create_type=True)))
     notes: Optional[str] = None
+    interviewer_review: Optional[str] = Field(default=None, description="Private review notes from the interviewer, not visible to candidates")
     interviewer_id: Optional[int] = Field(default=None, sa_column=Column(ForeignKey("hr.id", ondelete="SET NULL"), nullable=True))
     category: Optional[str] = Field(default=None)
     
@@ -463,6 +464,7 @@ class MatchBase(TimeBase):
     # Flags
     flags: Optional[Dict] = Field(default=None, sa_column=Column(JSON))
 
+    analysis: Optional[str] = Field(default=None)
 
 class Match(MatchBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)

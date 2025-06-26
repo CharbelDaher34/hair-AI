@@ -234,7 +234,7 @@ const ApplicationDashboard = () => {
             Review and manage candidate applications ({total} total)
           </p>
         </div>
-        <Button asChild className="button shadow-lg hover:shadow-xl transition-all duration-300">
+        <Button variant="outline" asChild className="shadow-lg hover:shadow-xl transition-all duration-300">
           <Link to="/applications/create">
             <Plus className="mr-2 h-4 w-4" />
             Add Application
@@ -280,7 +280,7 @@ const ApplicationDashboard = () => {
                 <Users className="h-8 w-8 text-blue-600" />
               </div>
               <p className="text-lg text-gray-600 mb-4">No applications found</p>
-              <Button asChild className="button shadow-lg hover:shadow-xl transition-all duration-300">
+              <Button variant="outline" asChild className="shadow-lg hover:shadow-xl transition-all duration-300">
                 <Link to="/applications/create">
                   <Plus className="mr-2 h-4 w-4" />
                   Add First Application

@@ -1,14 +1,15 @@
 import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { Link } from "react-router-dom";
-import { Users, Eye, CheckCircle, XCircle, Loader2, TrendingUp, Calendar, Target, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Users, Eye, CheckCircle, XCircle, Loader2, TrendingUp, Calendar, Target, ArrowUpDown, ArrowUp, ArrowDown, AlertTriangle, Flag } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import apiService from "@/services/api";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface JobAnalyticsData {
   job_id: number;
@@ -87,6 +88,7 @@ type SortDirection = 'asc' | 'desc';
 
 const JobAnalytics = () => {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [analytics, setAnalytics] = useState<JobAnalyticsData | null>(null);
   const [matches, setMatches] = useState<MatchCandidate[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -104,7 +106,7 @@ const JobAnalytics = () => {
         // Fetch analytics and matches in parallel
         const [analyticsData, matchesData] = await Promise.all([
           apiService.getJobAnalytics(id!),
-          apiService.getJobMatches(id!)
+          apiService.getJobMatches(id!, true)
         ]);
         
         setAnalytics(analyticsData);
@@ -267,7 +269,7 @@ const JobAnalytics = () => {
               View Job
             </Link>
           </Button>
-          <Button asChild className="button shadow-lg hover:shadow-xl transition-all duration-300">
+          <Button variant="outline" asChild className="shadow-md hover:shadow-lg transition-all duration-300">
             <Link to={`/jobs/${id}/matches`}>
               <Users className="mr-2 h-4 w-4" />
               View All Matches
@@ -302,7 +304,7 @@ const JobAnalytics = () => {
       {/* Candidate Matches Table */}
       <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
         <CardHeader className="pb-6">
-          <CardTitle className="text-2xl font-bold text-gray-800">Candidate Matches</CardTitle>
+          <CardTitle className="text-2xl font-bold text-gray-800">Top 5 Candidates</CardTitle>
           <CardDescription className="text-base text-gray-600">
             Detailed view of all candidate matches with scores and skills
           </CardDescription>
@@ -346,6 +348,8 @@ const JobAnalytics = () => {
                     <TableHead className="font-semibold text-gray-700">Score Breakdown</TableHead>
                     <TableHead className="font-semibold text-gray-700">Matching Skills</TableHead>
                     <TableHead className="font-semibold text-gray-700">Status</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Flags</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -402,6 +406,56 @@ const JobAnalytics = () => {
                         <Badge variant={getStatusVariant(match.application_status || 'pending')} className="font-medium">
                           {match.application_status || 'pending'}
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {match.flags?.constraint_violations && Object.keys(match.flags.constraint_violations).length > 0 ? (
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300 transition-all duration-150"
+                              >
+                                <AlertTriangle className="h-4 w-4 mr-1" />
+                                {Object.keys(match.flags.constraint_violations).length} Issue{Object.keys(match.flags.constraint_violations).length !== 1 ? 's' : ''}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-80 p-4 bg-white shadow-xl rounded-lg border border-red-200">
+                              <div className="space-y-3">
+                                <div className="flex items-center gap-2">
+                                  <Flag className="h-5 w-5 text-red-600" />
+                                  <h4 className="font-semibold text-red-800">Constraint Violations</h4>
+                                </div>
+                                <div className="space-y-2">
+                                  {Object.entries(match.flags.constraint_violations).map(([field, violation]) => (
+                                    <div key={field} className="p-2 bg-red-50 rounded border border-red-200">
+                                      <div className="font-medium text-red-800 text-sm">{field}</div>
+                                      <div className="text-red-600 text-xs mt-1">{violation}</div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                        ) : (
+                          <Badge variant="secondary" className="text-green-700 bg-green-100 border-green-200">
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                            No Issues
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="text-green-600 hover:text-green-800 hover:bg-green-100 transition-all duration-150"
+                          onClick={() => navigate(`/interviews/create?application_id=${match.application_id}`)}
+                          disabled={!match.application_id}
+                          title="Schedule Interview"
+                        >
+                          <Calendar className="h-4 w-4 mr-1" />
+                          Schedule Interview
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}

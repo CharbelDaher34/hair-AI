@@ -52,8 +52,11 @@ services:
       # OTP configuration
       - OTP_EXPIRE_MINUTES=10
       - OTP_LENGTH=6
+      # Resume storage configuration
+      - RESUME_STORAGE_DIR=/resumes
     volumes:
-      - ./backend/app/static:/app/static
+      - ./backend/app/static:/static
+      - ./backend/app/resumes:/resumes
   ai:
     build:
       context: ./ai

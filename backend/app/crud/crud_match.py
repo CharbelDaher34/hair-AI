@@ -197,6 +197,7 @@ def create_match(db: Session, *, match_in: MatchCreate) -> Optional[Match]:
         "missing_skills": match_result_from_ai.get("missing_skills", []),
         "extra_skills": match_result_from_ai.get("extra_skills", []),
         "weights_used": match_result_from_ai.get("weights_used", {}),
+        "analysis": match_result_from_ai.get("analysis", ""),
     }
     
     flags = {}
@@ -312,6 +313,7 @@ def create_matches_for_job_and_applicants(
             "missing_skills": match_result_from_ai.get("missing_skills", []),
             "extra_skills": match_result_from_ai.get("extra_skills", []),
             "weights_used": match_result_from_ai.get("weights_used", {}),
+            "analysis": match_result_from_ai.get("analysis", ""),
         }
 
         flags = {}
