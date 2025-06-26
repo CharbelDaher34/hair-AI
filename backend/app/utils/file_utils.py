@@ -4,6 +4,10 @@ import tempfile
 from pathlib import Path
 from typing import Optional
 from core.config import RESUME_STORAGE_DIR
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
 
 
 def ensure_resume_directory() -> None:
@@ -116,6 +120,65 @@ def create_temp_text_file(content: str, filename_prefix: str, extension: str = '
         
     except Exception as e:
         print(f"[File Utils] Failed to create temp file: {str(e)}")
+        return None
+
+
+def create_temp_pdf_file(content: str, filename_prefix: str, title: str = "Document") -> Optional[str]:
+    """
+    Create a temporary PDF file with the given content.
+
+    Args:
+        content: Text content to write to the PDF
+        filename_prefix: Prefix for the temporary filename
+        title: Title for the PDF document
+
+    Returns:
+        Path to the temporary PDF file if successful, None otherwise
+    """
+    try:
+        # Create a temporary file
+        temp_fd, temp_path = tempfile.mkstemp(suffix='.pdf', prefix=f'{filename_prefix}_')
+        os.close(temp_fd)  # Close the file descriptor since we'll use the path
+        
+        # Create PDF document
+        doc = SimpleDocTemplate(temp_path, pagesize=letter,
+                              rightMargin=72, leftMargin=72,
+                              topMargin=72, bottomMargin=18)
+        
+        # Get styles
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=16,
+            spaceAfter=30,
+            alignment=1  # Center alignment
+        )
+        
+        # Build content
+        story = []
+        
+        # Add title
+        story.append(Paragraph(title, title_style))
+        story.append(Spacer(1, 12))
+        
+        # Split content into paragraphs and add to story
+        paragraphs = content.split('\n\n')
+        for para in paragraphs:
+            if para.strip():
+                # Replace newlines within paragraphs with <br/> tags
+                formatted_para = para.replace('\n', '<br/>')
+                story.append(Paragraph(formatted_para, styles['Normal']))
+                story.append(Spacer(1, 12))
+        
+        # Build PDF
+        doc.build(story)
+        
+        print(f"[File Utils] Created temp PDF file: {temp_path}")
+        return temp_path
+        
+    except Exception as e:
+        print(f"[File Utils] Failed to create temp PDF file: {str(e)}")
         return None
 
 

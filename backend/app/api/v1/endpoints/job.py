@@ -239,9 +239,11 @@ class JobGenerationRequest(BaseModel):
     data: str
 
 
+
+
 @router.get("/matches/{job_id}", response_model=MatchResponseWithDetails)
 def get_job_matches(
-    *, db: Session = Depends(get_session), job_id: int, request: Request
+    *, db: Session = Depends(get_session), job_id: int, request: Request,top_5: bool = False
 ) -> MatchResponseWithDetails:
     """Get all matches for a specific job"""
     current_user: Optional[TokenData] = request.state.user
@@ -266,7 +268,7 @@ def get_job_matches(
         )
 
     try:
-        match_candidate_pairs = crud_job.get_job_matches(db=db, job_id=job_id)
+        match_candidate_pairs = crud_job.get_job_matches(db=db, job_id=job_id,top_5=top_5)
 
         matches_with_candidates = []
         for match, candidate in match_candidate_pairs:

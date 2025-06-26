@@ -74,3 +74,40 @@ def decode_access_token(token: str) -> Optional[TokenData]:
 
 # Removed placeholder CRUD functions for HR as they should be directly used in the router
 # or through a dedicated CRUD layer imported there.
+
+def create_interview_review_token(interview_id: int, interviewer_id: int) -> str:
+    """Create a secure token for interview review form access"""
+    import secrets
+    from datetime import datetime, timedelta
+    
+    # Create payload with interview and interviewer info plus expiration
+    payload = {
+        "interview_id": interview_id,
+        "interviewer_id": interviewer_id,
+        "exp": datetime.utcnow() + timedelta(days=30),  # Token valid for 30 days
+        "type": "interview_review"
+    }
+    
+    # Create JWT token
+    token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+    return token
+
+def verify_interview_review_token(token: str) -> dict:
+    """Verify and decode interview review token"""
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        
+        # Check if token is for interview review
+        if payload.get("type") != "interview_review":
+            raise HTTPException(status_code=401, detail="Invalid token type")
+            
+        # Check expiration
+        if datetime.utcnow() > datetime.fromtimestamp(payload["exp"]):
+            raise HTTPException(status_code=401, detail="Token has expired")
+            
+        return {
+            "interview_id": payload["interview_id"],
+            "interviewer_id": payload["interviewer_id"]
+        }
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")

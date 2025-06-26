@@ -1,5 +1,6 @@
 from typing import Any, Dict, Optional, Union, List
 import time
+import logging
 from sqlmodel import Session, select, func
 from sqlalchemy.orm import selectinload
 
@@ -18,6 +19,13 @@ from . import crud_job
 from . import crud_match
 from . import crud_candidate
 from core.database import engine
+
+# --- Logger Setup ---
+logger = logging.getLogger(__name__)
+# Configure if not already configured by a higher-level module
+if not logger.hasHandlers():
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+
 
 def get_application(db: Session, application_id: int) -> Optional[Application]:
     return db.get(Application, application_id)
@@ -61,7 +69,7 @@ def get_random_applications_by_employer(
         .limit(limit)
     )
     result = db.exec(statement).all()
-    print(
+    logger.info(
         f"[get_random_applications_by_employer] skip={skip}, limit={limit}, returned_ids={[app.id for app in result]}"
     )
     return result
@@ -142,7 +150,7 @@ def create_match_background(application_id: int, max_retries: int = 3):
     """
     for attempt in range(max_retries):
         try:
-            print(
+            logger.info(
                 f"[Background] Starting match creation for application {application_id} (attempt {attempt + 1}/{max_retries})"
             )
 
@@ -150,7 +158,7 @@ def create_match_background(application_id: int, max_retries: int = 3):
                 # Get candidate and job data for validation
                 application = db.get(Application, application_id)
                 if not application:
-                    print(f"[Background] Application {application_id} not found")
+                    logger.warning(f"[Background] Application {application_id} not found")
                     return
 
                 candidate = db.get(Candidate, application.candidate_id)
@@ -164,68 +172,66 @@ def create_match_background(application_id: int, max_retries: int = 3):
                     and job.description
                     and job.description.strip()
                 ):
-                    print(
+                    logger.info(
                         f"[Background] Creating match for application {application_id}"
                     )
-                    print(f"[Background] Job: {job.title}")
-                    print(f"[Background] Candidate: {candidate.full_name}")
+                    logger.info(f"[Background] Job: {job.title}")
+                    logger.info(f"[Background] Candidate: {candidate.full_name}")
 
                     # Create match using CRUD (which will call the AI service)
                     match_create = MatchCreate(application_id=application_id)
                     new_match = crud_match.create_match(db=db, match_in=match_create)
 
                     if new_match:
-                        print(
+                        db.commit()
+                        logger.info(
                             f"[Background] Successfully created match {new_match.id} for application {application_id}"
                         )
                         return  # Success - exit the retry loop
                     else:
-                        print(
+                        logger.warning(
                             f"[Background] Failed to create match for application {application_id}"
                         )
                         if attempt < max_retries - 1:
-                            print(f"[Background] Retrying in 5 seconds...")
+                            logger.info(f"[Background] Retrying in 5 seconds...")
                             time.sleep(5)
                             continue
                         else:
-                            print(
+                            logger.error(
                                 f"[Background] Max retries reached for application {application_id}"
                             )
                             return
                 else:
                     # Log why matching was skipped
                     if not candidate:
-                        print(
+                        logger.warning(
                             f"[Background] Candidate not found for application {application_id}"
                         )
                     elif not job:
-                        print(
+                        logger.warning(
                             f"[Background] Job not found for application {application_id}"
                         )
                     elif not candidate.parsed_resume:
-                        print(
+                        logger.warning(
                             f"[Background] Candidate {candidate.id} has no parsed resume data - skipping match creation"
                         )
                     elif not job.description or not job.description.strip():
-                        print(
+                        logger.warning(
                             f"[Background] Job {job.id} has no description - skipping match creation"
                         )
                     return
 
         except Exception as match_err:
-            print(
-                f"[Background] Error creating match for application {application_id} (attempt {attempt + 1}): {str(match_err)}"
+            logger.error(
+                f"[Background] Error creating match for application {application_id} (attempt {attempt + 1}): {match_err}",
+                exc_info=True
             )
-            print(f"[Background] Error type: {type(match_err)}")
 
             if attempt < max_retries - 1:
-                print(f"[Background] Retrying in 5 seconds...")
+                logger.info(f"[Background] Retrying in 5 seconds...")
                 time.sleep(5)
             else:
-                print(f"[Background] Max retries reached for application {application_id}")
-                import traceback
-
-                print(f"[Background] Full traceback: {traceback.format_exc()}")
+                logger.error(f"[Background] Max retries reached for application {application_id}")
                 return
 
 
@@ -243,8 +249,8 @@ def create_application(
         if candidate:
             crud_candidate.add_candidate_to_employer(db, candidate_id=candidate.id, employer_id=db_application.job.employer_id)
     
-    print(f"[CreateApplication] Application {db_application.id} created successfully")
-    print(f"[CreateApplication] Match creation will be handled in background")
+    logger.info(f"[CreateApplication] Application {db_application.id} created successfully")
+    logger.info(f"[CreateApplication] Match creation will be handled in background")
 
     return db_application
 
@@ -288,7 +294,7 @@ def get_applications_count_by_employer(db: Session, employer_id: int) -> int:
     )
     result = db.exec(statement)
     total = result.one()
-    print(f"Total applications: {total}")
+    logger.info(f"Total applications: {total}")
     if isinstance(total, tuple):
         total = total[0]
     return total

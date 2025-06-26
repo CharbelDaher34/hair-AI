@@ -17,6 +17,8 @@ PUBLIC_PATHS_PREFIXES = [
     "/api/v1/jobs/public",  # Public job endpoints for application forms
     "/api/v1/candidates",  # Public candidate creation
     "/api/v1/applications",  # Public application creation
+    "/api/v1/interviews/review-form",
+    "/api/v1/interviews/submit-review",
 ]
 
 # Define paths that require authentication

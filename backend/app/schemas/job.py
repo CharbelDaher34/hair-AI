@@ -8,6 +8,7 @@ from models.models import (
     SeniorityLevel,
     compensation_base,
     skills_base,
+    MatchBase,
 )
 from utils.pydantic_utils import make_optional
 from sqlalchemy import Enum as SQLAlchemyEnum
@@ -29,6 +30,9 @@ class JobRead(JobBase):
     recruited_to_name: Optional[str] = None
     application_count: Optional[int] = None
 
+class MatchRead(MatchBase):
+    id:int
+    
 
 class JobAnalytics(SQLModel):
     job_id: int
@@ -62,6 +66,9 @@ class JobAnalytics(SQLModel):
     application_to_match_rate: float
     application_to_interview_rate: float
     match_to_interview_rate: float
+
+    # Top 5 matches
+    top_5_matches: List[MatchRead]
 
 
 # class JobAnalyticsWithDetails(JobAnalytics):

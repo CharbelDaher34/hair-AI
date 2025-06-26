@@ -212,7 +212,7 @@ const InterviewList = () => {
             Manage and track all candidate interviews
           </p>
         </div>
-        <Button asChild className="button shadow-lg hover:shadow-xl transition-all duration-300">
+        <Button variant="outline" asChild className="shadow-lg hover:shadow-xl transition-all duration-300">
           <Link to="/interviews/create">
             <Plus className="mr-2 h-4 w-4" />
             Schedule Interview

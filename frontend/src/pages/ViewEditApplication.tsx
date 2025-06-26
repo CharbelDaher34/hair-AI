@@ -5,10 +5,29 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { FileText, Mail, Phone, User, Calendar, Star, ExternalLink, X, Loader2, XCircle } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { FileText, Mail, Phone, User, Calendar, Star, ExternalLink, X, Loader2, XCircle, MessageSquare, Edit3, Save, Users } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
 import apiService from "@/services/api";
 import { ApplicationStatus } from "@/types";
+import { toast } from "@/hooks/use-toast";
+
+interface Interview {
+  id: number;
+  application_id: number;
+  date: string;
+  type: string;
+  status: string;
+  notes?: string | null;
+  interviewer_review?: string | null;
+  created_at: string;
+  updated_at: string;
+  interviewer?: {
+    id: number;
+    full_name: string;
+    email: string;
+  };
+}
 
 const ViewApplication = () => {
   const { id } = useParams();
@@ -17,6 +36,13 @@ const ViewApplication = () => {
   const [loading, set_loading] = useState(true);
   const [resume_pdf_url, set_resume_pdf_url] = useState<string | null>(null);
   const [pdf_loading, set_pdf_loading] = useState(false);
+  
+  // Interview-related state
+  const [interviews, set_interviews] = useState<Interview[]>([]);
+  const [interviews_loading, set_interviews_loading] = useState(false);
+  const [editing_review, set_editing_review] = useState<number | null>(null);
+  const [review_text, set_review_text] = useState<string>("");
+  const [saving_review, set_saving_review] = useState(false);
 
   useEffect(() => {
     const fetch_application = async () => {
@@ -31,6 +57,25 @@ const ViewApplication = () => {
       }
     };
     fetch_application();
+  }, [id]);
+
+  // Fetch interviews for the application
+  useEffect(() => {
+    const fetch_interviews = async () => {
+      if (!id) return;
+      
+      set_interviews_loading(true);
+      try {
+        const interviews_data = await apiService.getInterviewsByApplication(parseInt(id));
+        set_interviews(interviews_data);
+      } catch (error) {
+        console.error('Error fetching interviews:', error);
+      } finally {
+        set_interviews_loading(false);
+      }
+    };
+    
+    fetch_interviews();
   }, [id]);
 
   const handle_view_resume = async () => {
@@ -84,6 +129,47 @@ const ViewApplication = () => {
       default:
         return "outline";
     }
+  };
+
+  const handle_edit_review = (interview_id: number, current_review: string) => {
+    set_editing_review(interview_id);
+    set_review_text(current_review || "");
+  };
+
+  const handle_save_review = async (interview_id: number) => {
+    set_saving_review(true);
+    try {
+      await apiService.updateInterviewerReview(interview_id, review_text);
+      
+      // Update the local state
+      set_interviews(prev => prev.map(interview => 
+        interview.id === interview_id 
+          ? { ...interview, interviewer_review: review_text }
+          : interview
+      ));
+      
+      set_editing_review(null);
+      set_review_text("");
+      
+      toast({
+        title: "Success",
+        description: "Interviewer review updated successfully",
+      });
+    } catch (error) {
+      console.error('Error saving review:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save interviewer review",
+        variant: "destructive",
+      });
+    } finally {
+      set_saving_review(false);
+    }
+  };
+
+  const handle_cancel_edit = () => {
+    set_editing_review(null);
+    set_review_text("");
   };
 
   if (loading) {
@@ -141,7 +227,7 @@ const ViewApplication = () => {
             {application_data.candidate?.full_name} for {application_data.job?.title}
           </p>
         </div>
-        <Button variant="outline" onClick={() => navigate("/applications")} className="button-outline shadow-md hover:shadow-lg transition-all duration-300">
+        <Button variant="outline" onClick={() => navigate("/applications")} className="shadow-md hover:shadow-lg transition-all duration-300">
           Back to Applications
         </Button>
       </div>
@@ -373,6 +459,142 @@ const ViewApplication = () => {
             </CardContent>
           </Card>
 
+          {/* Interviews Section */}
+          <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center gap-3 text-xl font-bold text-gray-800">
+                <Users className="h-6 w-6 text-blue-600" />
+                Interviews & Reviews
+              </CardTitle>
+              <CardDescription className="text-base text-gray-600">
+                Interview schedule and private interviewer reviews for this application.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-4">
+              {interviews_loading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+                  <span className="ml-2 text-gray-600">Loading interviews...</span>
+                </div>
+              ) : interviews.length === 0 ? (
+                <div className="text-center py-8">
+                  <MessageSquare className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                  <p className="text-gray-600 mb-4">No interviews scheduled for this application</p>
+                  <Button variant="outline" className="button-outline">
+                    Schedule Interview
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {interviews.map((interview) => (
+                    <div key={interview.id} className="border border-gray-200 rounded-lg p-4 bg-gradient-to-r from-slate-50 to-blue-50">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Calendar className="h-4 w-4 text-blue-600" />
+                            <span className="font-semibold text-gray-800">
+                              {new Date(interview.date).toLocaleDateString()} at {new Date(interview.date).toLocaleTimeString()}
+                            </span>
+                            <Badge variant="outline" className="ml-2 capitalize">
+                              {interview.type}
+                            </Badge>
+                            <Badge 
+                              variant={interview.status === 'done' ? 'default' : interview.status === 'scheduled' ? 'secondary' : 'destructive'}
+                              className="capitalize"
+                            >
+                              {interview.status}
+                            </Badge>
+                          </div>
+                          {interview.interviewer && (
+                            <p className="text-sm text-gray-600 mb-2">
+                              <strong>Interviewer:</strong> {interview.interviewer.full_name}
+                            </p>
+                          )}
+                          {interview.notes && (
+                            <div className="mb-3">
+                              <Label className="text-sm font-semibold text-gray-700">Notes for Candidate:</Label>
+                              <p className="text-gray-800 bg-white p-3 rounded-md mt-1 text-sm border border-gray-200">
+                                {interview.notes}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <Separator className="my-3" />
+                      
+                      {/* Interviewer Review Section */}
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                            <MessageSquare className="h-4 w-4 text-purple-600" />
+                            Private Interviewer Review
+                          </Label>
+                          {!editing_review || editing_review !== interview.id ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handle_edit_review(interview.id, interview.interviewer_review || "")}
+                              className="flex items-center gap-1 text-xs"
+                            >
+                              <Edit3 className="h-3 w-3" />
+                              {interview.interviewer_review ? 'Edit Review' : 'Add Review'}
+                            </Button>
+                          ) : null}
+                        </div>
+                        
+                        {editing_review === interview.id ? (
+                          <div className="space-y-3">
+                            <Textarea
+                              value={review_text}
+                              onChange={(e) => set_review_text(e.target.value)}
+                              placeholder="Enter your private review of this interview..."
+                              className="min-h-[100px] bg-white border-gray-300 focus:border-purple-500 focus:ring-purple-500"
+                            />
+                            <div className="flex items-center gap-2">
+                              <Button
+                                size="sm"
+                                onClick={() => handle_save_review(interview.id)}
+                                disabled={saving_review}
+                                className="flex items-center gap-1"
+                              >
+                                {saving_review ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <Save className="h-3 w-3" />
+                                )}
+                                Save Review
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={handle_cancel_edit}
+                                disabled={saving_review}
+                              >
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="bg-white p-3 rounded-md border border-gray-200 min-h-[60px]">
+                            {interview.interviewer_review ? (
+                              <p className="text-gray-800 text-sm whitespace-pre-wrap">
+                                {interview.interviewer_review}
+                              </p>
+                            ) : (
+                              <p className="text-gray-500 italic text-sm">
+                                No review added yet. Click "Add Review" to provide feedback on this interview.
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
         </div>
 

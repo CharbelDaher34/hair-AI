@@ -11,8 +11,16 @@ from services.skills_module.ner_skills import skill_ner
 from sentence_transformers import SentenceTransformer
 import logging
 from utils import render_model
+from services.llm.llm_agent import LLM
+from pydantic import BaseModel, Field
+
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
+
+
+class MatchAnalysis(BaseModel):
+    """Pydantic model for match analysis"""
+    analysis: str = Field(..., description="Comprehensive analysis of the candidate-job match")
 
 
 class Matcher:
@@ -25,7 +33,30 @@ class Matcher:
         """
         self.embedding_model = SentenceTransformer(model_name)
         logger.error(f"Initialized embedding model: {model_name}")
-
+        
+        # Initialize LLM for match analysis
+        system_prompt = """You are an expert HR analyst specializing in candidate-job matching. 
+        Your task is to analyze how well a candidate matches a specific job opportunity.
+        
+        Analyze the candidate's background against the job requirements and provide:
+        1. A brief summary of the match
+        2. Key strengths that make the candidate suitable
+        3. Potential concerns or gaps
+        4. An overall assessment of match quality
+        5. A recommendation for next steps
+        
+        Be objective, professional, and constructive in your analysis."""
+        
+        try:
+            self.llm_analyzer = LLM(
+                result_type=MatchAnalysis,
+                system_prompt=system_prompt,
+                model_settings={"temperature": 0.3, "top_p": 0.9}
+            )
+        except Exception as e:
+            logger.error(f"Failed to initialize LLM analyzer: {e}")
+            self.llm_analyzer = None
+      
     def get_embedding(self, text: str) -> np.ndarray:
         """
         Generate embedding for a given text.
@@ -165,7 +196,7 @@ class Matcher:
             "full_text_embedding": self.get_embedding(job_full_text),
         }
         
-    def _score_candidate(self, cand: Dict, job_data: Dict, weights: Dict, fuzzy_threshold: float) -> Dict:
+    async def _score_candidate(self, cand: Dict, job_data: Dict, weights: Dict, fuzzy_threshold: float) -> Dict:
         """Scores a single candidate against pre-processed job data."""
         # Candidate skill extraction
         cand_hard = [s["name"].lower() for s in cand.get("skills", []) if s.get("type") == "Hard" and s.get("name")]
@@ -218,6 +249,9 @@ class Matcher:
         }
         final_score = sum(final_weights.get(k, 0) * v for k, v in final_score_components.items() if k in final_weights)
 
+        # Generate a reason for the match
+        analysis = await self.analyze_match(cand_full_text, job_data["full_text"])
+
         return {
             "candidate": cand.get("candidate_name") or cand.get("full_name"),
             "score": round(max(0.0, final_score), 3),
@@ -225,9 +259,54 @@ class Matcher:
             "missing_skills": sorted(list(set(all_missing))),
             "extra_skills": sorted(list(set(all_extra))),
             "matching_skills": sorted(list(set(all_matching))),
+            "analysis": analysis
         }
 
-    def match_candidates(
+    async def analyze_match(self, candidate_text: str, job_text: str) -> str:
+        """
+        Generate an LLM-powered analysis of the candidate-job match.
+        
+        Args:
+            candidate_text: Full text representation of candidate
+            job_text: Full text representation of job
+            
+        Returns:
+            String analysis of the match
+        """
+        if not self.llm_analyzer:
+            return "Analysis unavailable - LLM not initialized"
+            
+        try:
+            prompt = f"""
+            Please analyze this candidate-job match:
+            
+            JOB DESCRIPTION:
+            {job_text}
+            
+            CANDIDATE PROFILE:
+            {candidate_text}
+            
+            Provide a comprehensive analysis of how well this candidate matches the job requirements.
+            Include strengths, concerns, overall assessment, and recommendations.
+            """
+            
+            # Use the LLM to generate analysis
+            analysis_result = await self.llm_analyzer.llm_agent.run([prompt])
+            
+            # Extract analysis from the result
+            if isinstance(analysis_result, dict) and "analysis" in analysis_result:
+                return analysis_result["analysis"]
+            elif hasattr(analysis_result, "analysis"):
+                return analysis_result.analysis
+            else:
+                return str(analysis_result)
+                
+        except Exception as e:
+            logger.error(f"Error generating match analysis: {e}\n{traceback.format_exc()}")
+            return f"Analysis error: {str(e)}"
+
+
+    async def match_candidates(
         self,
         job: Dict,
         candidates: List[Dict],
@@ -306,7 +385,7 @@ class Matcher:
             # ---------- 3. Score all candidates ----------
             results = []
             for cand in candidates:
-                result = self._score_candidate(cand, job_data, processed_weights, fuzzy_threshold)
+                result = await self._score_candidate(cand, job_data, processed_weights, fuzzy_threshold)
                 result["weights_used"] = processed_weights
                 results.append(result)
     
@@ -317,90 +396,90 @@ class Matcher:
 
     
     
-# Exampl    e usage
-if __name__ == "__main__":
-    # In  itialize the matcher
-    matcher = Matcher()
+# # Exampl    e usage
+# if __name__ == "__main__":
+#     # In  itialize the matcher
+#     matcher = Matcher()
 
-    # Example job description
-    job_description = {
-        "title": "Senior Machine Learning Engineer",
-        "responsibilities": [
-            "Design and implement machine learning models",
-            "Work with large datasets",
-            "Deploy models to production",
-        ],
-        "skills": {
-            "hard_skills": [
-                "Python",
-                "Machine Learning",
-                "Deep Learning",
-                "TensorFlow",
-                "PyTorch",
-            ]
-        },
-    }
+#     # Example job description
+#     job_description = {
+#         "title": "Senior Machine Learning Engineer",
+#         "responsibilities": [
+#             "Design and implement machine learning models",
+#             "Work with large datasets",
+#             "Deploy models to production",
+#         ],
+#         "skills": {
+#             "hard_skills": [
+#                 "Python",
+#                 "Machine Learning",
+#                 "Deep Learning",
+#                 "TensorFlow",
+#                 "PyTorch",
+#             ]
+#         },
+#     }
 
-    # Example candidates
-    candidates = [
-        {
-            "full_name": "John Doe",
-            "skills": [
-                {"name": "Python", "type": "Hard"},
-                {"name": "Machine Learning", "type": "Hard"},
-                {"name": "TensorFlow", "type": "Hard"},
-            ],
-            "work_history": [
-                {
-                    "job_title": "Machine Learning Engineer",
-                    "summary": "Developed and deployed ML models.",
-                },
-                {
-                    "job_title": "Software Engineer",
-                    "summary": "Built backend systems.",
-                },
-            ],
-        },
-        {
-            "full_name": "Jane Smith",
-            "skills": [
-                {"name": "Java", "type": "Hard"},
-                {"name": "Spring", "type": "Hard"},
-            ],
-            "work_history": [
-                {
-                    "job_title": "Senior Software Engineer",
-                    "summary": "Focused on backend development with Java.",
-                }
-            ],
-        },
-    ]
+#     # Example candidates
+#     candidates = [
+#         {
+#             "full_name": "John Doe",
+#             "skills": [
+#                 {"name": "Python", "type": "Hard"},
+#                 {"name": "Machine Learning", "type": "Hard"},
+#                 {"name": "TensorFlow", "type": "Hard"},
+#             ],
+#             "work_history": [
+#                 {
+#                     "job_title": "Machine Learning Engineer",
+#                     "summary": "Developed and deployed ML models.",
+#                 },
+#                 {
+#                     "job_title": "Software Engineer",
+#                     "summary": "Built backend systems.",
+#                 },
+#             ],
+#         },
+#         {
+#             "full_name": "Jane Smith",
+#             "skills": [
+#                 {"name": "Java", "type": "Hard"},
+#                 {"name": "Spring", "type": "Hard"},
+#             ],
+#             "work_history": [
+#                 {
+#                     "job_title": "Senior Software Engineer",
+#                     "summary": "Focused on backend development with Java.",
+#                 }
+#             ],
+#         },
+#     ]
 
-    # Get matches with detailed analysis
-    matches = matcher.match_candidates(job_description, candidates)
+#     # Get matches with detailed analysis
+#     matches = await matcher.match_candidates(job_description, candidates)
 
-    # Print detailed results
-    print("\nMatching Results:")
-    print("=" * 80)
+#     # Print detailed results
+#     print("\nMatching Results:")
+#     print("=" * 80)
 
-    for match in matches:
-        print(f"\nCandidate: {match['candidate']}")
-        print(f"Final Score: {match['score']:.3f}")
-        print(f"Overall Embedding Similarity: {match['overall_embedding_similarity']:.3f}")
-        print(f"Skills Embedding Similarity: {match['skills_embedding_similarity']:.3f}")
+#     for match in matches:
+#         print(f"\nCandidate: {match['candidate']}")
+#         print(f"Final Score: {match['score']:.3f}")
+#         print(f"Overall Embedding Similarity: {match['overall_embedding_similarity']:.3f}")
+#         print(f"Skills Embedding Similarity: {match['skills_embedding_similarity']:.3f}")
 
-        print("\nScore Breakdown:")
-        print("  Final Score Components:")
-        for component, score in match["score_breakdown"]["final_score_components"].items():
-            print(f"  - {component}: {score}")
+#         print("\nScore Breakdown:")
+#         print("  Final Score Components:")
+#         for component, score in match["score_breakdown"]["final_score_components"].items():
+#             print(f"  - {component}: {score}")
             
-        print("\n  Skills Score Components:")
-        for component, score in match["score_breakdown"]["skills_score_components"].items():
-            print(f"  - {component}: {score}")
+#         print("\n  Skills Score Components:")
+#         for component, score in match["score_breakdown"]["skills_score_components"].items():
+#             print(f"  - {component}: {score}")
 
-        print("\nSkill Analysis:")
-        print(f"  Matching Skills: {', '.join(match['matching_skills'])}")
-        print(f"  Missing Skills: {', '.join(match['missing_skills'])}")
-        print(f"  Extra Skills: {', '.join(match['extra_skills'])}")
+#         print("\nSkill Analysis:")
+#         print(f"  Matching Skills: {', '.join(match['matching_skills'])}")
+#         print(f"  Missing Skills: {', '.join(match['missing_skills'])}")
+#         print(f"  Extra Skills: {', '.join(match['extra_skills'])}")
 
-        print("\n-" * 80)
+#         print("\n-" * 80)
