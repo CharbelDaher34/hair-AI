@@ -12,168 +12,319 @@ Usage:
 import os
 import sys
 import time
-import random
+import json
+import logging  # Added
+import traceback  # Added
 from datetime import datetime
-from typing import List
+from typing import List, Dict, Any, Tuple
+from collections import defaultdict
+from pathlib import Path  # Added
 
 # Add the parent directory to the path so we can import from the app
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from sqlmodel import Session, select
-from core.database import engine
-from crud import crud_match
+import sqlalchemy  # Added for type casting in query
+from sqlmodel import Session, select, SQLModel
+from sqlalchemy.orm import selectinload, joinedload
+from sqlalchemy import text
+from core.database import get_admin_engine
+from crud import crud_match  # We will add a new function here
 from models.models import Application, Match, Candidate, Job
-from schemas import MatchCreate
+from models.candidate_pydantic import (
+    CandidateResume,
+)  # To validate/structure parsed_resume
+# from schemas import MatchCreate # MatchCreate is for single, we'll adapt
+
+# --- Configuration ---
+MAX_RETRIES_PER_JOB_BATCH = int(os.getenv("MATCHER_MAX_RETRIES_JOB", "3"))
+RETRY_DELAY_SECONDS_JOB = int(os.getenv("MATCHER_RETRY_DELAY_JOB", "10"))
+INTER_JOB_BATCH_DELAY_SECONDS = int(os.getenv("MATCHER_INTER_JOB_DELAY", "2"))
+# Max candidates to send to AI per job in one call.
+# The AI can handle many, but extremely large lists might hit request size limits or timeouts.
+# Set to a high number if no immediate issues are known.
+MAX_CANDIDATES_PER_AI_CALL = int(os.getenv("MATCHER_MAX_CANDIDATES_PER_AI_CALL", "100"))
+
+# --- Logger Setup ---
+LOG_LEVEL_STR = os.getenv("LOG_LEVEL", "INFO").upper()
+LOG_LEVEL = getattr(logging, LOG_LEVEL_STR, logging.INFO)
+
+logging.basicConfig(
+    level=LOG_LEVEL,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)],
+)
+logger = logging.getLogger(Path(__file__).stem)
+
+# Use admin engine to bypass RLS
+admin_engine = get_admin_engine()
 
 
-def get_applications_without_matches() -> List[Application]:
+def get_applications_needing_match_grouped_by_job() -> Dict[int, List[Application]]:
     """
-    Get all applications that don't have matches.
+    Get all applications that don't have matches, grouped by job_id.
+    Eagerly loads Candidate and Job objects to reduce further DB queries.
 
     Returns:
-        List of applications that need matching
+        Dict where keys are job_id and values are lists of Application objects for that job.
     """
-    with Session(engine) as db:
-        # Query applications that don't have any matches
-        statement = select(Application).where(
-            ~Application.id.in_(select(Match.application_id))
+    applications_by_job: Dict[int, List[Application]] = defaultdict(list)
+    with Session(admin_engine) as db:
+        # Query applications that don't have any matches, joining Candidate for parsed_resume check
+        # and Job for job_description check.
+        stmt = (
+            select(Application)
+            .join(Candidate, Application.candidate_id == Candidate.id)
+            .join(Job, Application.job_id == Job.id)
+            .options(
+                joinedload(Application.candidate).joinedload(
+                    Candidate.applications
+                ),  # Eager load candidate
+                joinedload(Application.job),  # Eager load job
+            )
+            .where(
+                ~Application.id.in_(
+                    select(Match.application_id).distinct()
+                )  # Application not in Match table
+            )
+            .where(
+                text(
+                    "NOT (candidate.parsed_resume IS NULL OR candidate.parsed_resume::text = '{}' OR candidate.parsed_resume::text = 'null')"
+                )
+            )  # Candidate has valid parsed resume (not NULL, not empty, not 'null')
+            .where(Job.description.is_not(None))  # Job has a description
+            .where(Job.description != "")  # Job description is not empty
         )
-        applications = db.exec(statement).all()
 
-        return applications
+        applications_to_process = (
+            db.exec(stmt).unique().all()
+        )  # .unique() because of joins
+
+        for app in applications_to_process:
+            # Basic checks that should have been covered by the WHERE clauses, but good for sanity.
+            if not app.candidate or not app.candidate.parsed_resume:
+                logger.warning(
+                    f"Skipping application {app.id}: Candidate {app.candidate_id} has no parsed_resume (should be filtered by query)."
+                )
+                continue
+            if (
+                not app.job
+                or not app.job.description
+                or not app.job.description.strip()
+            ):
+                logger.warning(
+                    f"Skipping application {app.id}: Job {app.job_id} has no valid description (should be filtered by query)."
+                )
+                continue
+
+            applications_by_job[app.job_id].append(app)
+
+    return applications_by_job
 
 
-def create_match_for_application(application_id: int, max_retries: int = 3) -> bool:
+def process_matches_for_job_batch(
+    db: Session, job: Job, applications_for_job: List[Application]
+) -> Tuple[int, int]:
     """
-    Create a match for a single application.
-
-    Args:
-        application_id: ID of the application
-        max_retries: Maximum number of retry attempts
-
-    Returns:
-        bool: True if successful, False otherwise
+    Processes a batch of applications for a single job.
+    Calls AI matcher and creates Match records via crud_match.
     """
-    initial_delay = 5  # seconds
-    for attempt in range(max_retries):
+    successful_matches_for_job = 0
+    failed_matches_for_job = 0
+
+    # candidates_payload_for_ai and app_id_to_candidate_id_map are now internal to crud_match.create_matches_for_job_and_applicants
+    # This function's role is simplified to mainly call the CRUD function.
+
+    # The main logic of preparing AI data, calling AI, and creating DB objects is now in crud_match.
+    # This function just orchestrates the call for a given job and its applications.
+    if not applications_for_job:
+        logger.info(f"Job {job.id}: No applications to process in this batch.")
+        return 0, 0
+
+    logger.info(
+        f"Job {job.id}: Preparing to match {len(applications_for_job)} applications."
+    )
+
+    try:
+        num_succeeded, num_failed = crud_match.create_matches_for_job_and_applicants(
+            db=db,
+            job=job,
+            applications=applications_for_job,
+        )
+
+        # Commit the match results to the database
+        if num_succeeded > 0:
+            try:
+                db.commit()
+                logger.info(
+                    f"Job {job.id}: Successfully committed {num_succeeded} matches to database."
+                )
+                successful_matches_for_job += num_succeeded
+                failed_matches_for_job += num_failed
+            except Exception as commit_error:
+                logger.error(
+                    f"Job {job.id}: Error committing {num_succeeded} matches to database: {commit_error}",
+                    exc_info=True,
+                )
+                db.rollback()
+                # All matches in this batch are now considered failed due to commit error
+                failed_matches_for_job += len(applications_for_job)
+                successful_matches_for_job += 0
+        else:
+            # No successful matches to commit, just record the failures
+            successful_matches_for_job += num_succeeded  # This is 0
+            failed_matches_for_job += num_failed
+
+    except Exception as e:
+        logger.error(
+            f"Job {job.id}: Unhandled exception in create_matches_for_job_and_applicants for {len(applications_for_job)} applications: {e}",
+            exc_info=True,
+        )
+        # Rollback any partial changes
         try:
-            print(
-                f"[Matcher] Processing application {application_id} (attempt {attempt + 1}/{max_retries})"
-            )
+            db.rollback()
+        except Exception:
+            pass  # Rollback might fail if session is already in bad state
+        # If the CRUD function itself throws a major error not caught internally,
+        # all applications in this specific call are considered failed.
+        failed_matches_for_job += len(applications_for_job)
 
-            with Session(engine) as db:
-                # Get the application with related data
-                application = db.get(Application, application_id)
-                if not application:
-                    print(f"[Matcher] Application {application_id} not found")
-                    return False
-
-                # Get candidate and job data for validation
-                candidate = db.get(Candidate, application.candidate_id)
-                job = db.get(Job, application.job_id)
-
-                if not candidate or not job:
-                    print(
-                        f"[Matcher] Missing candidate or job data for application {application_id}"
-                    )
-                    return False
-
-                # Check if candidate has parsed resume data
-                if not candidate.parsed_resume:
-                    print(
-                        f"[Matcher] Candidate {candidate.id} has no parsed resume data - skipping"
-                    )
-                    return False
-
-                # Check if job has description
-                if not job.description or not job.description.strip():
-                    print(f"[Matcher] Job {job.id} has no description - skipping")
-                    return False
-
-                print(f"[Matcher] Creating match for application {application_id}")
-                print(f"[Matcher] Job: {job.title}")
-                print(f"[Matcher] Candidate: {candidate.full_name}")
-
-                # Create match using CRUD (which will call the AI service)
-                match_create = MatchCreate(application_id=application_id)
-
-                new_match = crud_match.create_match(db=db, match_in=match_create)
-
-                if new_match:
-                    print(
-                        f"[Matcher] Successfully created match {new_match.id} for application {application_id}"
-                    )
-                    return True
-                else:
-                    print(
-                        f"[Matcher] Failed to create match for application {application_id}"
-                    )
-                    # This path might indicate a non-exception failure within create_match,
-                    # so retry might also be appropriate here if it's a transient issue.
-                    # For now, aligning with previous logic of retrying on exceptions.
-                    return False # Or consider retrying if it could be transient
-
-        except Exception as match_err:
-            print(
-                f"[Matcher] Error creating match for application {application_id} (attempt {attempt + 1}): {str(match_err)}"
-            )
-            print(f"[Matcher] Error type: {type(match_err)}")
-
-            if attempt < max_retries - 1:
-                delay = initial_delay * (2**attempt) + random.uniform(0, 1)
-                print(f"[Matcher] Retrying in {delay:.2f} seconds...")
-                time.sleep(delay)
-            else:
-                print(f"[Matcher] Max retries reached for application {application_id}")
-                import traceback
-
-                print(f"[Matcher] Full traceback: {traceback.format_exc()}")
-                return False
-
-    return False
+    logger.info(
+        f"Job {job.id}: Processed batch of {len(applications_for_job)} applications. Succeeded: {successful_matches_for_job}, Failed: {failed_matches_for_job}"
+    )
+    return successful_matches_for_job, failed_matches_for_job
 
 
 def process_all_applications():
     """
-    Process all applications that need matching.
-
-    Returns:
-        dict: Results summary with successful and failed counts
+    Process all applications that need matching, grouped by job.
     """
-    print(f"[Matcher] Starting batch application matching at {datetime.now()}")
+    logger.info(f"Starting batch application matching.")
 
-    applications = get_applications_without_matches()
-    print(f"[Matcher] Found {len(applications)} applications that need matching")
+    applications_by_job = get_applications_needing_match_grouped_by_job()
 
-    if not applications:
-        print("[Matcher] No applications to process")
-        return {"successful": 0, "failed": 0, "total": 0}
+    if not applications_by_job:
+        logger.info("No applications found needing matches with valid prerequisites.")
+        return {
+            "successful_matches": 0,
+            "failed_matches": 0,
+            "total_applications_considered": 0,
+            "jobs_processed": 0,
+        }
 
-    successful = 0
-    failed = 0
+    total_applications_to_match = sum(
+        len(apps) for apps in applications_by_job.values()
+    )
+    logger.info(
+        f"Found {total_applications_to_match} applications across {len(applications_by_job)} jobs needing matches."
+    )
 
-    for i, application in enumerate(applications, 1):
-        print(
-            f"\n[Matcher] Processing application {i}/{len(applications)}: ID {application.id}"
+    overall_successful_matches = 0
+    overall_failed_matches = 0
+    jobs_processed_count = 0
+
+    for job_id, apps_for_this_job in applications_by_job.items():
+        jobs_processed_count += 1
+        job_object = apps_for_this_job[0].job
+
+        logger.info(
+            f"Processing job {job_id} ('{job_object.title}') with {len(apps_for_this_job)} applications. ({jobs_processed_count}/{len(applications_by_job)} jobs)"
         )
 
-        success = create_match_for_application(application.id)
-        if success:
-            successful += 1
-            print(f"[Matcher] ✅ Successfully processed application {application.id}")
-        else:
-            failed += 1
-            print(f"[Matcher] ❌ Failed to process application {application.id}")
+        for i in range(0, len(apps_for_this_job), MAX_CANDIDATES_PER_AI_CALL):
+            application_sub_batch = apps_for_this_job[
+                i : i + MAX_CANDIDATES_PER_AI_CALL
+            ]
+            sub_batch_num = i // MAX_CANDIDATES_PER_AI_CALL + 1
+            if not application_sub_batch:
+                continue
 
-        # Add a small delay between applications to avoid overwhelming the matching service
-        if i < len(applications):
-            print("[Matcher] Waiting 2 seconds before next application...")
-            time.sleep(2)
+            logger.info(
+                f"  - Sub-batch {sub_batch_num} with {len(application_sub_batch)} applications for job {job_id}."
+            )
 
-    print(f"\n[Matcher] Batch matching completed at {datetime.now()}")
-    print(f"[Matcher] Results: {successful} successful, {failed} failed")
+            for attempt in range(MAX_RETRIES_PER_JOB_BATCH):
+                succeeded_in_sub_batch = 0
+                failed_in_sub_batch = 0
+                try:
+                    with Session(admin_engine) as db:
+                        succeeded_in_sub_batch, failed_in_sub_batch = (
+                            process_matches_for_job_batch(
+                                db, job_object, application_sub_batch
+                            )
+                        )
+                    # Accumulate results from this attempt
+                    # Note: If retrying, ensure not to double-count successes from previous attempts of the same sub-batch.
+                    # The current structure re-processes the whole sub-batch. If process_matches_for_job_batch
+                    # is idempotent (deletes existing before creating), this is fine.
+                    # For now, we sum up results from the latest attempt for this sub-batch.
+                    # A more complex state management would be needed if only failed items from a sub-batch are retried.
 
-    return {"successful": successful, "failed": failed, "total": len(applications)}
+                    if failed_in_sub_batch == 0:
+                        logger.info(
+                            f"  - Sub-batch {sub_batch_num} for job {job_id} processed successfully on attempt {attempt + 1} ({succeeded_in_sub_batch} matches)."
+                        )
+                        overall_successful_matches += succeeded_in_sub_batch
+                        # overall_failed_matches += failed_in_sub_batch # This is 0 here
+                        break
+                    else:
+                        logger.warning(
+                            f"  - Sub-batch {sub_batch_num} for job {job_id} had {failed_in_sub_batch} failures (and {succeeded_in_sub_batch} successes) on attempt {attempt + 1}."
+                        )
+                        if attempt < MAX_RETRIES_PER_JOB_BATCH - 1:
+                            logger.info(
+                                f"  - Retrying sub-batch {sub_batch_num} for job {job_id} in {RETRY_DELAY_SECONDS_JOB}s..."
+                            )
+                            time.sleep(RETRY_DELAY_SECONDS_JOB)
+                        else:
+                            logger.error(
+                                f"  - Max retries reached for sub-batch {sub_batch_num} of job {job_id}. {failed_in_sub_batch} app(s) failed, {succeeded_in_sub_batch} app(s) succeeded in this final attempt."
+                            )
+                            overall_successful_matches += succeeded_in_sub_batch
+                            overall_failed_matches += failed_in_sub_batch
+
+                except Exception as e:  # Catch errors from process_matches_for_job_batch or session handling
+                    logger.error(
+                        f"  - Critical error processing sub-batch {sub_batch_num} for job {job_id} (attempt {attempt + 1}): {e}",
+                        exc_info=True,
+                    )
+                    if attempt < MAX_RETRIES_PER_JOB_BATCH - 1:
+                        logger.info(
+                            f"  - Retrying sub-batch {sub_batch_num} for job {job_id} due to critical error in {RETRY_DELAY_SECONDS_JOB}s..."
+                        )
+                        time.sleep(RETRY_DELAY_SECONDS_JOB)
+                    else:
+                        logger.error(
+                            f"  - Max retries reached for sub-batch {sub_batch_num} of job {job_id} due to critical error. Marking all {len(application_sub_batch)} apps in this sub-batch as failed for this attempt."
+                        )
+                        overall_failed_matches += len(
+                            application_sub_batch
+                        )  # Assume all failed if critical error on last attempt
+
+                if (
+                    failed_in_sub_batch == 0 and attempt < MAX_RETRIES_PER_JOB_BATCH
+                ):  # Broke from successful attempt
+                    break
+            # End of retry loop for a sub-batch
+
+        if jobs_processed_count < len(applications_by_job):
+            logger.info(
+                f"Waiting {INTER_JOB_BATCH_DELAY_SECONDS}s before processing next job..."
+            )
+            time.sleep(INTER_JOB_BATCH_DELAY_SECONDS)
+
+    logger.info(f"Batch application matching completed.")
+    logger.info(
+        f"Results: {overall_successful_matches} successful matches created, {overall_failed_matches} failed matches."
+    )
+    logger.info(
+        f"Total applications considered for matching: {total_applications_to_match} across {jobs_processed_count} jobs."
+    )
+    return {
+        "successful_matches": overall_successful_matches,
+        "failed_matches": overall_failed_matches,
+        "total_applications_considered": total_applications_to_match,
+        "jobs_processed": jobs_processed_count,
+    }
 
 
 if __name__ == "__main__":

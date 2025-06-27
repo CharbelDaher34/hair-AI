@@ -2,21 +2,24 @@ import asyncio
 import aiosmtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from typing import Optional
+from email.mime.base import MIMEBase
+from email import encoders
+from typing import Optional, List, Dict
 import logging
+import os
 
-from core.config import SMTP_HOST, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD, FROM_EMAIL
+from core.config import settings
 
 logger = logging.getLogger(__name__)
 
 
 class EmailService:
     def __init__(self):
-        self.smtp_host = SMTP_HOST
-        self.smtp_port = SMTP_PORT
-        self.smtp_username = SMTP_USERNAME
-        self.smtp_password = SMTP_PASSWORD
-        self.from_email = FROM_EMAIL
+        self.smtp_host = settings.SMTP_HOST
+        self.smtp_port = settings.SMTP_PORT
+        self.smtp_username = settings.SMTP_USERNAME
+        self.smtp_password = settings.SMTP_PASSWORD
+        self.from_email = settings.FROM_EMAIL
 
     async def send_email(
         self,
@@ -24,34 +27,73 @@ class EmailService:
         subject: str,
         html_content: str,
         text_content: Optional[str] = None,
+        attachments: Optional[List[Dict[str, str]]] = None,
     ) -> bool:
         """
         Send an email using SMTP.
-        
+
         Args:
             to_email: Recipient email address
             subject: Email subject
             html_content: HTML content of the email
             text_content: Plain text content (optional)
-            
+            attachments: List of attachments with format:
+                [{"file_path": "/path/to/file", "filename": "display_name.pdf"}]
+
         Returns:
             bool: True if email was sent successfully, False otherwise
         """
         try:
             # Create message
-            message = MIMEMultipart("alternative")
+            message = MIMEMultipart("mixed")
             message["Subject"] = subject
             message["From"] = self.from_email
             message["To"] = to_email
 
+            # Create alternative container for text/html content
+            content_container = MIMEMultipart("alternative")
+
             # Add text content if provided
             if text_content:
                 text_part = MIMEText(text_content, "plain")
-                message.attach(text_part)
+                content_container.attach(text_part)
 
             # Add HTML content
             html_part = MIMEText(html_content, "html")
-            message.attach(html_part)
+            content_container.attach(html_part)
+
+            # Attach the content container to the main message
+            message.attach(content_container)
+
+            # Add attachments if provided
+            if attachments:
+                for attachment in attachments:
+                    file_path = attachment.get("file_path")
+                    filename = attachment.get("filename")
+
+                    if file_path and os.path.exists(file_path):
+                        try:
+                            with open(file_path, "rb") as attachment_file:
+                                # Create MIMEBase object
+                                part = MIMEBase("application", "octet-stream")
+                                part.set_payload(attachment_file.read())
+
+                                # Encode file in ASCII characters to send by email
+                                encoders.encode_base64(part)
+
+                                # Add header as key/value pair to attachment part
+                                part.add_header(
+                                    "Content-Disposition",
+                                    f"attachment; filename= {filename or os.path.basename(file_path)}",
+                                )
+
+                                # Attach the part to message
+                                message.attach(part)
+                                logger.info(f"Attached file: {filename or file_path}")
+                        except Exception as e:
+                            logger.error(f"Failed to attach file {file_path}: {str(e)}")
+                    else:
+                        logger.warning(f"Attachment file not found: {file_path}")
 
             # Send email
             await aiosmtplib.send(
@@ -70,20 +112,22 @@ class EmailService:
             logger.error(f"Failed to send email to {to_email}: {str(e)}")
             return False
 
-    async def send_otp_email(self, to_email: str, otp_code: str, full_name: str = "") -> bool:
+    async def send_otp_email(
+        self, to_email: str, otp_code: str, full_name: str = ""
+    ) -> bool:
         """
         Send OTP verification email.
-        
+
         Args:
             to_email: Recipient email address
             otp_code: OTP code to send
             full_name: Recipient's full name (optional)
-            
+
         Returns:
             bool: True if email was sent successfully, False otherwise
         """
         subject = "Email Verification - Your OTP Code"
-        
+
         # Create HTML content
         html_content = f"""
         <!DOCTYPE html>
@@ -234,4 +278,4 @@ class EmailService:
 
 
 # Create a global instance
-email_service = EmailService() 
+email_service = EmailService()

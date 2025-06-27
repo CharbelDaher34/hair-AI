@@ -177,6 +177,7 @@ export interface InterviewBase {
   type: string; // e.g., 'phone', 'zoom', 'in-person'
   status: string; // e.g., 'scheduled', 'done', 'canceled'
   notes: string | null;
+  interviewer_review: string | null; // Private review notes from interviewer
   created_at: string; // ISO datetime string
   updated_at: string; // ISO datetime string
 }
@@ -383,4 +384,5 @@ export interface InterviewCreate {
   type: string;
   status: string;
   notes?: string | null;
+  interviewer_review?: string | null;
 } 

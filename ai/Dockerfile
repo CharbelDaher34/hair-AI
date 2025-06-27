@@ -13,13 +13,16 @@ COPY app/uv.lock .
 # Install dependencies and sync the virtual environment
 RUN uv lock && \
     uv sync --locked
+
+# Make port 8011 available to the world outside this container
+RUN uv run python -m ensurepip --upgrade && \
+    uv run python -m spacy download en_core_web_lg
+
 # Copy the application code
 COPY app/ .
 ENV PATH="/app/.venv/bin:$PATH"
 
-# Make port 8011 available to the world outside this container
 EXPOSE 8011
-RUN uv run python -m ensurepip --upgrade && \
-    uv run python -m spacy download en_core_web_lg
+
 
 CMD ["uv","run","main.py"]

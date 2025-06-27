@@ -5,6 +5,7 @@ from pydantic_ai import Agent
 from pydantic_ai.mcp import MCPServerStdio
 from pydantic_ai.messages import ModelMessage
 import logfire
+
 try:
     logfire.configure()
     logfire.instrument_pydantic_ai()

@@ -1,14 +1,15 @@
 import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { Link } from "react-router-dom";
-import { Users, Eye, CheckCircle, XCircle, Loader2, TrendingUp, Calendar, Target, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Users, Eye, CheckCircle, XCircle, Loader2, TrendingUp, Calendar, Target, ArrowUpDown, ArrowUp, ArrowDown, AlertTriangle, Flag } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import apiService from "@/services/api";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface JobAnalyticsData {
   job_id: number;
@@ -38,15 +39,13 @@ interface MatchCandidate {
   application_id: number;
   score: number;
   score_breakdown?: {
-    final_score_components: Record<string, number>;
-    skills_score_components: Record<string, number>;
+    skills_score?: number;
+    [key: string]: any;
   };
   weights_used?: {
-    final_weights: Record<string, number>;
-    skill_weights: Record<string, number>;
+    final_weights?: Record<string, number>;
+    skill_weights?: Record<string, number>;
   };
-  overall_embedding_similarity?: number;
-  skills_embedding_similarity?: number;
   matching_skills?: string[];
   missing_skills?: string[];
   extra_skills?: string[];
@@ -84,11 +83,12 @@ interface ChartData {
   color?: string;
 }
 
-type SortField = 'score' | 'overall_embedding_similarity' | 'skills_embedding_similarity' | 'full_name';
+type SortField = 'score' | 'full_name';
 type SortDirection = 'asc' | 'desc';
 
 const JobAnalytics = () => {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [analytics, setAnalytics] = useState<JobAnalyticsData | null>(null);
   const [matches, setMatches] = useState<MatchCandidate[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -106,7 +106,7 @@ const JobAnalytics = () => {
         // Fetch analytics and matches in parallel
         const [analyticsData, matchesData] = await Promise.all([
           apiService.getJobAnalytics(id!),
-          apiService.getJobMatches(id!)
+          apiService.getJobMatches(id!, true)
         ]);
         
         setAnalytics(analyticsData);
@@ -269,7 +269,7 @@ const JobAnalytics = () => {
               View Job
             </Link>
           </Button>
-          <Button asChild className="button shadow-lg hover:shadow-xl transition-all duration-300">
+          <Button variant="outline" asChild className="shadow-md hover:shadow-lg transition-all duration-300">
             <Link to={`/jobs/${id}/matches`}>
               <Users className="mr-2 h-4 w-4" />
               View All Matches
@@ -304,7 +304,7 @@ const JobAnalytics = () => {
       {/* Candidate Matches Table */}
       <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
         <CardHeader className="pb-6">
-          <CardTitle className="text-2xl font-bold text-gray-800">Candidate Matches</CardTitle>
+          <CardTitle className="text-2xl font-bold text-gray-800">Top 5 Candidates</CardTitle>
           <CardDescription className="text-base text-gray-600">
             Detailed view of all candidate matches with scores and skills
           </CardDescription>
@@ -345,26 +345,11 @@ const JobAnalytics = () => {
                         Overall Score {getSortIcon('score')}
                       </Button>
                     </TableHead>
-                    <TableHead>
-                      <Button
-                        variant="ghost"
-                        onClick={() => handleSort('overall_embedding_similarity')}
-                        className="h-auto p-2 font-semibold text-gray-700 hover:bg-gray-200 transition-colors duration-200"
-                      >
-                        Overall Similarity {getSortIcon('overall_embedding_similarity')}
-                      </Button>
-                    </TableHead>
-                    <TableHead>
-                      <Button
-                        variant="ghost"
-                        onClick={() => handleSort('skills_embedding_similarity')}
-                        className="h-auto p-2 font-semibold text-gray-700 hover:bg-gray-200 transition-colors duration-200"
-                      >
-                        Skills Similarity {getSortIcon('skills_embedding_similarity')}
-                      </Button>
-                    </TableHead>
+                    <TableHead className="font-semibold text-gray-700">Score Breakdown</TableHead>
                     <TableHead className="font-semibold text-gray-700">Matching Skills</TableHead>
                     <TableHead className="font-semibold text-gray-700">Status</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Flags</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -380,21 +365,22 @@ const JobAnalytics = () => {
                         <div className={`font-bold text-lg ${getScoreColor(match.score)}`}>
                           {(match.score * 100).toFixed(1)}%
                         </div>
-                        {match.score_breakdown && (
-                          <div className="text-xs text-gray-500 mt-1">
-                            View breakdown for details
+                      </TableCell>
+                      <TableCell>
+                        {match.score_breakdown ? (
+                          <div className="text-xs space-y-1">
+                            {Object.entries(match.score_breakdown).slice(0, 2).map(([key, value]) => (
+                              <div key={key} className="text-gray-600">
+                                {key.replace(/_/g, ' ')}: {typeof value === 'number' ? (value * 100).toFixed(1) + '%' : String(value)}
+                              </div>
+                            ))}
+                            {Object.keys(match.score_breakdown).length > 2 && (
+                              <div className="text-gray-500 italic">+{Object.keys(match.score_breakdown).length - 2} more</div>
+                            )}
                           </div>
+                        ) : (
+                          <span className="text-xs text-gray-500 italic">No breakdown</span>
                         )}
-                      </TableCell>
-                      <TableCell>
-                        <div className={`font-medium ${getSimilarityColor(match.overall_embedding_similarity || 0)}`}>
-                          {match.overall_embedding_similarity ? (match.overall_embedding_similarity * 100).toFixed(1) + '%' : 'N/A'}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className={`font-medium ${getSimilarityColor(match.skills_embedding_similarity || 0)}`}>
-                          {match.skills_embedding_similarity ? (match.skills_embedding_similarity * 100).toFixed(1) + '%' : 'N/A'}
-                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1 max-w-xs">
@@ -420,6 +406,56 @@ const JobAnalytics = () => {
                         <Badge variant={getStatusVariant(match.application_status || 'pending')} className="font-medium">
                           {match.application_status || 'pending'}
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {match.flags?.constraint_violations && Object.keys(match.flags.constraint_violations).length > 0 ? (
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300 transition-all duration-150"
+                              >
+                                <AlertTriangle className="h-4 w-4 mr-1" />
+                                {Object.keys(match.flags.constraint_violations).length} Issue{Object.keys(match.flags.constraint_violations).length !== 1 ? 's' : ''}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-80 p-4 bg-white shadow-xl rounded-lg border border-red-200">
+                              <div className="space-y-3">
+                                <div className="flex items-center gap-2">
+                                  <Flag className="h-5 w-5 text-red-600" />
+                                  <h4 className="font-semibold text-red-800">Constraint Violations</h4>
+                                </div>
+                                <div className="space-y-2">
+                                  {Object.entries(match.flags.constraint_violations).map(([field, violation]) => (
+                                    <div key={field} className="p-2 bg-red-50 rounded border border-red-200">
+                                      <div className="font-medium text-red-800 text-sm">{field}</div>
+                                      <div className="text-red-600 text-xs mt-1">{violation}</div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                        ) : (
+                          <Badge variant="secondary" className="text-green-700 bg-green-100 border-green-200">
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                            No Issues
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="text-green-600 hover:text-green-800 hover:bg-green-100 transition-all duration-150"
+                          onClick={() => navigate(`/interviews/create?application_id=${match.application_id}`)}
+                          disabled={!match.application_id}
+                          title="Schedule Interview"
+                        >
+                          <Calendar className="h-4 w-4 mr-1" />
+                          Schedule Interview
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}

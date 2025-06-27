@@ -93,8 +93,7 @@ export function AppSidebar() {
             <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-400 rounded-full border-2 border-white shadow-sm"></div>
           </div>
           <div className="flex flex-col">
-            <span className="font-bold text-xl text-white drop-shadow-sm">AI HR</span>
-            <span className="text-xs text-blue-100 font-medium">Management Suite</span>
+            <span className="font-bold text-xl text-white drop-shadow-sm">HAIR</span>
           </div>
         </div>
         <SidebarTrigger className="ml-auto text-white hover:bg-white/20 transition-colors duration-200 data-[state=open]:rotate-180" />

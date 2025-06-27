@@ -6,8 +6,10 @@ from core.database import get_session
 from crud import crud_form_key
 from schemas import FormKeyCreate, FormKeyUpdate, FormKeyRead
 from core.security import TokenData
+import logging
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.post("/", response_model=FormKeyRead, status_code=status.HTTP_201_CREATED)
@@ -23,7 +25,7 @@ def create_form_key(
 
     form_key_in.employer_id = current_user.employer_id
 
-    print("form_key_data", form_key_in)
+    logger.info(f"Creating form key: {form_key_in}")
     try:
         form_key_in = FormKeyCreate(**form_key_in.model_dump())
         form_key = crud_form_key.create_form_key(db=db, form_key_in=form_key_in)

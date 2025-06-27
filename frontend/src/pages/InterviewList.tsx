@@ -212,7 +212,7 @@ const InterviewList = () => {
             Manage and track all candidate interviews
           </p>
         </div>
-        <Button asChild className="button shadow-lg hover:shadow-xl transition-all duration-300">
+        <Button variant="outline" asChild className="shadow-lg hover:shadow-xl transition-all duration-300">
           <Link to="/interviews/create">
             <Plus className="mr-2 h-4 w-4" />
             Schedule Interview
@@ -239,19 +239,19 @@ const InterviewList = () => {
                 className="pl-10 h-12 shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500"
               />
             </div>
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
+            {/* <Select value={typeFilter} onValueChange={setTypeFilter}>
               <SelectTrigger className="w-48 h-12 shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500">
                 <SelectValue placeholder="Filter by type" />
               </SelectTrigger>
-              {/* <SelectContent>
+              <SelectContent>
                 <SelectItem value="all">All Types</SelectItem>
                 {getUniqueTypes().map((type) => (
                   <SelectItem key={type} value={type.toLowerCase()}>
                     {type}
                   </SelectItem>
                 ))}
-              </SelectContent> */}
-            </Select>
+              </SelectContent>
+            </Select> */}
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-48 h-12 shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500">
                 <SelectValue placeholder="Filter by status" />

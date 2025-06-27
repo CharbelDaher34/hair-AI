@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Eye, Edit, Trash2, Plus, Search, MoreHorizontal, Filter, Loader2, Calendar, Clock, Users, ChevronDown } from "lucide-react";
+import { Eye, Edit, Trash2, Plus, Search, Filter, Loader2, Calendar, Clock, Users, ChevronDown } from "lucide-react";
 import { Link } from "react-router-dom";
 import apiService from "@/services/api";
 import { Application, ApplicationDashboardResponse } from "@/types";
@@ -234,7 +235,7 @@ const ApplicationDashboard = () => {
             Review and manage candidate applications ({total} total)
           </p>
         </div>
-        <Button asChild className="button shadow-lg hover:shadow-xl transition-all duration-300">
+        <Button variant="outline" asChild className="shadow-lg hover:shadow-xl transition-all duration-300">
           <Link to="/applications/create">
             <Plus className="mr-2 h-4 w-4" />
             Add Application
@@ -280,7 +281,7 @@ const ApplicationDashboard = () => {
                 <Users className="h-8 w-8 text-blue-600" />
               </div>
               <p className="text-lg text-gray-600 mb-4">No applications found</p>
-              <Button asChild className="button shadow-lg hover:shadow-xl transition-all duration-300">
+              <Button variant="outline" asChild className="shadow-lg hover:shadow-xl transition-all duration-300">
                 <Link to="/applications/create">
                   <Plus className="mr-2 h-4 w-4" />
                   Add First Application
@@ -335,35 +336,33 @@ const ApplicationDashboard = () => {
                         </DropdownMenu>
                       </TableCell>
                       <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="h-8 w-8 p-0">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem asChild>
-                              <Link to={`/applications/${application.id}`}>
-                                <Eye className="mr-2 h-4 w-4" />
-                                View
-                              </Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              onClick={() => fetch_interviews_for_application(application)}
-                              disabled={interviews_loading}
-                            >
-                              <Calendar className="mr-2 h-4 w-4" />
-                              Interviews
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              className="text-destructive"
-                              onClick={() => handle_delete_application(application)}
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <div className="flex items-center gap-2">
+                          <Button variant="outline" size="sm" asChild className="h-8">
+                            <Link to={`/applications/${application.id}`}>
+                              <Eye className="mr-1 h-3 w-3" />
+                              View
+                            </Link>
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => fetch_interviews_for_application(application)}
+                            disabled={interviews_loading}
+                            className="h-8"
+                          >
+                            <Calendar className="mr-1 h-3 w-3" />
+                            Interviews
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => handle_delete_application(application)}
+                            className="h-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="mr-1 h-3 w-3" />
+                            Delete
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

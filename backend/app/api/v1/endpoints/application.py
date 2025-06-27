@@ -7,6 +7,10 @@ from schemas import JobRead
 from fastapi import APIRouter, Depends, HTTPException, Request, status, BackgroundTasks
 from sqlmodel import Session, select, func
 import traceback
+import logging
+
+logger = logging.getLogger(__name__)
+
 from core.database import get_session
 from crud import crud_application, crud_job
 from schemas import (
@@ -27,23 +31,26 @@ router = APIRouter()
 
 @router.post("/", response_model=ApplicationRead, status_code=status.HTTP_201_CREATED)
 def create_application(
-    *, 
-    db: Session = Depends(get_session), 
+    *,
+    db: Session = Depends(get_session),
     application_in: ApplicationCreate,
-    background_tasks: BackgroundTasks
+    background_tasks: BackgroundTasks,
 ) -> ApplicationRead:
     try:
         application = crud_application.create_application(
             db=db, application_in=application_in
         )
-    
+
         # Schedule match creation as background task
         background_tasks.add_task(create_match_background, application.id)
-        print(f"[Application API] Scheduled background match creation for application {application.id}")
-    
+        logger.info(
+            f"[Application API] Scheduled background match creation for application {application.id}"
+        )
+
         return application
     except Exception as e:
         raise e
+
 
 class ApplicationDashboardResponse(BaseModel):
     applications: List[ApplicationWithDetails]
@@ -177,7 +184,9 @@ def update_application_status(
         raise HTTPException(status_code=404, detail="Application not found")
 
     # Create an ApplicationUpdate with only the status field
-    application_update = ApplicationUpdate(status=status_update.status,updated_at=datetime.now())
+    application_update = ApplicationUpdate(
+        status=status_update.status, updated_at=datetime.now()
+    )
 
     updated_application = crud_application.update_application(
         db=db, db_application=db_application, application_in=application_update

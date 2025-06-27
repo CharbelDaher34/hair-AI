@@ -16,6 +16,7 @@ from core.database import get_admin_engine
 from core.database import test_rls
 from scripts.apply_rls_only import apply_rls_policies_only
 
+
 def read_sql_file() -> str:
     """Read the RLS setup SQL file and return its content as a string."""
     sql_file_path = Path(__file__).parent / "db_setup.sql"

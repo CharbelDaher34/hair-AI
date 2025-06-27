@@ -1,6 +1,7 @@
 from sqlmodel import create_engine, Session, SQLModel
 from datetime import datetime
 import os
+import logging
 
 # Models
 from models.models import (
@@ -117,8 +118,15 @@ class Resume_Data(BaseModel):
     summary: Optional[str] = None
 
 
+# --- Logging Configuration ---
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
+
+
 def run_sequential_crud_tests():
-    print("=== Starting Sequential CRUD Tests ===")
+    logger.info("=== Starting Sequential CRUD Tests ===")
     create_db_and_tables()
     db: Session = next(get_session())
 
@@ -163,7 +171,7 @@ def run_sequential_crud_tests():
         }
 
         # --- 1. Company ---
-        print("\\n--- Testing Company ---")
+        logger.info("\n--- Testing Company ---")
         company_in = CompanyCreate(**company_data)
         created_company = create_company(db=db, company_in=company_in)
         assert (
@@ -171,12 +179,14 @@ def run_sequential_crud_tests():
             and created_company.name == company_data["name"]
             and created_company.is_owner == company_data["is_owner"]
         )
-        print(f"CREATE Company: {created_company.name} (ID: {created_company.id})")
+        logger.info(
+            f"CREATE Company: {created_company.name} (ID: {created_company.id})"
+        )
         employer_id = created_company.id
 
         retrieved_company = get_company(db=db, employer_id=employer_id)
         assert retrieved_company and retrieved_company.id == employer_id
-        print(f"READ Company: {retrieved_company.name}")
+        logger.info(f"READ Company: {retrieved_company.name}")
 
         company_update_data = CompanyUpdate(description="Updated company description.")
         updated_company = update_company(
@@ -186,59 +196,59 @@ def run_sequential_crud_tests():
             updated_company
             and updated_company.description == "Updated company description."
         )
-        print(
+        logger.info(
             f"UPDATE Company: {updated_company.name}, New Description: {updated_company.description}"
         )
         # delete_company is tested at the end after all dependent entities are cleaned up.
 
         # --- 2. HR ---
-        print("\\n--- Testing HR ---")
+        logger.info("\n--- Testing HR ---")
         hr_in_data = {**hr_data, "employer_id": employer_id}
         hr_in = HRCreate(**hr_in_data)
         created_hr = create_hr(db=db, hr_in=hr_in)
         assert created_hr and created_hr.email == hr_data["email"]
-        print(
+        logger.info(
             f"CREATE HR: {created_hr.full_name} (ID: {created_hr.id}) for Company ID: {employer_id}"
         )
         hr_id = created_hr.id
 
         retrieved_hr = get_hr(db=db, hr_id=hr_id)
         assert retrieved_hr and retrieved_hr.id == hr_id
-        print(f"READ HR: {retrieved_hr.full_name}")
+        logger.info(f"READ HR: {retrieved_hr.full_name}")
 
         hr_update_data = HRUpdate(full_name="Updated Test HR Name")
         updated_hr = update_hr(db=db, db_hr=retrieved_hr, hr_in=hr_update_data)
         assert updated_hr and updated_hr.full_name == "Updated Test HR Name"
-        print(f"UPDATE HR: {updated_hr.full_name}")
+        logger.info(f"UPDATE HR: {updated_hr.full_name}")
         # delete_hr is tested at the end.
 
         # --- 3. FormKey ---
-        print("\\n--- Testing FormKey ---")
+        logger.info("\n--- Testing FormKey ---")
         form_key_in_data = {**form_key_data, "employer_id": employer_id}
         form_key_in = FormKeyCreate(**form_key_in_data)
         created_form_key = create_form_key(db=db, form_key_in=form_key_in)
         assert created_form_key and created_form_key.name == form_key_data["name"]
-        print(
+        logger.info(
             f"CREATE FormKey: {created_form_key.name} (ID: {created_form_key.id}) for Company ID: {employer_id}"
         )
         form_key_id = created_form_key.id
 
         retrieved_form_key = get_form_key(db=db, form_key_id=form_key_id)
         assert retrieved_form_key and retrieved_form_key.id == form_key_id
-        print(f"READ FormKey: {retrieved_form_key.name}")
+        logger.info(f"READ FormKey: {retrieved_form_key.name}")
 
         form_key_update_data = FormKeyUpdate(field_type="text")
         updated_form_key = update_form_key(
             db=db, db_form_key=retrieved_form_key, form_key_in=form_key_update_data
         )
         assert updated_form_key and updated_form_key.field_type == "text"
-        print(
+        logger.info(
             f"UPDATE FormKey: {updated_form_key.name}, New Field Type: {updated_form_key.field_type}"
         )
         # delete_form_key is tested at the end.
 
         # --- 4. Job ---
-        print("\\n--- Testing Job ---")
+        logger.info("\n--- Testing Job ---")
         job_in_data = {**job_data, "employer_id": employer_id, "created_by": hr_id}
         job_in = JobCreate(**job_in_data)
         created_job = create_job(db=db, job_in=job_in)
@@ -246,25 +256,25 @@ def run_sequential_crud_tests():
             created_job
             and created_job.job_data["title"] == job_data["job_data"]["title"]
         )
-        print(
+        logger.info(
             f"CREATE Job: '{created_job.job_data['title']}' (ID: {created_job.id}) for Company ID: {employer_id}, HR ID: {hr_id}"
         )
         job_id = created_job.id
 
         retrieved_job = get_job(db=db, job_id=job_id)
         assert retrieved_job and retrieved_job.id == job_id
-        print(f"READ Job: '{retrieved_job.job_data['title']}'")
+        logger.info(f"READ Job: '{retrieved_job.job_data['title']}'")
 
         job_update_data = JobUpdate(status="closed")
         updated_job = update_job(db=db, db_job=retrieved_job, job_in=job_update_data)
         assert updated_job and updated_job.status == "closed"
-        print(
+        logger.info(
             f"UPDATE Job: '{updated_job.job_data['title']}', New Status: {updated_job.status}"
         )
         # delete_job is tested at the end.
 
         # --- 5. JobFormKeyConstraint ---
-        print("\\n--- Testing JobFormKeyConstraint ---")
+        logger.info("\n--- Testing JobFormKeyConstraint ---")
         constraint_data = {
             "job_id": job_id,
             "form_key_id": form_key_id,
@@ -275,7 +285,7 @@ def run_sequential_crud_tests():
             db=db, constraint_in=constraint_in
         )
         assert created_constraint and created_constraint.constraints["min_value"] == 1
-        print(
+        logger.info(
             f"CREATE JobFormKeyConstraint (ID: {created_constraint.id}) for Job ID: {job_id}, FormKey ID: {form_key_id}"
         )
         constraint_id = created_constraint.id
@@ -284,7 +294,7 @@ def run_sequential_crud_tests():
             db=db, constraint_id=constraint_id
         )
         assert retrieved_constraint and retrieved_constraint.id == constraint_id
-        print(f"READ JobFormKeyConstraint: ID {retrieved_constraint.id}")
+        logger.info(f"READ JobFormKeyConstraint: ID {retrieved_constraint.id}")
 
         constraint_update_data = JobFormKeyConstraintUpdate(
             constraints={"min_value": 2, "max_value": 5}
@@ -295,7 +305,7 @@ def run_sequential_crud_tests():
             constraint_in=constraint_update_data,
         )
         assert updated_constraint and updated_constraint.constraints["max_value"] == 5
-        print(
+        logger.info(
             f"UPDATE JobFormKeyConstraint: ID {updated_constraint.id}, New Constraints: {updated_constraint.constraints}"
         )
 
@@ -305,7 +315,7 @@ def run_sequential_crud_tests():
         # print(f"DELETE JobFormKeyConstraint: ID {deleted_constraint.id}")
 
         # --- 6. Candidate ---
-        print("\n--- Testing Candidate ---")
+        logger.info("\n--- Testing Candidate ---")
         # Use AgentClient to parse the candidate's resume text
         resume_text = (
             candidate_data["full_name"]
@@ -325,27 +335,27 @@ def run_sequential_crud_tests():
         candidate_in = CandidateCreate(**candidate_data)
         created_candidate = create_candidate(db=db, candidate_in=candidate_in)
         assert created_candidate and created_candidate.email == candidate_data["email"]
-        print(
+        logger.info(
             f"CREATE Candidate: {created_candidate.full_name} (ID: {created_candidate.id})"
         )
         candidate_id = created_candidate.id
 
         retrieved_candidate = get_candidate(db=db, candidate_id=candidate_id)
         assert retrieved_candidate and retrieved_candidate.id == candidate_id
-        print(f"READ Candidate: {retrieved_candidate.full_name}")
+        logger.info(f"READ Candidate: {retrieved_candidate.full_name}")
 
         candidate_update_data = CandidateUpdate(phone="0987654321")
         updated_candidate = update_candidate(
             db=db, db_candidate=retrieved_candidate, candidate_in=candidate_update_data
         )
         assert updated_candidate and updated_candidate.phone == "0987654321"
-        print(
+        logger.info(
             f"UPDATE Candidate: {updated_candidate.full_name}, New Phone: {updated_candidate.phone}"
         )
         # delete_candidate is tested at the end.
 
         # --- 7. Application ---
-        print("\\n--- Testing Application ---")
+        logger.info("\n--- Testing Application ---")
         application_in_data = {
             **application_data,
             "candidate_id": candidate_id,
@@ -354,14 +364,14 @@ def run_sequential_crud_tests():
         application_in = ApplicationCreate(**application_in_data)
         created_application = create_application(db=db, application_in=application_in)
         assert created_application and created_application.candidate_id == candidate_id
-        print(
+        logger.info(
             f"CREATE Application (ID: {created_application.id}) for Candidate ID: {candidate_id}, Job ID: {job_id}"
         )
         application_id = created_application.id
 
         retrieved_application = get_application(db=db, application_id=application_id)
         assert retrieved_application and retrieved_application.id == application_id
-        print(f"READ Application: ID {retrieved_application.id}")
+        logger.info(f"READ Application: ID {retrieved_application.id}")
 
         application_update_data = ApplicationUpdate(
             form_responses={"experience": "4 years", "status": "interview"}
@@ -375,25 +385,25 @@ def run_sequential_crud_tests():
             updated_application
             and updated_application.form_responses["status"] == "interview"
         )
-        print(
+        logger.info(
             f"UPDATE Application: ID {updated_application.id}, New Form Responses: {updated_application.form_responses}"
         )
         # delete_application is tested at the end.
 
         # --- 8. Match ---
-        print("\\n--- Testing Match ---")
+        logger.info("\n--- Testing Match ---")
         match_in_data = {**match_data, "application_id": application_id}
         match_in = MatchCreate(**match_in_data)
         created_match, ai_response = create_match(db=db, match_in=match_in)
         assert created_match and created_match.match_result == ai_response
-        print(
+        logger.info(
             f"CREATE Match (ID: {created_match.id}) for Application ID: {application_id}"
         )
         match_id = created_match.id
 
         retrieved_match = get_match(db=db, match_id=match_id)
         assert retrieved_match and retrieved_match.id == match_id
-        print(
+        logger.info(
             f"READ Match: ID {retrieved_match.id}, Score: {retrieved_match.match_result}"
         )
 
@@ -402,7 +412,7 @@ def run_sequential_crud_tests():
             db=db, db_match=retrieved_match, match_in=match_update_data
         )
         assert updated_match and updated_match.match_result == ai_response
-        print(
+        logger.info(
             f"UPDATE Match: ID {updated_match.id}, New Score: {updated_match.match_result}"
         )
 
@@ -412,7 +422,7 @@ def run_sequential_crud_tests():
         # print(f"DELETE Match: ID {deleted_match.id}")
 
         # --- 9. RecruiterCompanyLink ---
-        print("\n--- Testing RecruiterCompanyLink ---")
+        logger.info("\n--- Testing RecruiterCompanyLink ---")
         # Create a second company to be the recruiter (TargetLinkCo)
         recruiter_company_in = CompanyCreate(**company_data_target)
         created_recruiter_company = create_company(
@@ -422,7 +432,7 @@ def run_sequential_crud_tests():
             created_recruiter_company
             and created_recruiter_company.name == company_data_target["name"]
         )
-        print(
+        logger.info(
             f"CREATE Recruiter Company: {created_recruiter_company.name} (ID: {created_recruiter_company.id})"
         )
         recruiter_employer_id = created_recruiter_company.id
@@ -443,7 +453,7 @@ def run_sequential_crud_tests():
             created_recruiter_hr
             and created_recruiter_hr.email == recruiter_hr_data["email"]
         )
-        print(
+        logger.info(
             f"CREATE Recruiter HR: {created_recruiter_hr.full_name} (ID: {created_recruiter_hr.id})"
         )
         recruiter_hr_id = created_recruiter_hr.id
@@ -456,7 +466,7 @@ def run_sequential_crud_tests():
         link_in = RecruiterCompanyLinkCreate(**link_data)
         created_link = create_recruiter_company_link(db=db, link_in=link_in)
         assert created_link and created_link.target_employer_id == employer_id
-        print(
+        logger.info(
             f"CREATE RecruiterCompanyLink (ID: {created_link.id}) from Recruiter {recruiter_employer_id} to Target {employer_id}"
         )
         link_id = created_link.id
@@ -483,20 +493,22 @@ def run_sequential_crud_tests():
             and created_recruiter_job.job_data["title"]
             == recruiter_job_data["job_data"]["title"]
         )
-        print(
+        logger.info(
             f"CREATE Recruited Job: '{created_recruiter_job.job_data['title']}' (ID: {created_recruiter_job.id})"
         )
-        print(f"  - Created by Recruiter Company: {created_recruiter_company.name}")
-        print(f"  - For Target Company: {created_company.name}")
-        print(f"  - Created by HR: {created_recruiter_hr.full_name}")
+        logger.info(
+            f"  - Created by Recruiter Company: {created_recruiter_company.name}"
+        )
+        logger.info(f"  - For Target Company: {created_company.name}")
+        logger.info(f"  - Created by HR: {created_recruiter_hr.full_name}")
 
         retrieved_link = get_recruiter_company_link(db=db, link_id=link_id)
         assert retrieved_link and retrieved_link.id == link_id
-        print(f"READ RecruiterCompanyLink: ID {retrieved_link.id}")
+        logger.info(f"READ RecruiterCompanyLink: ID {retrieved_link.id}")
 
         # RecruiterCompanyLinkUpdate schema does not exist / model has no updatable fields other than FKs.
         # Update test for RecruiterCompanyLink is skipped. If model changes, add this.
-        print(
+        logger.info(
             "UPDATE RecruiterCompanyLink: Skipped (no updatable fields in current model/schema)"
         )
 
@@ -512,7 +524,7 @@ def run_sequential_crud_tests():
         # print(f"DELETE Target Company for Link: {deleted_target_company.name} (ID: {target_employer_id})")
 
         # --- Final Cleanup (in reverse order of creation due to dependencies) ---
-        print("\\n--- Final Cleanup ---")
+        logger.info("\n--- Final Cleanup ---")
 
         # Match already deleted in its section
         # JobFormKeyConstraint already deleted in its section
@@ -556,18 +568,19 @@ def run_sequential_crud_tests():
         #     assert get_company(db=db, employer_id=employer_id) is None
         #     print(f"DELETE Company: ID {employer_id}")
 
-        print("\\n=== Sequential CRUD Tests Completed Successfully! ===")
+        logger.info("\n=== Sequential CRUD Tests Completed Successfully! ===")
 
     except AssertionError as e:
-        print(f"\\nXXX ASSERTION FAILED XXX: {e}")
+        logger.error(f"!!! ASSERTION FAILED: {e}", exc_info=True)
+        # Re-raise to ensure the test runner catches the failure
+        raise
     except Exception as e:
-        print(f"\\nXXX AN ERROR OCCURRED XXX: {e}")
-        import traceback
-
-        traceback.print_exc()
+        logger.error(f"!!! An exception occurred during tests: {e}", exc_info=True)
+        # Re-raise to ensure the test runner catches the failure
+        raise
     finally:
         db.close()
-        print("Database session closed.")
+        logger.info("--- Database Session Closed ---")
 
 
 if __name__ == "__main__":

@@ -195,7 +195,7 @@ const JobDetails = () => {
               Analytics
             </Link>
           </Button>
-          <Button asChild className="button shadow-lg hover:shadow-xl transition-all duration-300">
+          <Button variant="outline" asChild className="shadow-md hover:shadow-lg transition-all duration-300">
             <Link to={`/jobs/${id}/matches`}>
               <Users className="mr-2 h-4 w-4" />
               View Matches
@@ -269,7 +269,7 @@ const JobDetails = () => {
             <CardContent className="space-y-4">
               <div className="flex justify-between items-center text-gray-700">
                 <span className="font-semibold">Salary</span>
-                <Badge variant="success" className="text-base">{format_salary(job.compensation)}</Badge>
+                <Badge variant="default" className="text-base">{format_salary(job.compensation)}</Badge>
               </div>
               <Separator />
               <div className="flex justify-between items-center text-gray-700">
