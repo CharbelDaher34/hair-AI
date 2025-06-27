@@ -1,7 +1,13 @@
 from enum import Enum
 from typing import Optional, List, Dict, Union
 from sqlmodel import SQLModel, Field, Relationship, Column, Text
-from sqlalchemy import Boolean, JSON, Enum as SQLAlchemyEnum, UniqueConstraint, ForeignKey
+from sqlalchemy import (
+    Boolean,
+    JSON,
+    Enum as SQLAlchemyEnum,
+    UniqueConstraint,
+    ForeignKey,
+)
 from datetime import datetime
 from pydantic import field_validator
 from models.candidate_pydantic import CandidateResume
@@ -13,8 +19,12 @@ class TimeBase(SQLModel):
 
 
 class CandidateEmployerLink(SQLModel, table=True):
-    candidate_id: int = Field(foreign_key="candidate.id", primary_key=True, ondelete="CASCADE")
-    employer_id: int = Field(foreign_key="company.id", primary_key=True, ondelete="CASCADE")
+    candidate_id: int = Field(
+        foreign_key="candidate.id", primary_key=True, ondelete="CASCADE"
+    )
+    employer_id: int = Field(
+        foreign_key="company.id", primary_key=True, ondelete="CASCADE"
+    )
 
 
 class CompanyBase(TimeBase):
@@ -54,12 +64,8 @@ class Company(CompanyBase, table=True):
         sa_relationship_kwargs={"foreign_keys": "Job.recruited_to_id"},
     )
     candidates: List["Candidate"] = Relationship(
-        back_populates="employers",
-        link_model=CandidateEmployerLink
+        back_populates="employers", link_model=CandidateEmployerLink
     )
-
-    def get_company_data(self):
-        return f"company(name={self.name},/n description={self.description},/n industry={self.industry},/n bio={self.bio},/n website={self.website},/n logo_url={self.logo_url},/n is_owner={self.is_owner},/n domain={self.domain})"
 
 
 class HRBase(TimeBase):
@@ -132,7 +138,9 @@ class FormKey(FormKeyBase, table=True):
 
 class JobFormKeyConstraintBase(TimeBase):
     job_id: int = Field(sa_column=Column(ForeignKey("job.id", ondelete="CASCADE")))
-    form_key_id: int = Field(sa_column=Column(ForeignKey("formkey.id", ondelete="CASCADE")))
+    form_key_id: int = Field(
+        sa_column=Column(ForeignKey("formkey.id", ondelete="CASCADE"))
+    )
     constraints: Dict = Field(sa_column=Column(JSON))
 
     __table_args__ = (UniqueConstraint("job_id", "form_key_id", name="uq_job_formkey"),)
@@ -179,14 +187,23 @@ class skills_base(SQLModel):
 
 
 class compensation_base(SQLModel):
-    base_salary: int = Field(default=None,description="The monthly base salary of the job in USD")
+    base_salary: int = Field(
+        default=None, description="The monthly base salary of the job in USD"
+    )
     benefits: list[str] = Field(default=[])
 
 
 class JobBase(TimeBase):
     employer_id: int = Field(foreign_key="company.id", ondelete="CASCADE")
-    recruited_to_id: Optional[int] = Field(default=None, foreign_key="company.id", ondelete="CASCADE")
-    created_by_hr_id: int = Field(foreign_key="hr.id", ondelete="SET NULL", nullable=True)
+    recruited_to_id: Optional[int] = Field(
+        default=None, foreign_key="company.id", ondelete="CASCADE"
+    )
+    created_by_hr_id: Optional[int] = Field(
+        default=None,
+        foreign_key="hr.id",
+        ondelete="SET NULL",
+        sa_column_kwargs={"nullable": True},
+    )
     status: Status = Field(
         default=Status.DRAFT,
         sa_column=Column(SQLAlchemyEnum(Status, name="status_enum", create_type=True)),
@@ -270,18 +287,16 @@ class Job(JobBase, table=True):
     )
     created_by_hr: Optional[HR] = Relationship(back_populates="jobs")
     applications: List["Application"] = Relationship(
-        back_populates="job",
-        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+        back_populates="job", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
     )
     form_key_constraints: List[JobFormKeyConstraint] = Relationship(
-        back_populates="job",
-        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+        back_populates="job", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
     )
-    
+
     def get_job_data(self):
         """
         Get a comprehensive text representation of the job data.
-        
+
         Returns:
             str: Formatted job data as text
         """
@@ -295,7 +310,7 @@ class Job(JobBase, table=True):
                 benefits = ", ".join(self.compensation["benefits"])
                 comp_parts.append(f"Benefits: {benefits}")
             compensation_text = "; ".join(comp_parts) if comp_parts else "Not specified"
-        
+
         # Format skills
         skills_text = "Not specified"
         if self.skills:
@@ -307,12 +322,14 @@ class Job(JobBase, table=True):
                 soft_skills = ", ".join(self.skills["soft_skills"])
                 skill_parts.append(f"Soft Skills: {soft_skills}")
             skills_text = "; ".join(skill_parts) if skill_parts else "Not specified"
-        
+
         # Format responsibilities
         responsibilities_text = "Not specified"
         if self.responsibilities:
-            responsibilities_text = "\n".join([f"• {resp}" for resp in self.responsibilities])
-        
+            responsibilities_text = "\n".join(
+                [f"• {resp}" for resp in self.responsibilities]
+            )
+
         # Format company information
         company_info = "Not available"
         if self.employer:
@@ -324,19 +341,19 @@ class Job(JobBase, table=True):
             if self.employer.industry:
                 company_parts.append(f"Industry: {self.employer.industry}")
             company_info = "\n".join(company_parts)
-        
+
         return f"""# JOB INFORMATION
 
 ## Basic Details
 Job ID: {self.id}
 Title: {self.title}
 Location: {self.location}
-Department: {self.department or 'Not specified'}
-Job Type: {self.job_type.replace('_', ' ').title() if self.job_type else 'Not specified'}
-Experience Level: {self.experience_level.replace('_', ' ').title() if self.experience_level else 'Not specified'}
-Seniority Level: {self.seniority_level.title() if self.seniority_level else 'Not specified'}
-Category: {self.job_category or 'Not specified'}
-Status: {self.status.title() if self.status else 'Not specified'}
+Department: {self.department or "Not specified"}
+Job Type: {self.job_type.replace("_", " ").title() if self.job_type else "Not specified"}
+Experience Level: {self.experience_level.replace("_", " ").title() if self.experience_level else "Not specified"}
+Seniority Level: {self.seniority_level.title() if self.seniority_level else "Not specified"}
+Category: {self.job_category or "Not specified"}
+Status: {self.status.title() if self.status else "Not specified"}
 
 ## Job Description
 {self.description}
@@ -354,9 +371,10 @@ Status: {self.status.title() if self.status else 'Not specified'}
 {company_info}
 
 ## Dates
-Created: {self.created_at.strftime('%B %d, %Y at %I:%M %p') if self.created_at else 'Not available'}
-Updated: {self.updated_at.strftime('%B %d, %Y at %I:%M %p') if self.updated_at else 'Not available'}
+Created: {self.created_at.strftime("%B %d, %Y at %I:%M %p") if self.created_at else "Not available"}
+Updated: {self.updated_at.strftime("%B %d, %Y at %I:%M %p") if self.updated_at else "Not available"}
 """
+
 
 class CandidateBase(TimeBase):
     full_name: str
@@ -373,8 +391,7 @@ class Candidate(CandidateBase, table=True):
 
     applications: List["Application"] = Relationship(back_populates="candidate")
     employers: List[Company] = Relationship(
-        back_populates="candidates",
-        link_model=CandidateEmployerLink
+        back_populates="candidates", link_model=CandidateEmployerLink
     )
 
 
@@ -388,7 +405,9 @@ class ApplicationStatus(str, Enum):
 
 
 class ApplicationBase(TimeBase):
-    candidate_id: int = Field(sa_column=Column(ForeignKey("candidate.id", ondelete="CASCADE")))
+    candidate_id: int = Field(
+        sa_column=Column(ForeignKey("candidate.id", ondelete="CASCADE"))
+    )
     job_id: int = Field(sa_column=Column(ForeignKey("job.id", ondelete="CASCADE")))
     form_responses: Dict = Field(default=None, sa_column=Column(JSON))
     status: ApplicationStatus = Field(
@@ -399,8 +418,10 @@ class ApplicationBase(TimeBase):
             )
         ),
     )
-    
-    __table_args__ = (UniqueConstraint("candidate_id", "job_id", name="uq_candidate_job"),)
+
+    __table_args__ = (
+        UniqueConstraint("candidate_id", "job_id", name="uq_candidate_job"),
+    )
 
 
 class Application(ApplicationBase, table=True):
@@ -425,17 +446,25 @@ class InterviewStatus(str, Enum):
 
 
 class InterviewBase(TimeBase):
-    application_id: int = Field(sa_column=Column(ForeignKey("application.id", ondelete="CASCADE")))
+    application_id: int = Field(
+        sa_column=Column(ForeignKey("application.id", ondelete="CASCADE"))
+    )
     date: datetime
     type: str
     # type: InterviewType = Field(default=InterviewType.PHONE, sa_column=Column(SQLAlchemyEnum(InterviewType, name="interviewtype_enum", create_type=True)))
     status: str
     # status: InterviewStatus = Field(default=InterviewStatus.SCHEDULED, sa_column=Column(SQLAlchemyEnum(InterviewStatus, name="interviewstatus_enum", create_type=True)))
     notes: Optional[str] = None
-    interviewer_review: Optional[str] = Field(default=None, description="Private review notes from the interviewer, not visible to candidates")
-    interviewer_id: Optional[int] = Field(default=None, sa_column=Column(ForeignKey("hr.id", ondelete="SET NULL"), nullable=True))
+    interviewer_review: Optional[str] = Field(
+        default=None,
+        description="Private review notes from the interviewer, not visible to candidates",
+    )
+    interviewer_id: Optional[int] = Field(
+        default=None,
+        sa_column=Column(ForeignKey("hr.id", ondelete="SET NULL"), nullable=True),
+    )
     category: Optional[str] = Field(default=None)
-    
+
 
 class Interview(InterviewBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -447,7 +476,9 @@ class Interview(InterviewBase, table=True):
 
 
 class MatchBase(TimeBase):
-    application_id: int = Field(sa_column=Column(ForeignKey("application.id", ondelete="CASCADE"), unique=True))
+    application_id: int = Field(
+        sa_column=Column(ForeignKey("application.id", ondelete="CASCADE"), unique=True)
+    )
 
     # Main match result fields
     score: Optional[float] = Field(default=None)
@@ -465,6 +496,7 @@ class MatchBase(TimeBase):
     flags: Optional[Dict] = Field(default=None, sa_column=Column(JSON))
 
     analysis: Optional[str] = Field(default=None)
+
 
 class Match(MatchBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)

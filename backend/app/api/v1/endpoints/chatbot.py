@@ -1,12 +1,15 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
 from sqlmodel import Session
 from typing import Optional
+import logging
 
 from core.security import decode_access_token, TokenData
 from services.mcp_sqlalchemy_server.client import Chat
 from core.database import get_session
 
 router = APIRouter()
+
+logger = logging.getLogger(__name__)
 
 
 @router.websocket("/ws")
@@ -26,7 +29,7 @@ async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_ses
         from crud.crud_company import get_company
 
         company = get_company(db=next(get_session()), employer_id=employer_id)
-        print(f"company: {company}")
+        logger.info(f"company: {company}")
         # Initialize chat client with employer_id
         chat = Chat(company=company.model_dump())
 
@@ -47,7 +50,42 @@ async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_ses
                 await websocket.send_text(response)
 
     except WebSocketDisconnect:
-        print("Client disconnected")
+        logger.info("Client disconnected")
     except Exception as e:
-        print(f"An error occurred: {e}")
+        logger.error(f"An error occurred: {e}", exc_info=True)
         await websocket.close(code=1011)
+
+
+async def send_initial_message(websocket: WebSocket, company_id: int):
+    try:
+        await websocket.send_json(
+            {
+                "sender": "bot",
+                "message": "Welcome to the chatbot! How can I assist you today?",
+                "company_id": company_id,
+            }
+        )
+    except Exception as e:
+        logger.error(f"Error sending initial message: {e}", exc_info=True)
+
+
+@router.websocket("/ws/{company_id}")
+async def websocket_endpoint(websocket: WebSocket, company_id: int):
+    await websocket.accept()
+    logger.info(f"New client connected for company: {company_id}")
+
+    await send_initial_message(websocket, company_id)
+
+    try:
+        while True:
+            data = await websocket.receive_text()
+            # Here you would process the data and generate a response
+            # For now, we'll just echo it back.
+            await websocket.send_text(f"Message text was: {data}")
+    except WebSocketDisconnect:
+        logger.info(f"Client disconnected from company: {company_id}")
+    except Exception as e:
+        logger.error(
+            f"An error occurred in websocket for company {company_id}: {e}",
+            exc_info=True,
+        )

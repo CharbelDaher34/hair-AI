@@ -7,30 +7,54 @@ from models.models import (
 )  # Import metadata to ensure all models are registered
 import os
 from dotenv import load_dotenv
+import logging
+from core.config import settings
+from contextvars import ContextVar
+from typing import Optional
 
 load_dotenv()
 
-DATABASE_URL = f"postgresql://{os.getenv('POSTGRES_USER')}:{os.getenv('POSTGRES_PASSWORD')}@{os.getenv('POSTGRES_SERVER')}:{os.getenv('POSTGRES_PORT')}/{os.getenv('POSTGRES_DB')}"
-print(DATABASE_URL)
+logger = logging.getLogger(__name__)
+
+# Context variable that stores the company_id for the current request (if any)
+current_company_id_var: ContextVar[Optional[int]] = ContextVar(
+    "current_company_id", default=None
+)
+
+# Use the centralized settings for the database URL
+DATABASE_URL = str(settings.DATABASE_URL) if settings.DATABASE_URL else ""
+logger.info("Database URL: %s", DATABASE_URL)
+DATABASE_URL_ADMIN = (
+    str(settings.ADMIN_DATABASE_URL) if settings.ADMIN_DATABASE_URL else ""
+)
 
 
 def get_engine():
+    # The main engine should use the standard DATABASE_URL
     return create_engine(DATABASE_URL, echo=False)
 
 
 def get_admin_engine():
-    DATABASE_URL = f"postgresql://charbel:charbel@{os.getenv('POSTGRES_SERVER')}:{os.getenv('POSTGRES_PORT')}/{os.getenv('POSTGRES_DB')}"
-    return create_engine(DATABASE_URL, echo=False)
+    # Admin engine might need different credentials, ensure they are set in your env
+    # For simplicity, we can use the same URL if admin user is the same
+    # Note: In a real production setup, you might have a separate ADMIN_DATABASE_URL
+    return create_engine(DATABASE_URL_ADMIN, echo=False)
 
 
 engine = get_admin_engine()
+admin_engine = get_admin_engine()
+
+
+def get_admin_session():
+    with Session(admin_engine) as session:
+        yield session
 
 
 def drop_rls_policies():
     """Drop all RLS policies to avoid dependency issues when dropping tables"""
     policies_to_drop = [
         "hr_rls ON hr",
-        "job_rls ON job", 
+        "job_rls ON job",
         "candidate_rls ON candidate",
         "application_rls ON application",
         "interview_rls ON interview",
@@ -39,38 +63,39 @@ def drop_rls_policies():
         "formkey_rls ON formkey",
         "jobformkeyconstraint_rls ON jobformkeyconstraint",
         "candidateemployerlink_rls ON candidateemployerlink",
-        "company_rls ON company"
+        "company_rls ON company",
     ]
-    
+
     admin_engine = get_admin_engine()
     with Session(admin_engine) as session:
         for policy in policies_to_drop:
             try:
                 session.execute(text(f"DROP POLICY IF EXISTS {policy}"))
-                print(f"Dropped policy: {policy}")
+                logger.info("Dropped policy: %s", policy)
             except Exception as e:
-                print(f"Could not drop policy {policy}: {e}")
+                logger.error("Could not drop policy %s: %s", policy, e)
         session.commit()
 
 
 def create_db_and_tables(admin=False, drop=False):
-    # Drop RLS policies first to avoid dependency issues    
+    # Drop RLS policies first to avoid dependency issues
     # Now drop and recreate tables
     if drop:
-        print("Dropping tables...")
+        logger.info("Dropping tables...")
         drop_rls_policies()
-        target_metadata.drop_all(get_admin_engine())
-        print("Tables dropped")
+        target_metadata.drop_all(admin_engine)
+        logger.info("Tables dropped")
 
-    
     all_exist, missing_tables = check_db_tables()
     if not all_exist:
-        print("Creating tables...")
-        target_metadata.create_all(get_admin_engine())
-        print(f"Created {len(missing_tables)} missing tables: {missing_tables}")
+        logger.info("Creating tables...")
+        target_metadata.create_all(admin_engine)
+        logger.info(
+            "Created %d missing tables: %s", len(missing_tables), missing_tables
+        )
     else:
-        print("All tables already exist")
-        
+        logger.info("All tables already exist")
+
     apply_rls_policies_only()
 
 
@@ -88,8 +113,28 @@ def check_db_tables():
 
 
 def get_session():
-    with Session(engine) as session:
+    """Return a session. If a company id is present in the context variable
+    it will automatically set the RLS variable for that company inside the DB
+    connection.
+    """
+    company_id = current_company_id_var.get()
+    logger.info("\n\n\n\n\nGetting session for company id: %s\n\n\n\n", company_id)
+    with Session(admin_engine) as session:
         yield session
+    # if company_id:
+    #     with Session(engine) as session:
+    #         session.execute(
+    #             text("SET LOCAL multi_tenancy.current_company_id = :company_id"),
+    #             {"company_id": str(company_id)},
+    #         )
+    #         yield session
+    # else:
+    #     # Set RLS variable to '0' to avoid invalid cast errors in policies
+    #     with Session(engine) as session:
+    #         session.execute(
+    #             text("SET LOCAL multi_tenancy.current_company_id = '0'"),
+    #         )
+    #         yield session
 
 
 @contextmanager
@@ -121,68 +166,72 @@ def test_rls(company_id: int):
     from sqlmodel import select
     from sqlalchemy import text
 
-    print(f"Testing row level security with company id = {company_id}")
+    logger.info("Testing row level security with company id = %s", company_id)
     with get_session_rls(company_id) as session:
         # Check if the session variable is set correctly
         session_var = session.execute(
             text("SELECT current_setting('multi_tenancy.current_company_id', TRUE)")
         ).scalar()
-        print(f"Session variable value is: '{session_var}'")
+        logger.info("Session variable value is: '%s'", session_var)
 
         stmt = select(Company)
         companies = session.exec(stmt).all()
-        print(f"Found {len(companies)} Company(s):")
+        logger.info("Found %d Company(s):", len(companies))
         for company in companies:
-            print(f"  - Company: {company.name}, ID: {company.id}")
+            logger.info("  - Company: %s, ID: %s", company.name, company.id)
 
         stmt = select(Job)
         jobs = session.exec(stmt).all()
-        print(f"Found {len(jobs)} Job(s):")
+        logger.info("Found %d Job(s):", len(jobs))
         for job in jobs:
-            print(f"  - Job: {job.title}, Company ID: {job.employer_id}")
+            logger.info("  - Job: %s, Company ID: %s", job.title, job.employer_id)
 
         stmt = select(Candidate)
         candidates = session.exec(stmt).all()
-        print(f"Found {len(candidates)} Candidate(s):")
+        logger.info("Found %d Candidate(s):", len(candidates))
         for candidate in candidates:
-            print(f"  - Candidate: {candidate.full_name}, ID: {candidate.id}")
+            logger.info("  - Candidate: %s, ID: %s", candidate.full_name, candidate.id)
 
         stmt = select(Application)
         applications = session.exec(stmt).all()
-        print(f"Found {len(applications)} Application(s):")
+        logger.info("Found %d Application(s):", len(applications))
         for application in applications:
-            print(
-                f"  - Application: {application.id}, Candidate ID: {application.candidate_id}, Job ID: {application.job_id}"
+            logger.info(
+                "  - Application: %s, Candidate ID: %s, Job ID: %s",
+                application.id,
+                application.candidate_id,
+                application.job_id,
             )
 
         stmt = select(Match)
         matches = session.exec(stmt).all()
-        print(f"Found {len(matches)} Match(es):")
+        logger.info("Found %d Match(es):", len(matches))
         # This query should only return the rows that belong to company id 1 if RLS policies are in place.
         stmt = select(HR)
         hrs = session.exec(stmt).all()
-        print(f"Found {len(hrs)} HR(s) for company id {company_id}:")
+        logger.info("Found %d HR(s) for company id %s:", len(hrs), company_id)
         for hr in hrs:
-            print(f"  - HR: {hr.full_name}, Company ID: {hr.employer_id}")
-
+            logger.info("  - HR: %s, Company ID: %s", hr.full_name, hr.employer_id)
 
 
 def apply_rls_policies_only():
     """Apply RLS policies without dropping existing ones first"""
-    
-    # check if the rls exists 
-    with get_admin_engine().begin() as connection:
-        result = connection.execute(text("""
+
+    # check if the rls exists
+    with admin_engine.begin() as connection:
+        result = connection.execute(
+            text("""
             SELECT EXISTS (
                 SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'hr'
             )
-        """))
+        """)
+        )
         rls_exists = result.scalar()
-    
+
     if rls_exists:
-        print("RLS policies already exist, skipping...")
+        logger.info("RLS policies already exist, skipping...")
         return
-    
+
     # RLS policies SQL (without the DROP statements at the beginning)
     rls_sql = """
 -- Step 0: Drop all existing RLS policies to avoid dependency issues
@@ -410,8 +459,8 @@ CREATE POLICY company_rls ON company
     FOR ALL TO public
     USING (id = current_setting('multi_tenancy.current_company_id', true)::int);
 """
-    
-    print("Applying RLS policies...")
-    with get_admin_engine().begin() as connection:
+
+    logger.info("Applying RLS policies...")
+    with admin_engine.begin() as connection:
         connection.exec_driver_sql(rls_sql)
-    print("RLS policies applied successfully!")
+    logger.info("RLS policies applied successfully!")

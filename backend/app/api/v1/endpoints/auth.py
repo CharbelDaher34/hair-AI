@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm  # For form data
 from sqlmodel import Session
 import time
+import logging
 from core.database import get_session
 from core.security import (
     create_access_token,
@@ -20,6 +21,8 @@ from schemas import HRCreate
 
 router = APIRouter()
 
+logger = logging.getLogger(__name__)
+
 
 @router.post(
     "/register",
@@ -34,7 +37,7 @@ async def register_hr_and_get_token(
     Registers an HR user and returns user details along with an access token.
     The password in HRCreate is plain text and will be hashed here.
     """
-    print(f"Registering HR: {form_data}")
+    logger.info(f"Registering HR: email={form_data.email}")
 
     # Check if user already exists
     db_hr_check = get_hr_by_email(db, email=form_data.email)
@@ -42,11 +45,11 @@ async def register_hr_and_get_token(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered"
         )
-    print(f"form_data: {form_data.password}")
+    logger.debug("Password received for HR registration (masked)")
     created_hr_user: HR = crud_create_hr(
         db=db, hr_in=form_data
     )  # Pass the HR model instance
-    print(f"created_hr_user: {created_hr_user}")
+    logger.info(f"Created HR user with ID: {created_hr_user.id}")
     if not created_hr_user:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

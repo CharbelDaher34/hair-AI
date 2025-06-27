@@ -3,16 +3,19 @@ import shutil
 import tempfile
 from pathlib import Path
 from typing import Optional
-from core.config import RESUME_STORAGE_DIR
+from core.config import settings
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def ensure_resume_directory() -> None:
     """Ensure the resume storage directory exists."""
-    os.makedirs(RESUME_STORAGE_DIR, exist_ok=True)
+    os.makedirs(settings.RESUME_STORAGE_DIR, exist_ok=True)
 
 
 def save_resume_file(temp_file_path: str, candidate_id: int) -> str:
@@ -31,7 +34,9 @@ def save_resume_file(temp_file_path: str, candidate_id: int) -> str:
     """
     ensure_resume_directory()
 
-    permanent_resume_path = os.path.join(RESUME_STORAGE_DIR, f"{candidate_id}.pdf")
+    permanent_resume_path = os.path.join(
+        settings.RESUME_STORAGE_DIR, f"{candidate_id}.pdf"
+    )
     shutil.copy2(temp_file_path, permanent_resume_path)
 
     return permanent_resume_path
@@ -47,8 +52,8 @@ def get_resume_file_path(candidate_id: int) -> Optional[str]:
     Returns:
         Path to the resume file if it exists, None otherwise
     """
-    resume_path = os.path.join(RESUME_STORAGE_DIR, f"{candidate_id}.pdf")
-    print(f"[File Utils] Resume path: {resume_path}")
+    resume_path = os.path.join(settings.RESUME_STORAGE_DIR, f"{candidate_id}.pdf")
+    logger.info(f"Resume path: {resume_path}")
     return resume_path if os.path.exists(resume_path) else None
 
 
@@ -62,7 +67,7 @@ def delete_resume_file(candidate_id: int) -> bool:
     Returns:
         True if file was deleted or didn't exist, False if deletion failed
     """
-    resume_path = os.path.join(RESUME_STORAGE_DIR, f"{candidate_id}.pdf")
+    resume_path = os.path.join(settings.RESUME_STORAGE_DIR, f"{candidate_id}.pdf")
 
     if os.path.exists(resume_path):
         try:
@@ -95,7 +100,9 @@ def get_resume_file_size(candidate_id: int) -> Optional[int]:
     return None
 
 
-def create_temp_text_file(content: str, filename_prefix: str, extension: str = 'txt') -> Optional[str]:
+def create_temp_text_file(
+    content: str, filename_prefix: str, extension: str = "txt"
+) -> Optional[str]:
     """
     Create a temporary text file with the given content.
 
@@ -109,21 +116,25 @@ def create_temp_text_file(content: str, filename_prefix: str, extension: str = '
     """
     try:
         # Create a temporary file
-        temp_fd, temp_path = tempfile.mkstemp(suffix=f'.{extension}', prefix=f'{filename_prefix}_')
-        
+        temp_fd, temp_path = tempfile.mkstemp(
+            suffix=f".{extension}", prefix=f"{filename_prefix}_"
+        )
+
         # Write content to the temporary file
-        with os.fdopen(temp_fd, 'w', encoding='utf-8') as temp_file:
+        with os.fdopen(temp_fd, "w", encoding="utf-8") as temp_file:
             temp_file.write(content)
-        
-        print(f"[File Utils] Created temp file: {temp_path}")
+
+        logger.info(f"Created temp file: {temp_path}")
         return temp_path
-        
+
     except Exception as e:
-        print(f"[File Utils] Failed to create temp file: {str(e)}")
+        logger.error(f"Failed to create temp file: {str(e)}", exc_info=True)
         return None
 
 
-def create_temp_pdf_file(content: str, filename_prefix: str, title: str = "Document") -> Optional[str]:
+def create_temp_pdf_file(
+    content: str, filename_prefix: str, title: str = "Document"
+) -> Optional[str]:
     """
     Create a temporary PDF file with the given content.
 
@@ -137,48 +148,55 @@ def create_temp_pdf_file(content: str, filename_prefix: str, title: str = "Docum
     """
     try:
         # Create a temporary file
-        temp_fd, temp_path = tempfile.mkstemp(suffix='.pdf', prefix=f'{filename_prefix}_')
+        temp_fd, temp_path = tempfile.mkstemp(
+            suffix=".pdf", prefix=f"{filename_prefix}_"
+        )
         os.close(temp_fd)  # Close the file descriptor since we'll use the path
-        
+
         # Create PDF document
-        doc = SimpleDocTemplate(temp_path, pagesize=letter,
-                              rightMargin=72, leftMargin=72,
-                              topMargin=72, bottomMargin=18)
-        
+        doc = SimpleDocTemplate(
+            temp_path,
+            pagesize=letter,
+            rightMargin=72,
+            leftMargin=72,
+            topMargin=72,
+            bottomMargin=18,
+        )
+
         # Get styles
         styles = getSampleStyleSheet()
         title_style = ParagraphStyle(
-            'CustomTitle',
-            parent=styles['Heading1'],
+            "CustomTitle",
+            parent=styles["Heading1"],
             fontSize=16,
             spaceAfter=30,
-            alignment=1  # Center alignment
+            alignment=1,  # Center alignment
         )
-        
+
         # Build content
         story = []
-        
+
         # Add title
         story.append(Paragraph(title, title_style))
         story.append(Spacer(1, 12))
-        
+
         # Split content into paragraphs and add to story
-        paragraphs = content.split('\n\n')
+        paragraphs = content.split("\n\n")
         for para in paragraphs:
             if para.strip():
                 # Replace newlines within paragraphs with <br/> tags
-                formatted_para = para.replace('\n', '<br/>')
-                story.append(Paragraph(formatted_para, styles['Normal']))
+                formatted_para = para.replace("\n", "<br/>")
+                story.append(Paragraph(formatted_para, styles["Normal"]))
                 story.append(Spacer(1, 12))
-        
+
         # Build PDF
         doc.build(story)
-        
-        print(f"[File Utils] Created temp PDF file: {temp_path}")
+
+        logger.info(f"Created temp PDF file: {temp_path}")
         return temp_path
-        
+
     except Exception as e:
-        print(f"[File Utils] Failed to create temp PDF file: {str(e)}")
+        logger.error(f"Failed to create temp PDF file: {str(e)}", exc_info=True)
         return None
 
 
@@ -195,9 +213,11 @@ def cleanup_temp_file(file_path: str) -> bool:
     try:
         if file_path and os.path.exists(file_path):
             os.remove(file_path)
-            print(f"[File Utils] Cleaned up temp file: {file_path}")
+            logger.info(f"Cleaned up temp file: {file_path}")
             return True
         return True  # File didn't exist, so cleanup was successful
     except Exception as e:
-        print(f"[File Utils] Failed to cleanup temp file {file_path}: {str(e)}")
+        logger.error(
+            f"Failed to cleanup temp file {file_path}: {str(e)}", exc_info=True
+        )
         return False

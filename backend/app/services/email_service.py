@@ -8,18 +8,18 @@ from typing import Optional, List, Dict
 import logging
 import os
 
-from core.config import SMTP_HOST, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD, FROM_EMAIL
+from core.config import settings
 
 logger = logging.getLogger(__name__)
 
 
 class EmailService:
     def __init__(self):
-        self.smtp_host = SMTP_HOST
-        self.smtp_port = SMTP_PORT
-        self.smtp_username = SMTP_USERNAME
-        self.smtp_password = SMTP_PASSWORD
-        self.from_email = FROM_EMAIL
+        self.smtp_host = settings.SMTP_HOST
+        self.smtp_port = settings.SMTP_PORT
+        self.smtp_username = settings.SMTP_USERNAME
+        self.smtp_password = settings.SMTP_PASSWORD
+        self.from_email = settings.FROM_EMAIL
 
     async def send_email(
         self,
@@ -31,7 +31,7 @@ class EmailService:
     ) -> bool:
         """
         Send an email using SMTP.
-        
+
         Args:
             to_email: Recipient email address
             subject: Email subject
@@ -39,7 +39,7 @@ class EmailService:
             text_content: Plain text content (optional)
             attachments: List of attachments with format:
                 [{"file_path": "/path/to/file", "filename": "display_name.pdf"}]
-            
+
         Returns:
             bool: True if email was sent successfully, False otherwise
         """
@@ -70,23 +70,23 @@ class EmailService:
                 for attachment in attachments:
                     file_path = attachment.get("file_path")
                     filename = attachment.get("filename")
-                    
+
                     if file_path and os.path.exists(file_path):
                         try:
                             with open(file_path, "rb") as attachment_file:
                                 # Create MIMEBase object
-                                part = MIMEBase('application', 'octet-stream')
+                                part = MIMEBase("application", "octet-stream")
                                 part.set_payload(attachment_file.read())
-                                
+
                                 # Encode file in ASCII characters to send by email
                                 encoders.encode_base64(part)
-                                
+
                                 # Add header as key/value pair to attachment part
                                 part.add_header(
-                                    'Content-Disposition',
-                                    f'attachment; filename= {filename or os.path.basename(file_path)}',
+                                    "Content-Disposition",
+                                    f"attachment; filename= {filename or os.path.basename(file_path)}",
                                 )
-                                
+
                                 # Attach the part to message
                                 message.attach(part)
                                 logger.info(f"Attached file: {filename or file_path}")
@@ -112,20 +112,22 @@ class EmailService:
             logger.error(f"Failed to send email to {to_email}: {str(e)}")
             return False
 
-    async def send_otp_email(self, to_email: str, otp_code: str, full_name: str = "") -> bool:
+    async def send_otp_email(
+        self, to_email: str, otp_code: str, full_name: str = ""
+    ) -> bool:
         """
         Send OTP verification email.
-        
+
         Args:
             to_email: Recipient email address
             otp_code: OTP code to send
             full_name: Recipient's full name (optional)
-            
+
         Returns:
             bool: True if email was sent successfully, False otherwise
         """
         subject = "Email Verification - Your OTP Code"
-        
+
         # Create HTML content
         html_content = f"""
         <!DOCTYPE html>
@@ -276,4 +278,4 @@ class EmailService:
 
 
 # Create a global instance
-email_service = EmailService() 
+email_service = EmailService()

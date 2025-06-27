@@ -20,7 +20,10 @@ logger.setLevel(logging.DEBUG)
 
 class MatchAnalysis(BaseModel):
     """Pydantic model for match analysis"""
-    analysis: str = Field(..., description="Comprehensive analysis of the candidate-job match")
+
+    analysis: str = Field(
+        ..., description="Comprehensive analysis of the candidate-job match"
+    )
 
 
 class Matcher:
@@ -33,7 +36,7 @@ class Matcher:
         """
         self.embedding_model = SentenceTransformer(model_name)
         logger.error(f"Initialized embedding model: {model_name}")
-        
+
         # Initialize LLM for match analysis
         system_prompt = """You are an expert HR analyst specializing in candidate-job matching. 
         Your task is to analyze how well a candidate matches a specific job opportunity.
@@ -46,17 +49,17 @@ class Matcher:
         5. A recommendation for next steps
         
         Be objective, professional, and constructive in your analysis."""
-        
+
         try:
             self.llm_analyzer = LLM(
                 result_type=MatchAnalysis,
                 system_prompt=system_prompt,
-                model_settings={"temperature": 0.3, "top_p": 0.9}
+                model_settings={"temperature": 0.3, "top_p": 0.9},
             )
         except Exception as e:
             logger.error(f"Failed to initialize LLM analyzer: {e}")
             self.llm_analyzer = None
-      
+
     def get_embedding(self, text: str) -> np.ndarray:
         """
         Generate embedding for a given text.
@@ -69,23 +72,31 @@ class Matcher:
         """
         return self.embedding_model.encode(text)
 
-    def calculate_embedding_similarity(self, embedding_one: np.ndarray, embedding_two: np.ndarray) -> float:
+    def calculate_embedding_similarity(
+        self, embedding_one: np.ndarray, embedding_two: np.ndarray
+    ) -> float:
         """
         Calculate cosine similarity between two embeddings.
-        
+
         Returns:
             float: Raw cosine similarity score in range [-1, 1]
         """
-        return np.dot(embedding_one, embedding_two) / (np.linalg.norm(embedding_one) * np.linalg.norm(embedding_two))
+        return np.dot(embedding_one, embedding_two) / (
+            np.linalg.norm(embedding_one) * np.linalg.norm(embedding_two)
+        )
 
-    def calculate_normalized_embedding_similarity(self, embedding_one: np.ndarray, embedding_two: np.ndarray) -> float:
+    def calculate_normalized_embedding_similarity(
+        self, embedding_one: np.ndarray, embedding_two: np.ndarray
+    ) -> float:
         """
         Calculate normalized cosine similarity between two embeddings.
-        
+
         Returns:
             float: Normalized cosine similarity score in range [0, 1]
         """
-        raw_similarity = self.calculate_embedding_similarity(embedding_one, embedding_two)
+        raw_similarity = self.calculate_embedding_similarity(
+            embedding_one, embedding_two
+        )
         return (raw_similarity + 1.0) / 2.0
 
     def calculate_text_similarity(self, text_one: str, text_two: str) -> float:
@@ -108,34 +119,39 @@ class Matcher:
         similarity = np.dot(embedding_one, embedding_two) / (
             np.linalg.norm(embedding_one) * np.linalg.norm(embedding_two)
         )
-        
+
         # Normalize cosine similarity from [-1, 1] to [0, 1] to prevent negative scores
         # This ensures embedding similarity contributes positively to the final score
         normalized_similarity = (similarity + 1.0) / 2.0
-        
+
         return float(max(0.0, min(1.0, normalized_similarity)))
 
-
-    def fuzzy_match_skills(self, required_skills: List[str], candidate_skills: List[str], threshold: float = 0.6) -> Dict:
+    def fuzzy_match_skills(
+        self,
+        required_skills: List[str],
+        candidate_skills: List[str],
+        threshold: float = 0.6,
+    ) -> Dict:
         """
         Perform fuzzy matching between required and candidate skills using the ner_skills match_skills method.
-        
+
         Args:
             required_skills: List of required skills
             candidate_skills: List of candidate skills
             fthreshold: Minimum fuzzy match score to consider a match (0-1)
-            
+
         Returns:
             Dict containing matching, missing, and extra skills with analysis
         """
         print(f"Required skills: {required_skills}")
         print(f"Candidate skills: {candidate_skills}")
         print(f"Threshold: {threshold}")
-        
 
         # Use the existing match_skills method from ner_skills
-        match_result = skill_ner.match_skills(required_skills, candidate_skills, threshold)
-       
+        match_result = skill_ner.match_skills(
+            required_skills, candidate_skills, threshold
+        )
+
         # Convert to the expected format with additional details
         # Extract skill names from the matching_skills dictionaries
         matching_skills = []
@@ -145,14 +161,24 @@ class Matcher:
                     matching_skills.append(match["job"])
                 elif isinstance(match, str):
                     matching_skills.append(match)
-        
-        missing_skills = list(match_result["missing_skills"]) if match_result["missing_skills"] else []
-        extra_skills = list(match_result["extra_skills"]) if match_result["extra_skills"] else []
-        
-        match_percentage = (len(matching_skills) / len(required_skills) * 100) if required_skills else 0
+
+        missing_skills = (
+            list(match_result["missing_skills"])
+            if match_result["missing_skills"]
+            else []
+        )
+        extra_skills = (
+            list(match_result["extra_skills"]) if match_result["extra_skills"] else []
+        )
+
+        match_percentage = (
+            (len(matching_skills) / len(required_skills) * 100)
+            if required_skills
+            else 0
+        )
         # Ensure match_percentage is never negative
         match_percentage = max(0.0, match_percentage)
-        
+
         return {
             "matching_skills": matching_skills,
             "missing_skills": missing_skills,
@@ -171,9 +197,13 @@ class Matcher:
 
         # Extract skills from the rendered text using NER
         try:
-            extracted_skills = [s.lower() for s in skill_ner.extract_skills(job_full_text)]
+            extracted_skills = [
+                s.lower() for s in skill_ner.extract_skills(job_full_text)
+            ]
         except Exception as e:
-            logger.error(f"Error extracting skills from job: {e}\n{traceback.format_exc()}")
+            logger.error(
+                f"Error extracting skills from job: {e}\n{traceback.format_exc()}"
+            )
             extracted_skills = []
 
         # Deduplicate skills to avoid overlap between provided and extracted skills
@@ -181,11 +211,13 @@ class Matcher:
         unique_hard = sorted(list(set(hard_skills)))
         unique_soft = sorted(list(set(soft_skills)))
         # Extracted skills might overlap with hard/soft, so we find what's truly "other"
-        unique_extracted = sorted(list(set(extracted_skills) - set(unique_hard) - set(unique_soft)))
+        unique_extracted = sorted(
+            list(set(extracted_skills) - set(unique_hard) - set(unique_soft))
+        )
 
         # Create a unified text representation of all unique skills for embedding
         all_skills_text = " ".join(unique_hard + unique_soft + unique_extracted)
-        
+
         return {
             "hard_skills": unique_hard,
             "soft_skills": unique_soft,
@@ -195,41 +227,77 @@ class Matcher:
             "skills_embedding": self.get_embedding(all_skills_text),
             "full_text_embedding": self.get_embedding(job_full_text),
         }
-        
-    async def _score_candidate(self, cand: Dict, job_data: Dict, weights: Dict, fuzzy_threshold: float) -> Dict:
+
+    async def _score_candidate(
+        self, cand: Dict, job_data: Dict, weights: Dict, fuzzy_threshold: float
+    ) -> Dict:
         """Scores a single candidate against pre-processed job data."""
         # Candidate skill extraction
-        cand_hard = [s["name"].lower() for s in cand.get("skills", []) if s.get("type") == "Hard" and s.get("name")]
-        cand_soft = [s["name"].lower() for s in cand.get("skills", []) if s.get("type") == "Soft" and s.get("name")]
-        
+        cand_hard = [
+            s["name"].lower()
+            for s in cand.get("skills", [])
+            if s.get("type") == "Hard" and s.get("name")
+        ]
+        cand_soft = [
+            s["name"].lower()
+            for s in cand.get("skills", [])
+            if s.get("type") == "Soft" and s.get("name")
+        ]
+
         cand_full_text = render_model(cand)
         try:
-            cand_extracted = [s.lower() for s in skill_ner.extract_skills(cand_full_text)]
+            cand_extracted = [
+                s.lower() for s in skill_ner.extract_skills(cand_full_text)
+            ]
         except Exception as e:
-            logger.error(f"Error extracting skills from candidate: {e}\n{traceback.format_exc()}")
+            logger.error(
+                f"Error extracting skills from candidate: {e}\n{traceback.format_exc()}"
+            )
             cand_extracted = []
-        
+
         cand_all_skills_text = " ".join(cand_hard + cand_soft + cand_extracted)
-        
+
         # Fuzzy skill matching analysis
-        hard_analysis = self.fuzzy_match_skills(job_data["hard_skills"], cand_hard, fuzzy_threshold)
-        soft_analysis = self.fuzzy_match_skills(job_data["soft_skills"], cand_soft, fuzzy_threshold)
-        extracted_analysis = self.fuzzy_match_skills(job_data["extracted_skills"], cand_extracted, fuzzy_threshold)
-        
-        all_missing = (hard_analysis.get("missing_skills", []) or []) + (soft_analysis.get("missing_skills", []) or []) + (extracted_analysis.get("missing_skills", []) or [])
-        all_extra = (hard_analysis.get("extra_skills", []) or []) + (soft_analysis.get("extra_skills", []) or []) + (extracted_analysis.get("extra_skills", []) or [])
-        all_matching = (hard_analysis.get("matching_skills", []) or []) + (soft_analysis.get("matching_skills", []) or []) + (extracted_analysis.get("matching_skills", []) or [])
-        
+        hard_analysis = self.fuzzy_match_skills(
+            job_data["hard_skills"], cand_hard, fuzzy_threshold
+        )
+        soft_analysis = self.fuzzy_match_skills(
+            job_data["soft_skills"], cand_soft, fuzzy_threshold
+        )
+        extracted_analysis = self.fuzzy_match_skills(
+            job_data["extracted_skills"], cand_extracted, fuzzy_threshold
+        )
+
+        all_missing = (
+            (hard_analysis.get("missing_skills", []) or [])
+            + (soft_analysis.get("missing_skills", []) or [])
+            + (extracted_analysis.get("missing_skills", []) or [])
+        )
+        all_extra = (
+            (hard_analysis.get("extra_skills", []) or [])
+            + (soft_analysis.get("extra_skills", []) or [])
+            + (extracted_analysis.get("extra_skills", []) or [])
+        )
+        all_matching = (
+            (hard_analysis.get("matching_skills", []) or [])
+            + (soft_analysis.get("matching_skills", []) or [])
+            + (extracted_analysis.get("matching_skills", []) or [])
+        )
+
         # Calculate component scores
         hard_score = (hard_analysis.get("match_percentage", 0) or 0) / 100
         soft_score = (soft_analysis.get("match_percentage", 0) or 0) / 100
         extracted_score = (extracted_analysis.get("match_percentage", 0) or 0) / 100
-        
+
         cand_skills_embedding = self.get_embedding(cand_all_skills_text)
-        skills_sim = self.calculate_normalized_embedding_similarity(cand_skills_embedding, job_data["skills_embedding"])
-        
+        skills_sim = self.calculate_normalized_embedding_similarity(
+            cand_skills_embedding, job_data["skills_embedding"]
+        )
+
         cand_full_text_embedding = self.get_embedding(cand_full_text)
-        overall_sim = self.calculate_normalized_embedding_similarity(cand_full_text_embedding, job_data["full_text_embedding"])
+        overall_sim = self.calculate_normalized_embedding_similarity(
+            cand_full_text_embedding, job_data["full_text_embedding"]
+        )
 
         # Calculate composite skills_score
         skill_weights = weights["skill_weights"]
@@ -239,7 +307,11 @@ class Matcher:
             "extracted_skills": extracted_score,
             "skills_embedding_similarity": skills_sim,
         }
-        skills_score = sum(skill_weights.get(k, 0) * v for k, v in skills_score_components.items() if k in skill_weights)
+        skills_score = sum(
+            skill_weights.get(k, 0) * v
+            for k, v in skills_score_components.items()
+            if k in skill_weights
+        )
 
         # Calculate final weighted score
         final_weights = weights["final_weights"]
@@ -247,7 +319,11 @@ class Matcher:
             "skills_score": skills_score,
             "overall_similarity": overall_sim,
         }
-        final_score = sum(final_weights.get(k, 0) * v for k, v in final_score_components.items() if k in final_weights)
+        final_score = sum(
+            final_weights.get(k, 0) * v
+            for k, v in final_score_components.items()
+            if k in final_weights
+        )
 
         # Generate a reason for the match
         analysis = await self.analyze_match(cand_full_text, job_data["full_text"])
@@ -259,23 +335,23 @@ class Matcher:
             "missing_skills": sorted(list(set(all_missing))),
             "extra_skills": sorted(list(set(all_extra))),
             "matching_skills": sorted(list(set(all_matching))),
-            "analysis": analysis
+            "analysis": analysis,
         }
 
     async def analyze_match(self, candidate_text: str, job_text: str) -> str:
         """
         Generate an LLM-powered analysis of the candidate-job match.
-        
+
         Args:
             candidate_text: Full text representation of candidate
             job_text: Full text representation of job
-            
+
         Returns:
             String analysis of the match
         """
         if not self.llm_analyzer:
             return "Analysis unavailable - LLM not initialized"
-            
+
         try:
             prompt = f"""
             Please analyze this candidate-job match:
@@ -289,10 +365,10 @@ class Matcher:
             Provide a comprehensive analysis of how well this candidate matches the job requirements.
             Include strengths, concerns, overall assessment, and recommendations.
             """
-            
+
             # Use the LLM to generate analysis
             analysis_result = await self.llm_analyzer.llm_agent.run([prompt])
-            
+
             # Extract analysis from the result
             if isinstance(analysis_result, dict) and "analysis" in analysis_result:
                 return analysis_result["analysis"]
@@ -300,18 +376,19 @@ class Matcher:
                 return analysis_result.analysis
             else:
                 return str(analysis_result)
-                
-        except Exception as e:
-            logger.error(f"Error generating match analysis: {e}\n{traceback.format_exc()}")
-            return f"Analysis error: {str(e)}"
 
+        except Exception as e:
+            logger.error(
+                f"Error generating match analysis: {e}\n{traceback.format_exc()}"
+            )
+            return f"Analysis error: {str(e)}"
 
     async def match_candidates(
         self,
         job: Dict,
         candidates: List[Dict],
         weights: Optional[Dict] = None,
-        fuzzy_threshold: float = 0.60
+        fuzzy_threshold: float = 0.60,
     ) -> List[Dict]:
         """
         Rank candidates against a job using a two-level scoring model.
@@ -338,7 +415,7 @@ class Matcher:
         Returns:
             List of candidate matches with detailed analysis
         """
-        
+
         if not candidates:
             return []
         try:
@@ -353,49 +430,58 @@ class Matcher:
                     "soft_skills": 0.05,
                     "extracted_skills": 0.05,
                     "skills_embedding_similarity": 0.85,
-                }
+                },
             }
-            
+
             user_final_weights = (weights or {}).get("final_score_weights", {})
-            final_weights = {**default_weights["final_score_weights"], **user_final_weights}
-    
+            final_weights = {
+                **default_weights["final_score_weights"],
+                **user_final_weights,
+            }
+
             user_skill_weights = (weights or {}).get("skill_score_weights", {})
-            skill_weights = {**default_weights["skill_score_weights"], **user_skill_weights}
-    
+            skill_weights = {
+                **default_weights["skill_score_weights"],
+                **user_skill_weights,
+            }
+
             # Strip zero-weight keys & renormalise for final score
             final_weights = {k: v for k, v in final_weights.items() if v > 0}
             total_final_w = sum(final_weights.values())
             if total_final_w > 0:
                 final_weights = {k: v / total_final_w for k, v in final_weights.items()}
-    
+
             # Strip zero-weight keys & renormalise for skill score
             skill_weights = {k: v for k, v in skill_weights.items() if v > 0}
             total_skill_w = sum(skill_weights.values())
             if total_skill_w > 0:
                 skill_weights = {k: v / total_skill_w for k, v in skill_weights.items()}
-            
+
             processed_weights = {
                 "final_weights": final_weights,
-                "skill_weights": skill_weights
+                "skill_weights": skill_weights,
             }
 
             # ---------- 2. Job preprocessing ----------
             job_data = self._prepare_job_data(job)
-    
+
             # ---------- 3. Score all candidates ----------
             results = []
             for cand in candidates:
-                result = await self._score_candidate(cand, job_data, processed_weights, fuzzy_threshold)
+                result = await self._score_candidate(
+                    cand, job_data, processed_weights, fuzzy_threshold
+                )
                 result["weights_used"] = processed_weights
                 results.append(result)
-    
+
             return sorted(results, key=lambda x: x["score"], reverse=True)
         except Exception as e:
-            logger.error(f"Error during candidate matching: {e}\n{traceback.format_exc()}")
+            logger.error(
+                f"Error during candidate matching: {e}\n{traceback.format_exc()}"
+            )
             return []
 
-    
-    
+
 # # Exampl    e usage
 # if __name__ == "__main__":
 #     # In  itialize the matcher
@@ -472,7 +558,7 @@ class Matcher:
 #         print("  Final Score Components:")
 #         for component, score in match["score_breakdown"]["final_score_components"].items():
 #             print(f"  - {component}: {score}")
-            
+
 #         print("\n  Skills Score Components:")
 #         for component, score in match["score_breakdown"]["skills_score_components"].items():
 #             print(f"  - {component}: {score}")

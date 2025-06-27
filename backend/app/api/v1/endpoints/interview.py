@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Any, List, Optional
+import logging
 
 from core.database import get_session
 from fastapi import APIRouter, Depends, HTTPException, Request, Form
@@ -18,8 +19,12 @@ from core.security import TokenData, verify_interview_review_token  # For type h
 
 router = APIRouter()
 
+logger = logging.getLogger(__name__)
+
+
 class InterviewerReviewUpdate(BaseModel):
     interviewer_review: str
+
 
 class InterviewReviewFormSubmission(BaseModel):
     review_text: str
@@ -126,6 +131,7 @@ def update_interview(
     )
     return interview
 
+
 @router.patch("/{interview_id}/status", response_model=InterviewRead)
 def update_interview_status(
     *,
@@ -140,8 +146,10 @@ def update_interview_status(
     interview = crud_interview.get_interview(db=db, interview_id=interview_id)
     if not interview:
         raise HTTPException(status_code=404, detail="Interview not found")
-    interview_in = InterviewUpdate(status=interview_in.status,updated_at=datetime.now())
-    if interview_in.status in ["cancelled", "canceled","Canceled","Cancelled"]:
+    interview_in = InterviewUpdate(
+        status=interview_in.status, updated_at=datetime.now()
+    )
+    if interview_in.status in ["cancelled", "canceled", "Canceled", "Cancelled"]:
         interview = crud_interview.update_interview(
             db=db, db_obj=interview, obj_in=interview_in, notify=True, reason=reason
         )
@@ -150,6 +158,7 @@ def update_interview_status(
             db=db, db_obj=interview, obj_in=interview_in, notify=True
         )
     return interview
+
 
 @router.delete("/{interview_id}", response_model=InterviewRead)
 def delete_interview(
@@ -168,6 +177,7 @@ def delete_interview(
     #     raise HTTPException(status_code=400, detail="Not enough permissions")
     interview = crud_interview.delete_interview(db=db, interview_id=interview_id)
     return interview
+
 
 @router.patch("/{interview_id}/review", response_model=InterviewRead)
 def update_interviewer_review(
@@ -188,22 +198,23 @@ def update_interviewer_review(
     interview = crud_interview.get_interview(db=db, interview_id=interview_id)
     if not interview:
         raise HTTPException(status_code=404, detail="Interview not found")
-    
+
     # Check if the current user is the interviewer or has HR permissions
-    if (interview.interviewer_id != current_user.id and 
-        current_user.user_type != "hr"):
-        raise HTTPException(status_code=403, detail="Not authorized to update this review")
-    
+    if interview.interviewer_id != current_user.id and current_user.user_type != "hr":
+        raise HTTPException(
+            status_code=403, detail="Not authorized to update this review"
+        )
+
     # Update only the interviewer_review field
     interview_update = InterviewUpdate(
-        interviewer_review=review_data.interviewer_review,
-        updated_at=datetime.now()
+        interviewer_review=review_data.interviewer_review, updated_at=datetime.now()
     )
-    
+
     interview = crud_interview.update_interview(
         db=db, db_obj=interview, obj_in=interview_update
     )
     return interview
+
 
 @router.get("/review-form/{token}", response_class=HTMLResponse)
 def get_interview_review_form(token: str, db: Session = Depends(get_session)) -> str:
@@ -215,19 +226,21 @@ def get_interview_review_form(token: str, db: Session = Depends(get_session)) ->
         token_data = verify_interview_review_token(token)
         interview_id = token_data["interview_id"]
         interviewer_id = token_data["interviewer_id"]
-        
+
         # Get interview details
-        interview = crud_interview.get_interview_with_application(db=db, interview_id=interview_id)
+        interview = crud_interview.get_interview_with_application(
+            db=db, interview_id=interview_id
+        )
         if not interview:
             raise HTTPException(status_code=404, detail="Interview not found")
-        
+
         # Verify the interviewer
         if interview.interviewer_id != interviewer_id:
             raise HTTPException(status_code=403, detail="Unauthorized access")
-        
+
         # Get current review if exists
         current_review = interview.interviewer_review or ""
-        
+
         # Create HTML form
         html_content = f"""
         <!DOCTYPE html>
@@ -378,19 +391,19 @@ def get_interview_review_form(token: str, db: Session = Depends(get_session)) ->
                     <h3 style="margin-top: 0; color: #374151;">Interview Details</h3>
                     <div class="detail-row">
                         <span class="detail-label">Candidate:</span>
-                        <span class="detail-value">{interview.application.candidate.full_name if interview.application and interview.application.candidate else 'N/A'}</span>
+                        <span class="detail-value">{interview.application.candidate.full_name if interview.application and interview.application.candidate else "N/A"}</span>
                     </div>
                     <div class="detail-row">
                         <span class="detail-label">Position:</span>
-                        <span class="detail-value">{interview.application.job.title if interview.application and interview.application.job else 'N/A'}</span>
+                        <span class="detail-value">{interview.application.job.title if interview.application and interview.application.job else "N/A"}</span>
                     </div>
                     <div class="detail-row">
                         <span class="detail-label">Date:</span>
-                        <span class="detail-value">{interview.date.strftime('%B %d, %Y at %I:%M %p')}</span>
+                        <span class="detail-value">{interview.date.strftime("%B %d, %Y at %I:%M %p")}</span>
                     </div>
                     <div class="detail-row">
                         <span class="detail-label">Type:</span>
-                        <span class="detail-value">{interview.type.replace('_', ' ').title()}</span>
+                        <span class="detail-value">{interview.type.replace("_", " ").title()}</span>
                     </div>
                 </div>
 
@@ -478,9 +491,9 @@ def get_interview_review_form(token: str, db: Session = Depends(get_session)) ->
         </body>
         </html>
         """
-        
+
         return html_content
-        
+
     except Exception as e:
         # Return error page
         error_html = f"""
@@ -502,42 +515,45 @@ def get_interview_review_form(token: str, db: Session = Depends(get_session)) ->
         """
         return error_html
 
+
 @router.post("/submit-review")
 def submit_interview_review(
-    review_submission: InterviewReviewFormSubmission,
-    db: Session = Depends(get_session)
+    review_submission: InterviewReviewFormSubmission, db: Session = Depends(get_session)
 ) -> dict:
     """
     Submit interview review via the form
     """
-    print(review_submission)
+    logger.info(review_submission)
     try:
         # Verify token
         token_data = verify_interview_review_token(review_submission.token)
         interview_id = token_data["interview_id"]
         interviewer_id = token_data["interviewer_id"]
-        
+
         # Get interview
         interview = crud_interview.get_interview(db=db, interview_id=interview_id)
         if not interview:
             raise HTTPException(status_code=404, detail="Interview not found")
-        
+
         # Verify interviewer
         if interview.interviewer_id != interviewer_id:
-            print("tomato is food")
+            logger.error(
+                f"Unauthorized attempt to submit review. "
+                f"Interviewer ID {interviewer_id} tried to access interview {interview_id}."
+            )
             raise HTTPException(status_code=403, detail="Unauthorized access")
-        
+
         # Update the review
         interview_update = InterviewUpdate(
-            interviewer_review=review_submission.review_text,
-            updated_at=datetime.now()
+            interviewer_review=review_submission.review_text, updated_at=datetime.now()
         )
-        
+
         crud_interview.update_interview(
             db=db, db_obj=interview, obj_in=interview_update
         )
-        
+
         return {"message": "Review submitted successfully"}
-        
+
     except Exception as e:
+        logger.error(f"Error submitting review: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))

@@ -111,7 +111,9 @@ def delete_job(db: Session, *, job_id: int) -> Optional[Job]:
     return db_job
 
 
-def get_job_matches(db: Session, job_id: int, top_5: bool = False) -> List[tuple[Match, Candidate]]:
+def get_job_matches(
+    db: Session, job_id: int, top_5: bool = False
+) -> List[tuple[Match, Candidate]]:
     # Get matches with candidates through applications since matches are linked to applications, not directly to jobs
     statement = (
         select(Match, Candidate)
@@ -248,10 +250,11 @@ def get_job_analytics(db: Session, job_id: int) -> JobAnalytics:
     match_to_interview_rate = (
         round((total_interviews / total_matches * 100), 1) if total_matches > 0 else 0.0
     )
-    
+
     # Get top 5 matches
     top_5_matches = db.exec(
-        select(Match).where(Match.application_id.in_(application_ids))
+        select(Match)
+        .where(Match.application_id.in_(application_ids))
         .order_by(Match.score.desc())
         .limit(5)
     ).all()

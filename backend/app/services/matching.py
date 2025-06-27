@@ -3,11 +3,18 @@ from typing import List, Optional
 import requests
 import os
 import time
+import logging
+from sqlalchemy.orm import Session
+from models.models import Match
+from schemas.match import MatchCreate
+
+logger = logging.getLogger(__name__)
 
 
 def _get_matcher_url():
     """
-    Determines the correct matcher URL by checking health endpoints of potential hosts.
+    Determines the correct base AI service URL by checking health endpoints of potential hosts.
+    Returns an empty string if the service is not available.
     """
     matcher_url = os.getenv("ai_url")
     if matcher_url:
@@ -19,23 +26,28 @@ def _get_matcher_url():
         base_url = f"http://{host}:{port}"
         health_url = f"{base_url}/health"
         try:
-            print(f"Trying to connect to {health_url}")
+            logger.info(f"Trying to connect to {health_url}")
             response = requests.get(health_url, timeout=5)
             response.raise_for_status()
-            print(f"✅ AI service is running at {base_url}")
+            logger.info(f"✅ AI service is running at {base_url}")
             return f"{base_url}/matcher/match_candidates"
         except requests.exceptions.RequestException as e:
-            print(f"❌ Could not connect to {health_url}: {e}")
+            logger.error(f"❌ Could not connect to {health_url}: {e}", exc_info=True)
 
-    print("❌ AI service is not running or not accessible.")
+    logger.error("❌ AI service is not running or not accessible.")
     return ""
 
 
 try:
     MATCHER_URL = _get_matcher_url()
-    print(f"✅ Matcher URL: {MATCHER_URL}")
+    if MATCHER_URL:
+        logger.info(f"✅ Matcher URL: {MATCHER_URL}")
+    else:
+        logger.warning(
+            "⚠️ Matcher URL could not be determined. Matching functionality will be disabled."
+        )
 except Exception as e:
-    print(f"❌ Could not get matcher URL: {e}")
+    logger.error(f"❌ Could not get matcher URL: {e}", exc_info=True)
     MATCHER_URL = ""
 
 
@@ -48,14 +60,14 @@ def match_candidates_client(
 ):
     """
     Call the AI matcher service with structured job and candidate data.
-    
+
     Args:
         job: Job dictionary with title, description, skills, etc.
         candidates: List of candidate dictionaries with parsed resume data
         weights: Optional weights for different scoring components
         fuzzy_threshold: Minimum fuzzy match score for skills (0-100)
         matcher_url: URL of the matcher service
-    
+
     Returns:
         dict: Matching results from the AI service
     """
@@ -71,6 +83,27 @@ def match_candidates_client(
         return response.json()
 
 
+def create_match(db: Session, match_in: MatchCreate):
+    """
+    Creates a match for an application, calling the AI service if available.
+    """
+    if not MATCHER_URL:
+        logger.warning(
+            "Skipping AI match creation because AI service is not available."
+        )
+        # Create a match entry with no score
+        db_match = Match(
+            **match_in.model_dump(), score=None, analysis="AI service unavailable"
+        )
+        db.add(db_match)
+        db.commit()
+        db.refresh(db_match)
+        return db_match, None  # Return the match and no AI response
+
+    # ... (existing code to call the AI service)
+    # ...
+
+
 if __name__ == "__main__":
     # Example usage
     job_data = {
@@ -78,8 +111,8 @@ if __name__ == "__main__":
         "description": "Looking for a Python developer with FastAPI experience.",
         "skills": {
             "hard_skills": ["Python", "FastAPI", "PostgreSQL"],
-            "soft_skills": ["Communication", "Teamwork"]
-        }
+            "soft_skills": ["Communication", "Teamwork"],
+        },
     }
     candidates_data = [
         {
@@ -87,15 +120,17 @@ if __name__ == "__main__":
             "skills": [
                 {"name": "Python", "type": "Hard"},
                 {"name": "FastAPI", "type": "Hard"},
-                {"name": "Communication", "type": "Soft"}
+                {"name": "Communication", "type": "Soft"},
             ],
-            "work_history": [{
-                "job_title": "Python Developer",
-                "summary": "Experienced Python developer, worked with Django and Flask. Some FastAPI knowledge."
-            }]
+            "work_history": [
+                {
+                    "job_title": "Python Developer",
+                    "summary": "Experienced Python developer, worked with Django and Flask. Some FastAPI knowledge.",
+                }
+            ],
         }
     ]
     result = match_candidates_client(job_data, candidates_data)
     import json
 
-    print(json.dumps(result, indent=2))
+    logger.info(json.dumps(result, indent=2))

@@ -1,5 +1,6 @@
 import os
 import uuid
+import logging
 from fastapi.testclient import TestClient
 from datetime import datetime  # Import datetime
 import base64
@@ -20,9 +21,15 @@ fake = Faker()
 
 create_db_and_tables(admin=True)
 
+# --- Logging Configuration ---
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
+
 
 def run_api_tests():
-    print("=== Starting API Endpoint Tests ===")
+    logger.info("=== Starting API Endpoint Tests ===")
 
     # To store IDs of created resources
     employer_id: uuid.UUID | None = None
@@ -265,7 +272,7 @@ def run_api_tests():
     # JobFormKeyConstraint data will be created dynamically with job_id, form_key_id, constraints
 
     # --- 1. Company ---
-    print("\n--- Testing Company API ---")
+    logger.info("\n--- Testing Company API ---")
     response = client.post(f"{API_V1_PREFIX}/companies/", json=company_data)
     assert response.status_code == 201, f"Failed to create company: {response.text}"
     created_company = response.json()
@@ -273,13 +280,13 @@ def run_api_tests():
     assert created_company["bio"] == company_data["bio"]
     assert created_company["is_owner"] == company_data["is_owner"]
     employer_id = created_company["id"]
-    print(f"CREATE Company: {created_company['name']} (ID: {employer_id})")
+    logger.info(f"CREATE Company: {created_company['name']} (ID: {employer_id})")
 
     response = client.get(f"{API_V1_PREFIX}/companies/{employer_id}")
     assert response.status_code == 200, response.text
     retrieved_company = response.json()
     assert retrieved_company["id"] == employer_id
-    print(f"READ Company: {retrieved_company['name']}")
+    logger.info(f"READ Company: {retrieved_company['name']}")
 
     company_update_data = {"description": fake.catch_phrase()}
     response = client.patch(
@@ -288,7 +295,7 @@ def run_api_tests():
     assert response.status_code == 200, response.text
     updated_company_res = response.json()
     assert updated_company_res["description"] == company_update_data["description"]
-    print(
+    logger.info(
         f"UPDATE Company: {updated_company_res['name']}, New Description: {updated_company_res['description']}"
     )
 
@@ -298,10 +305,10 @@ def run_api_tests():
     companies_list = response.json()
     assert isinstance(companies_list, list)
     assert any(c["id"] == employer_id for c in companies_list)
-    print(f"READ Companies: Found {len(companies_list)} companies.")
+    logger.info(f"READ Companies: Found {len(companies_list)} companies.")
 
     # --- 2. HR ---
-    print("\n--- Testing HR API ---")
+    logger.info("\n--- Testing HR API ---")
 
     hr_create_data = {**hr_data_me, "employer_id": employer_id}
     try:
@@ -309,7 +316,7 @@ def run_api_tests():
         assert response.status_code == 201, f"Failed to create HR: {response.text}"
 
     except Exception as e:
-        print("Failed to create HR", e)
+        logger.error("Failed to create HR", e)
         hr_create_data = {**hr_data, "employer_id": employer_id}
         response = client.post(f"{API_V1_PREFIX}/auth/register", json=hr_create_data)
         assert response.status_code == 201, f"Failed to create HR: {response.text}"
@@ -319,9 +326,9 @@ def run_api_tests():
     response = client.get(f"{API_V1_PREFIX}/hrs/")
     assert response.status_code == 200, response.text
     retrieved_hr = response.json()
-    print(retrieved_hr)
+    logger.info(retrieved_hr)
     hr_id = retrieved_hr["id"]
-    print(f"READ HR: {retrieved_hr['full_name']}")
+    logger.info(f"READ HR: {retrieved_hr['full_name']}")
 
     hr_update_data = {
         "role": fake.random_element(elements=("ceo", "recruiter", "admin"))
@@ -330,19 +337,19 @@ def run_api_tests():
     assert response.status_code == 200, response.text
     updated_hr_res = response.json()
     assert updated_hr_res["role"] == hr_update_data["role"]
-    print(f"UPDATE HR: {updated_hr_res['role']}")
+    logger.info(f"UPDATE HR: {updated_hr_res['role']}")
 
     # --- 3. FormKey ---
-    print("\n--- Testing FormKey API ---")
+    logger.info("\n--- Testing FormKey API ---")
     form_key_create_data = {**form_key_data, "employer_id": employer_id}
     response = client.post(f"{API_V1_PREFIX}/form_keys/", json=form_key_create_data)
-    print(response)
+    logger.info(response)
     assert response.status_code == 201, f"Failed to create FormKey: {response.text}"
     created_form_key = response.json()
     assert created_form_key["name"] == form_key_data["name"]
     assert created_form_key["enum_values"] == form_key_data["enum_values"]
     form_key_id = created_form_key["id"]
-    print(
+    logger.info(
         f"CREATE FormKey: {created_form_key['name']} (ID: {form_key_id}) for Company ID: {employer_id}"
     )
 
@@ -350,7 +357,7 @@ def run_api_tests():
     assert response.status_code == 200, response.text
     retrieved_form_key = response.json()
     assert retrieved_form_key["id"] == form_key_id
-    print(f"READ FormKey: {retrieved_form_key['name']}")
+    logger.info(f"READ FormKey: {retrieved_form_key['name']}")
 
     form_key_update_data = {
         "field_type": fake.random_element(elements=("text", "number", "date"))
@@ -361,17 +368,17 @@ def run_api_tests():
     assert response.status_code == 200, response.text
     updated_form_key_res = response.json()
     assert updated_form_key_res["field_type"] == form_key_update_data["field_type"]
-    print(
+    logger.info(
         f"UPDATE FormKey: {updated_form_key_res['name']}, New Field Type: {updated_form_key_res['field_type']}"
     )
 
     # --- 4. Job ---
-    print("\n--- Testing Job API ---")
+    logger.info("\n--- Testing Job API ---")
     job_create_data = {**job_data_payload, "recruited_to_id": employer_id}
     response = client.post(f"{API_V1_PREFIX}/jobs/", json=job_create_data)
     assert response.status_code == 201, f"Failed to create Job: {response.text}"
     created_job = response.json()
-    print("GOT HERE")
+    logger.info("GOT HERE")
     assert created_job["title"] == job_data_payload["title"]
     assert created_job["description"] == job_data_payload["description"]
     assert created_job["location"] == job_data_payload["location"]
@@ -385,7 +392,7 @@ def run_api_tests():
     assert created_job["responsibilities"] == job_data_payload["responsibilities"]
     assert created_job["skills"] == job_data_payload["skills"]
     job_id = created_job["id"]
-    print(
+    logger.info(
         f"CREATE Job: '{created_job['title']}' (ID: {job_id}) for Company ID: {employer_id}, HR ID: {hr_id}"
     )
 
@@ -393,7 +400,7 @@ def run_api_tests():
     assert response.status_code == 200, response.text
     retrieved_job = response.json()
     assert retrieved_job["id"] == job_id
-    print(f"READ Job: '{retrieved_job['title']}'")
+    logger.info(f"READ Job: '{retrieved_job['title']}'")
 
     job_update_data = {
         "status": fake.random_element(elements=("closed", "draft", "published"))
@@ -402,12 +409,12 @@ def run_api_tests():
     assert response.status_code == 200, response.text
     updated_job_res = response.json()
     assert updated_job_res["status"] == job_update_data["status"]
-    print(
+    logger.info(
         f"UPDATE Job: '{updated_job_res['title']}', New Status: {updated_job_res['status']}"
     )
 
     # --- 5. JobFormKeyConstraint ---
-    print("\n--- Testing JobFormKeyConstraint API ---")
+    logger.info("\n--- Testing JobFormKeyConstraint API ---")
     constraint_create_data = {
         "job_id": job_id,
         "form_key_id": form_key_id,
@@ -425,7 +432,7 @@ def run_api_tests():
         == constraint_create_data["constraints"]["min_value"]
     )
     constraint_id = created_constraint["id"]
-    print(
+    logger.info(
         f"CREATE JobFormKeyConstraint (ID: {constraint_id}) for Job ID: {job_id}, FormKey ID: {form_key_id}"
     )
 
@@ -433,7 +440,7 @@ def run_api_tests():
     assert response.status_code == 200, response.text
     retrieved_constraint = response.json()
     assert retrieved_constraint["id"] == constraint_id
-    print(f"READ JobFormKeyConstraint: ID {retrieved_constraint['id']}")
+    logger.info(f"READ JobFormKeyConstraint: ID {retrieved_constraint['id']}")
 
     constraint_update_data = {
         "constraints": {
@@ -451,12 +458,12 @@ def run_api_tests():
         updated_constraint_res["constraints"]["max_value"]
         == constraint_update_data["constraints"]["max_value"]
     )
-    print(
+    logger.info(
         f"UPDATE JobFormKeyConstraint: ID {updated_constraint_res['id']}, New Constraints: {updated_constraint_res['constraints']}"
     )
 
     # --- 6. Candidate ---
-    print("\n--- Testing Candidate API ---")
+    logger.info("\n--- Testing Candidate API ---")
     resume_pdf_path = (
         "/storage/hussein/matching/ai/app/services/llm/Charbel_Daher_Resume.pdf"
     )
@@ -468,17 +475,19 @@ def run_api_tests():
         )
     assert response.status_code == 201, f"Failed to create Candidate: {response.text}"
     created_candidate = response.json()
-    print(created_candidate)
-    print(candidate_data)
+    logger.info(created_candidate)
+    logger.info(candidate_data)
     assert created_candidate["email"] == candidate_data["email"]
     candidate_id = created_candidate["id"]
-    print(f"CREATE Candidate: {created_candidate['full_name']} (ID: {candidate_id})")
+    logger.info(
+        f"CREATE Candidate: {created_candidate['full_name']} (ID: {candidate_id})"
+    )
 
     response = client.get(f"{API_V1_PREFIX}/candidates/{candidate_id}")
     assert response.status_code == 200, response.text
     retrieved_candidate = response.json()
     assert retrieved_candidate["id"] == candidate_id
-    print(f"READ Candidate: {retrieved_candidate['full_name']}")
+    logger.info(f"READ Candidate: {retrieved_candidate['full_name']}")
 
     candidate_update_data = {"phone": fake.phone_number(), "email": fake.unique.email()}
     response = client.patch(
@@ -487,12 +496,12 @@ def run_api_tests():
     assert response.status_code == 200, response.text
     updated_candidate_res = response.json()
     assert updated_candidate_res["phone"] == candidate_update_data["phone"]
-    print(
+    logger.info(
         f"UPDATE Candidate: {updated_candidate_res['full_name']}, New Phone: {updated_candidate_res['phone']}"
     )
 
     # --- 7. Application ---
-    print("\n--- Testing Application API ---")
+    logger.info("\n--- Testing Application API ---")
     application_create_data = {
         **application_data_payload,
         "candidate_id": candidate_id,
@@ -503,10 +512,10 @@ def run_api_tests():
     )
     assert response.status_code == 201
     created_application = response.json()
-    print(created_application)
+    logger.info(created_application)
     assert created_application["candidate_id"] == candidate_id
     application_id = created_application["id"]
-    print(
+    logger.info(
         f"CREATE Application (ID: {application_id}) for Candidate ID: {candidate_id}, Job ID: {job_id}"
     )
 
@@ -514,7 +523,7 @@ def run_api_tests():
     assert response.status_code == 200, response.text
     retrieved_application = response.json()
     assert retrieved_application["id"] == application_id
-    print(f"READ Application: ID {retrieved_application['id']}")
+    logger.info(f"READ Application: ID {retrieved_application['id']}")
 
     application_update_data = {
         "form_responses": {
@@ -542,7 +551,7 @@ def run_api_tests():
         updated_application_res["form_responses"]["status"]
         == application_update_data["form_responses"]["status"]
     )
-    print(
+    logger.info(
         f"UPDATE Application: ID {updated_application_res['id']}, New Form Responses: {updated_application_res['form_responses']}"
     )
 
@@ -554,7 +563,7 @@ def run_api_tests():
         assert response.status_code == 200, response.text
         retrieved_matches = response.json()
         match_id = retrieved_matches[0]["id"]
-        print(f"READ Matches: ID {match_id}")
+        logger.info(f"READ Matches: ID {match_id}")
 
         response = client.patch(
             f"{API_V1_PREFIX}/matches/{match_id}", json=match_data_payload
@@ -564,14 +573,14 @@ def run_api_tests():
         updated_results = updated_match_res["match_result"]["results"]
         assert isinstance(updated_results[0]["score"], float)
         assert isinstance(updated_results[0]["match_percentage"], int)
-        print(
+        logger.info(
             f"UPDATE Match: ID {updated_match_res['id']}, New Score: {updated_match_res['match_result']['results'][0]['score']}"
         )
     except Exception as e:
-        print("No match created for application", application_id)
+        logger.error("No match created for application", application_id)
 
     # --- 9. RecruiterCompanyLink ---
-    print("\n--- Testing RecruiterCompanyLink API ---")
+    logger.info("\n--- Testing RecruiterCompanyLink API ---")
     # Create a second company to be the recruiter (ApiTargetLinkCo)
     response = client.post(f"{API_V1_PREFIX}/companies/", json=company_data_target)
     assert response.status_code == 201, (
@@ -581,7 +590,7 @@ def run_api_tests():
     assert created_recruiter_company["name"] == company_data_target["name"]
     assert created_recruiter_company["website"] == company_data_target["website"]
     recruiter_employer_id = created_recruiter_company["id"]
-    print(
+    logger.info(
         f"CREATE Recruiter Company: {created_recruiter_company['name']} (ID: {recruiter_employer_id})"
     )
 
@@ -596,7 +605,7 @@ def run_api_tests():
     assert response.status_code == 201, (
         f"Failed to create recruiter HR: {response.text}"
     )
-    print(f"CREATE Recruiter HR.")
+    logger.info(f"CREATE Recruiter HR.")
 
     token = response.json()["access_token"]
     client.headers.update({"Authorization": f"Bearer {token}"})
@@ -605,7 +614,7 @@ def run_api_tests():
     retrieved_hr = response.json()
 
     recruiter_hr_id = retrieved_hr["id"]
-    print(f"READ HR: {retrieved_hr['full_name']}")
+    logger.info(f"READ HR: {retrieved_hr['full_name']}")
 
     # Create link where ApiTargetLinkCo is the recruiter and ApiTestCo is the target
     link_create_data = {
@@ -621,7 +630,7 @@ def run_api_tests():
     created_link = response.json()
     assert created_link["target_employer_id"] == employer_id
     link_id = created_link["id"]
-    print(
+    logger.info(
         f"CREATE RecruiterCompanyLink (ID: {link_id}) from Recruiter {recruiter_employer_id} to Target {employer_id}"
     )
 
@@ -629,9 +638,9 @@ def run_api_tests():
     assert response.status_code == 200, response.text
     retrieved_link = response.json()
     assert retrieved_link["id"] == link_id
-    print(f"READ RecruiterCompanyLink: ID {retrieved_link['id']}")
+    logger.info(f"READ RecruiterCompanyLink: ID {retrieved_link['id']}")
 
-    print(
+    logger.info(
         "UPDATE RecruiterCompanyLink: Skipped (no updatable fields in current model/schema or not implemented)"
     )
 
@@ -715,18 +724,18 @@ def run_api_tests():
         == recruiter_job_data_payload["responsibilities"]
     )
     assert created_recruiter_job["skills"] == recruiter_job_data_payload["skills"]
-    print(
+    logger.info(
         f"CREATE Recruited Job: '{created_recruiter_job['title']}' (ID: {created_recruiter_job_id}) for Target Company ID: {employer_id}"
     )
 
     # --- Deletion Tests (in reverse order of dependency, or careful order) ---
-    print("\n--- Testing Deletion API Endpoints ---")
+    logger.info("\n--- Testing Deletion API Endpoints ---")
 
     # # Matches depend on Applications
     # if match_id:
     #     response = client.delete(f"{API_V1_PREFIX}/matches/{match_id}")
     #     assert response.status_code == 200, response.text
-    #     print(f"DELETE Match: ID {match_id}, response: {response.json()}")
+    #     logger.info(f"DELETE Match: ID {match_id}, response: {response.json()}")
     #     response = client.get(f"{API_V1_PREFIX}/matches/{match_id}")
     #     assert response.status_code == 404, "Match not deleted"
 
@@ -734,7 +743,7 @@ def run_api_tests():
     # if application_id:
     #     response = client.delete(f"{API_V1_PREFIX}/applications/{application_id}")
     #     assert response.status_code == 200, response.text
-    #     print(f"DELETE Application: ID {application_id}, response: {response.json()}")
+    #     logger.info(f"DELETE Application: ID {application_id}, response: {response.json()}")
     #     response = client.get(f"{API_V1_PREFIX}/applications/{application_id}")
     #     assert response.status_code == 404, "Application not deleted"
 
@@ -742,7 +751,7 @@ def run_api_tests():
     # if candidate_id:
     #     response = client.delete(f"{API_V1_PREFIX}/candidates/{candidate_id}")
     #     assert response.status_code == 200, response.text
-    #     print(f"DELETE Candidate: ID {candidate_id}, response: {response.json()}")
+    #     logger.info(f"DELETE Candidate: ID {candidate_id}, response: {response.json()}")
     #     response = client.get(f"{API_V1_PREFIX}/candidates/{candidate_id}")
     #     assert response.status_code == 404, "Candidate not deleted"
 
@@ -750,7 +759,7 @@ def run_api_tests():
     # if constraint_id:
     #     response = client.delete(f"{API_V1_PREFIX}/job_form_key_constraints/{constraint_id}")
     #     assert response.status_code == 200, response.text
-    #     print(f"DELETE JobFormKeyConstraint: ID {constraint_id}, response: {response.json()}")
+    #     logger.info(f"DELETE JobFormKeyConstraint: ID {constraint_id}, response: {response.json()}")
     #     response = client.get(f"{API_V1_PREFIX}/job_form_key_constraints/{constraint_id}")
     #     assert response.status_code == 404, "JobFormKeyConstraint not deleted"
 
@@ -758,7 +767,7 @@ def run_api_tests():
     # if created_recruiter_job_id:
     #     response = client.delete(f"{API_V1_PREFIX}/jobs/{created_recruiter_job_id}")
     #     assert response.status_code == 200, response.text
-    #     print(f"DELETE Recruited Job: ID {created_recruiter_job_id}, response: {response.json()}")
+    #     logger.info(f"DELETE Recruited Job: ID {created_recruiter_job_id}, response: {response.json()}")
     #     response = client.get(f"{API_V1_PREFIX}/jobs/{created_recruiter_job_id}")
     #     assert response.status_code == 404, "Recruited Job not deleted"
 
@@ -766,7 +775,7 @@ def run_api_tests():
     # if job_id:
     #     response = client.delete(f"{API_V1_PREFIX}/jobs/{job_id}")
     #     assert response.status_code == 200, response.text
-    #     print(f"DELETE Job: ID {job_id}, response: {response.json()}")
+    #     logger.info(f"DELETE Job: ID {job_id}, response: {response.json()}")
     #     response = client.get(f"{API_V1_PREFIX}/jobs/{job_id}")
     #     assert response.status_code == 404, "Job not deleted"
 
@@ -774,7 +783,7 @@ def run_api_tests():
     # if form_key_id:
     #     response = client.delete(f"{API_V1_PREFIX}/form_keys/{form_key_id}")
     #     assert response.status_code == 200, response.text
-    #     print(f"DELETE FormKey: ID {form_key_id}, response: {response.json()}")
+    #     logger.info(f"DELETE FormKey: ID {form_key_id}, response: {response.json()}")
     #     response = client.get(f"{API_V1_PREFIX}/form_keys/{form_key_id}")
     #     assert response.status_code == 404, "FormKey not deleted"
 
@@ -782,7 +791,7 @@ def run_api_tests():
     # if link_id:
     #     response = client.delete(f"{API_V1_PREFIX}/recruiter_company_links/{link_id}")
     #     assert response.status_code == 200, response.text
-    #     print(f"DELETE RecruiterCompanyLink: ID {link_id}, response: {response.json()}")
+    #     logger.info(f"DELETE RecruiterCompanyLink: ID {link_id}, response: {response.json()}")
     #     response = client.get(f"{API_V1_PREFIX}/recruiter_company_links/{link_id}")
     #     assert response.status_code == 404, "RecruiterCompanyLink not deleted"
 
@@ -790,14 +799,14 @@ def run_api_tests():
     # if hr_id:
     #     response = client.delete(f"{API_V1_PREFIX}/hrs/{hr_id}")
     #     assert response.status_code == 200, response.text
-    #     print(f"DELETE HR: ID {hr_id}, response: {response.json()}")
+    #     logger.info(f"DELETE HR: ID {hr_id}, response: {response.json()}")
     #     response = client.get(f"{API_V1_PREFIX}/hrs/{hr_id}")
     #     assert response.status_code == 404, "HR not deleted"
 
     # if recruiter_hr_id:
     #     response = client.delete(f"{API_V1_PREFIX}/hrs/{recruiter_hr_id}")
     #     assert response.status_code == 200, response.text
-    #     print(f"DELETE Recruiter HR: ID {recruiter_hr_id}, response: {response.json()}")
+    #     logger.info(f"DELETE Recruiter HR: ID {recruiter_hr_id}, response: {response.json()}")
     #     response = client.get(f"{API_V1_PREFIX}/hrs/{recruiter_hr_id}")
     #     assert response.status_code == 404, "Recruiter HR not deleted"
 
@@ -806,7 +815,7 @@ def run_api_tests():
     #     # Ensure all dependent entities (HR, Jobs, FormKeys, Links as target) are deleted or unlinked
     #     response = client.delete(f"{API_V1_PREFIX}/companies/{employer_id}")
     #     assert response.status_code == 200, response.text
-    #     print(f"DELETE Company: ID {employer_id}, response: {response.json()}")
+    #     logger.info(f"DELETE Company: ID {employer_id}, response: {response.json()}")
     #     response = client.get(f"{API_V1_PREFIX}/companies/{employer_id}")
     #     assert response.status_code == 404, "Company not deleted"
 
@@ -814,23 +823,24 @@ def run_api_tests():
     #      # Ensure all dependent entities (HR, Jobs as employer, Links as recruiter) are deleted or unlinked
     #     response = client.delete(f"{API_V1_PREFIX}/companies/{recruiter_employer_id}")
     #     assert response.status_code == 200, response.text
-    #     print(f"DELETE Recruiter Company: ID {recruiter_employer_id}, response: {response.json()}")
+    #     logger.info(f"DELETE Recruiter Company: ID {recruiter_employer_id}, response: {response.json()}")
     #     response = client.get(f"{API_V1_PREFIX}/companies/{recruiter_employer_id}")
     #     assert response.status_code == 404, "Recruiter Company not deleted"
 
-    # print("\n=== API Endpoint Tests Completed ===")
+    logger.info("\n=== API Endpoint Tests Succeeded! ===")
 
 
 if __name__ == "__main__":
     try:
-        print("Running API Endpoint Tests...")
+        logger.info("Running API Endpoint Tests...")
         run_api_tests()
-        print("\n=== API Endpoint Tests Succeeded! ===")
     except AssertionError as e:
-        print(f"\nXXX API ASSERTION FAILED XXX: {e}")
-        import traceback
+        logger.error(f"\nXXX API ASSERTION FAILED XXX: {e}", exc_info=True)
+        # Re-raise to ensure the test runner catches the failure
+        raise
     except Exception as e:
-        print(f"\nXXX AN API ERROR OCCURRED XXX: {e}")
-        import traceback
+        logger.error(f"\nXXX AN API ERROR OCCURRED XXX: {e}", exc_info=True)
+        # Re-raise to ensure the test runner catches the failure
+        raise
     finally:
-        print("wowowowow")
+        logger.info("--- API Endpoint Tests Completed ---")

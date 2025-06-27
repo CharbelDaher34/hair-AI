@@ -30,9 +30,10 @@ class JobRead(JobBase):
     recruited_to_name: Optional[str] = None
     application_count: Optional[int] = None
 
+
 class MatchRead(MatchBase):
-    id:int
-    
+    id: int
+
 
 class JobAnalytics(SQLModel):
     job_id: int

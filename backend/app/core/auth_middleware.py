@@ -3,8 +3,13 @@ from fastapi.security.http import HTTPBearer, HTTPAuthorizationCredentials
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import Response, JSONResponse
 from typing import Optional
+import logging
+from core.database import current_company_id_var
 
 from core.security import decode_access_token, TokenData
+
+# Configure module-level logger
+logger = logging.getLogger(__name__)
 
 # Define paths that DO NOT require authentication
 PUBLIC_PATHS_PREFIXES = [
@@ -96,26 +101,32 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 if referer.endswith("/docs") or referer.endswith("/redoc"):
                     is_public_path = True
 
-        print(f"current_path: {current_path}")
+        logger.debug("current_path: %s", current_path)
 
         # Check for auth-required paths (these override public paths)
         for auth_prefix in AUTH_REQUIRED_PATHS_PREFIXES:
             if path_matches_prefix(current_path, auth_prefix):
-                print(f"auth_prefix: {auth_prefix}")
+                logger.debug("auth_prefix: %s", auth_prefix)
                 is_public_path = False
                 break
 
         token_data: Optional[TokenData] = get_token_data_from_request(request)
 
+        company_ctx_token = None
+        if token_data and token_data.employer_id is not None:
+            company_ctx_token = current_company_id_var.set(token_data.employer_id)
+
         if is_public_path:
-            print(f"is_public_path: {is_public_path}")
+            logger.debug("is_public_path: %s", is_public_path)
             # For public paths, proceed without authentication enforcement
             if token_data:
                 request.state.user = token_data
             response = await call_next(request)
+            if company_ctx_token is not None:
+                current_company_id_var.reset(company_ctx_token)
             return response
         else:
-            print(f"is_public_path: {is_public_path}")
+            logger.debug("is_public_path: %s", is_public_path)
             # For non-public paths, enforce authentication
             if not token_data:
                 return JSONResponse(
@@ -128,4 +139,6 @@ class AuthMiddleware(BaseHTTPMiddleware):
             # Token is valid, attach user data to request state
             request.state.user = token_data
             response = await call_next(request)
+            if company_ctx_token is not None:
+                current_company_id_var.reset(company_ctx_token)
             return response

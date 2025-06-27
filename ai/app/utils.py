@@ -285,7 +285,6 @@ def create_model_from_schema(schema: dict, globals_dict: dict) -> type[BaseModel
     return main_model
 
 
-
 def render_model(model: Any, indent: int = 0) -> str:
     spacer = "  " * indent
 

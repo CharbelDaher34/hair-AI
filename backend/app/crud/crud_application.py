@@ -14,7 +14,12 @@ from models.models import (
     Status,
     ApplicationStatus,
 )
-from schemas import ApplicationCreate, ApplicationUpdate, MatchCreate, ApplicationWithDetails
+from schemas import (
+    ApplicationCreate,
+    ApplicationUpdate,
+    MatchCreate,
+    ApplicationWithDetails,
+)
 from . import crud_job
 from . import crud_match
 from . import crud_candidate
@@ -24,7 +29,10 @@ from core.database import engine
 logger = logging.getLogger(__name__)
 # Configure if not already configured by a higher-level module
 if not logger.hasHandlers():
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    )
 
 
 def get_application(db: Session, application_id: int) -> Optional[Application]:
@@ -86,7 +94,9 @@ def get_application_with_details(
         .where(Job.status != Status.CLOSED)
         .options(
             selectinload(Application.candidate),
-            selectinload(Application.job).selectinload(Job.form_key_constraints).selectinload(JobFormKeyConstraint.form_key),
+            selectinload(Application.job)
+            .selectinload(Job.form_key_constraints)
+            .selectinload(JobFormKeyConstraint.form_key),
             selectinload(Application.matches),
         )
     )
@@ -129,12 +139,12 @@ def get_application_with_details(
         # Convert to ApplicationWithDetails schema
         # Get the first match if available (since schema expects single match)
         match_data = application.matches[0] if application.matches else None
-        
+
         return ApplicationWithDetails(
             **application.model_dump(),
             candidate=application.candidate,
             job=application.job,
-            match=match_data
+            match=match_data,
         )
 
     return None
@@ -158,7 +168,9 @@ def create_match_background(application_id: int, max_retries: int = 3):
                 # Get candidate and job data for validation
                 application = db.get(Application, application_id)
                 if not application:
-                    logger.warning(f"[Background] Application {application_id} not found")
+                    logger.warning(
+                        f"[Background] Application {application_id} not found"
+                    )
                     return
 
                 candidate = db.get(Candidate, application.candidate_id)
@@ -224,14 +236,16 @@ def create_match_background(application_id: int, max_retries: int = 3):
         except Exception as match_err:
             logger.error(
                 f"[Background] Error creating match for application {application_id} (attempt {attempt + 1}): {match_err}",
-                exc_info=True
+                exc_info=True,
             )
 
             if attempt < max_retries - 1:
                 logger.info(f"[Background] Retrying in 5 seconds...")
                 time.sleep(5)
             else:
-                logger.error(f"[Background] Max retries reached for application {application_id}")
+                logger.error(
+                    f"[Background] Max retries reached for application {application_id}"
+                )
                 return
 
 
@@ -242,14 +256,20 @@ def create_application(
     db.add(db_application)
     db.commit()
     db.refresh(db_application)
-    
+
     # Add candidate to employer
     if db_application.candidate_id:
         candidate = db.get(Candidate, db_application.candidate_id)
         if candidate:
-            crud_candidate.add_candidate_to_employer(db, candidate_id=candidate.id, employer_id=db_application.job.employer_id)
-    
-    logger.info(f"[CreateApplication] Application {db_application.id} created successfully")
+            crud_candidate.add_candidate_to_employer(
+                db,
+                candidate_id=candidate.id,
+                employer_id=db_application.job.employer_id,
+            )
+
+    logger.info(
+        f"[CreateApplication] Application {db_application.id} created successfully"
+    )
     logger.info(f"[CreateApplication] Match creation will be handled in background")
 
     return db_application
@@ -288,9 +308,13 @@ def delete_application(db: Session, *, application_id: int) -> Optional[Applicat
 
 
 def get_applications_count_by_employer(db: Session, employer_id: int) -> int:
-    job_ids_subquery = select(Job.id).where(Job.employer_id == employer_id).where(Job.status != Status.CLOSED)
+    job_ids_subquery = (
+        select(Job.id)
+        .where(Job.employer_id == employer_id)
+        .where(Job.status != Status.CLOSED)
+    )
     statement = select(func.count(Application.id)).where(
-        Application.job_id.in_(job_ids_subquery) 
+        Application.job_id.in_(job_ids_subquery)
     )
     result = db.exec(statement)
     total = result.one()

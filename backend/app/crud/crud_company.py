@@ -1,9 +1,19 @@
 from typing import Any, Dict, Optional, Union, List
+import logging
 
 from sqlmodel import Session, select
 
 from models.models import Company, RecruiterCompanyLink
 from schemas import CompanyCreate, CompanyUpdate, CompanyRead
+
+logger = logging.getLogger(__name__)
+
+
+def _log_info(*values: object, **_: object) -> None:  # noqa: D401,A001
+    logger.info(" ".join(str(v) for v in values))
+
+
+print = _log_info  # type: ignore  # noqa: A001
 
 
 def get_company(db: Session, employer_id: int) -> Optional[Company]:

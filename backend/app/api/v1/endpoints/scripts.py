@@ -1,6 +1,9 @@
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 import os
 import sys
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Add the scripts directory to the path so we can import from it
 from scripts.resume_parser_batch import (
@@ -36,12 +39,9 @@ async def run_batch_resume_parsing(background_tasks: BackgroundTasks):
     def run_batch_processing():
         try:
             result = process_all_candidates()
-            print(f"[API] Batch processing completed: {result}")
+            logger.info(f"[API] Batch processing completed: {result}")
         except Exception as e:
-            print(f"[API] Batch processing failed: {str(e)}")
-            import traceback
-
-            print(f"[API] Full traceback: {traceback.format_exc()}")
+            logger.error(f"[API] Batch processing failed: {str(e)}", exc_info=True)
 
     background_tasks.add_task(run_batch_processing)
 
@@ -79,12 +79,9 @@ async def run_batch_application_matching(background_tasks: BackgroundTasks):
     def run_batch_matching():
         try:
             result = process_all_applications()
-            print(f"[API] Batch matching completed: {result}")
+            logger.info(f"[API] Batch matching completed: {result}")
         except Exception as e:
-            print(f"[API] Batch matching failed: {str(e)}")
-            import traceback
-
-            print(f"[API] Full traceback: {traceback.format_exc()}")
+            logger.error(f"[API] Batch matching failed: {str(e)}", exc_info=True)
 
     background_tasks.add_task(run_batch_matching)
 
