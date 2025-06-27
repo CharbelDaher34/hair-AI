@@ -98,6 +98,10 @@ class Settings(BaseSettings):
     ADMIN_USER: str = "charbel"
     ADMIN_PASSWORD: str = "charbel"
 
+    # AI service settings
+    AI_URL: str = "http://ai:8011"
+    AI_PORT: int = 8011
+
     @field_validator("CORS_ALLOWED_ORIGINS", mode="before")
     def assemble_cors_origins(cls, v: Any) -> Union[List[str], str]:
         if isinstance(v, str):

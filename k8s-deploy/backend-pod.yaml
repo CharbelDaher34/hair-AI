@@ -37,6 +37,16 @@ spec:
                 secretKeyRef:
                   name: postgres-secret
                   key: APP_DB_PASS
+            - name: ADMIN_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_USER
+            - name: ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_PASSWORD
           volumeMounts:
             - mountPath: /app/static
               name: backend-storage

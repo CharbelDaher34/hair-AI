@@ -40,7 +40,8 @@ services:
       - POSTGRES_PORT=5437
       - POSTGRES_HOST=db
       - POSTGRES_HOST_AUTH_METHOD=trust
-      - ai_url=http://ai:8011
+      - AI_URL=http://ai:8011
+      - AI_PORT=8011
       - GEMINI_API_KEY=AIzaSyDp8n_AmYsspADJBaNpkJvBdlch1-9vkhw
       - LOGFIRE_TOKEN=pylf_v1_us_659r32Hx0CWSbpJFLL6R0xhwm3N1Xjxq99DqYSJBpQWN
       # Email configuration (replace with your SMTP settings)
