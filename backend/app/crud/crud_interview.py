@@ -1,5 +1,6 @@
 from typing import Any, Dict, Optional, Union, List
 import asyncio
+import logging
 
 from sqlalchemy.orm import Session
 from sqlalchemy.sql.expression import true
@@ -8,15 +9,29 @@ from sqlmodel import select
 from models.models import Interview, Application, Job, Status, InterviewStatus
 from schemas import InterviewCreate, InterviewUpdate
 from services.email_service import email_service
-from utils.file_utils import get_resume_file_path, create_temp_text_file, create_temp_pdf_file, cleanup_temp_file
+from utils.file_utils import (
+    get_resume_file_path,
+    create_temp_text_file,
+    create_temp_pdf_file,
+    cleanup_temp_file,
+)
 from core.security import create_interview_review_token
 import os
+
+logger = logging.getLogger(__name__)
+
+
+def _log_info(*values: object, **_: object) -> None:
+    logger.info(" ".join(str(v) for v in values))
+
+
+print = _log_info  # type: ignore
 
 
 async def _send_interview_email(interview: Interview, action: str, db: Session) -> None:
     """
     Send email notification for interview operations to both candidate and interviewer.
-    
+
     Args:
         interview: Interview object
         action: Type of action ('created', 'updated', 'deleted')
@@ -34,41 +49,47 @@ async def _send_interview_email(interview: Interview, action: str, db: Session) 
         db.refresh(interview, ["application"])
         if not interview.application:
             return
-            
+
         db.refresh(interview.application, ["candidate", "job"])
         if not interview.application.candidate or not interview.application.job:
             return
-            
+
         candidate = interview.application.candidate
         job = interview.application.job
-        
+
         # Load the employer relationship for the job
         db.refresh(job, ["employer"])
-        
+
         # Load the interviewer relationship
         if interview.interviewer_id:
             db.refresh(interview, ["interviewer"])
-        
+
         # Format interview date
         interview_date = interview.date.strftime("%B %d, %Y at %I:%M %p")
-        
+
         # Send email to candidate
-        await _send_candidate_interview_email(interview, action, candidate, job, interview_date)
-        
+        await _send_candidate_interview_email(
+            interview, action, candidate, job, interview_date
+        )
+
         # Send email to interviewer if exists
         if interview.interviewer:
-            await _send_interviewer_interview_email(interview, action, candidate, job, interview_date)
-        
+            await _send_interviewer_interview_email(
+                interview, action, candidate, job, interview_date
+            )
+
     except Exception as e:
         # Log error but don't fail the operation
         print(f"Failed to send interview email: {str(e)}")
 
 
-async def _send_candidate_interview_email(interview: Interview, action: str, candidate, job, interview_date: str) -> None:
+async def _send_candidate_interview_email(
+    interview: Interview, action: str, candidate, job, interview_date: str
+) -> None:
     """Send interview notification email to the candidate."""
-    company_name = job.employer.name if job.employer else 'Company'
+    company_name = job.employer.name if job.employer else "Company"
     subject = f"Interview {action.title()} - {job.title} at {company_name}"
-    
+
     # Create HTML content for candidate
     html_content = f"""
     <!DOCTYPE html>
@@ -187,7 +208,7 @@ async def _send_candidate_interview_email(interview: Interview, action: str, can
                 </div>
                 <div class="detail-row">
                     <span class="detail-label">Company:</span>
-                    <span class="detail-value">{job.employer.name if job.employer else 'N/A'}</span>
+                    <span class="detail-value">{job.employer.name if job.employer else "N/A"}</span>
                 </div>
                 <div class="detail-row">
                     <span class="detail-label">Date & Time:</span>
@@ -195,11 +216,11 @@ async def _send_candidate_interview_email(interview: Interview, action: str, can
                 </div>
                 <div class="detail-row">
                     <span class="detail-label">Type:</span>
-                    <span class="detail-value">{interview.type.replace('_', ' ').title()}</span>
+                    <span class="detail-value">{interview.type.replace("_", " ").title()}</span>
                 </div>
                 <div class="detail-row">
                     <span class="detail-label">Status:</span>
-                    <span class="detail-value">{interview.status.replace('_', ' ').title()}</span>
+                    <span class="detail-value">{interview.status.replace("_", " ").title()}</span>
                 </div>
                 {"<div class='detail-row'><span class='detail-label'>Interviewer:</span><span class='detail-value'>" + interview.interviewer.full_name + "</span></div>" if interview.interviewer else ""}
                 {"<div class='detail-row'><span class='detail-label'>Notes:</span><span class='detail-value'>" + interview.notes + "</span></div>" if interview.notes else ""}
@@ -238,10 +259,10 @@ async def _send_candidate_interview_email(interview: Interview, action: str, can
 
     Interview Details:
     - Position: {job.title}
-    - Company: {job.employer.name if job.employer else 'N/A'}
+    - Company: {job.employer.name if job.employer else "N/A"}
     - Date & Time: {interview_date}
-    - Type: {interview.type.replace('_', ' ').title()}
-    - Status: {interview.status.replace('_', ' ').title()}
+    - Type: {interview.type.replace("_", " ").title()}
+    - Status: {interview.status.replace("_", " ").title()}
     {"- Interviewer: " + interview.interviewer.full_name if interview.interviewer else ""}
     {"- Notes: " + interview.notes if interview.notes else ""}
 
@@ -266,22 +287,26 @@ async def _send_candidate_interview_email(interview: Interview, action: str, can
         to_email=candidate.email,
         subject=subject,
         html_content=html_content,
-        text_content=text_content
+        text_content=text_content,
     )
 
 
-async def _send_interviewer_interview_email(interview: Interview, action: str, candidate, job, interview_date: str) -> None:
+async def _send_interviewer_interview_email(
+    interview: Interview, action: str, candidate, job, interview_date: str
+) -> None:
     """Send interview notification email to the interviewer."""
-    
-    company_name = job.employer.name if job.employer else 'Company'
-    
+
+    company_name = job.employer.name if job.employer else "Company"
+
     # Generate review form token
     review_token = create_interview_review_token(interview.id, interview.interviewer_id)
-    base_url = os.getenv("BACKEND_URL", "http://84.16.230.94:8017")  # Changed to BACKEND_URL since the endpoint is on the backend
+    base_url = os.getenv(
+        "BACKEND_URL", "http://84.16.230.94:8017"
+    )  # Changed to BACKEND_URL since the endpoint is on the backend
     review_form_url = f"{base_url}/api/v1/interviews/review-form/{review_token}"
-    
+
     subject = f"Interview {action.title()} - {job.title} with {candidate.full_name} (Resume & Job Details Attached)"
-    
+
     # Create HTML content for interviewer
     html_content = f"""
     <!DOCTYPE html>
@@ -423,7 +448,7 @@ async def _send_interviewer_interview_email(interview: Interview, action: str, c
                 </div>
                 <div class="detail-row">
                     <span class="detail-label">Company:</span>
-                    <span class="detail-value">{job.employer.name if job.employer else 'N/A'}</span>
+                    <span class="detail-value">{job.employer.name if job.employer else "N/A"}</span>
                 </div>
                 <div class="detail-row">
                     <span class="detail-label">Candidate:</span>
@@ -440,11 +465,11 @@ async def _send_interviewer_interview_email(interview: Interview, action: str, c
                 </div>
                 <div class="detail-row">
                     <span class="detail-label">Type:</span>
-                    <span class="detail-value">{interview.type.replace('_', ' ').title()}</span>
+                    <span class="detail-value">{interview.type.replace("_", " ").title()}</span>
                 </div>
                 <div class="detail-row">
                     <span class="detail-label">Status:</span>
-                    <span class="detail-value">{interview.status.replace('_', ' ').title()}</span>
+                    <span class="detail-value">{interview.status.replace("_", " ").title()}</span>
                 </div>
                 {"<div class='detail-row'><span class='detail-label'>Notes:</span><span class='detail-value'>" + interview.notes + "</span></div>" if interview.notes else ""}
             </div>
@@ -471,7 +496,7 @@ async def _send_interviewer_interview_email(interview: Interview, action: str, c
                 </div>
                 <div class="detail-row">
                     <span class="detail-label">Job Details:</span>
-                    <span class="detail-value">{job.title.replace(' ', '_')}_Job_Details.pdf</span>
+                    <span class="detail-value">{job.title.replace(" ", "_")}_Job_Details.pdf</span>
                 </div>
                 <p style="font-size: 14px; color: #6b7280; margin-top: 15px;">
                     Please review the attached documents before the interview.
@@ -497,13 +522,13 @@ async def _send_interviewer_interview_email(interview: Interview, action: str, c
 
     Interview Details:
     - Position: {job.title}
-    - Company: {job.employer.name if job.employer else 'N/A'}
+    - Company: {job.employer.name if job.employer else "N/A"}
     - Candidate: {candidate.full_name}
     - Candidate Email: {candidate.email}
     {"- Candidate Phone: " + candidate.phone if candidate.phone else ""}
     - Date & Time: {interview_date}
-    - Type: {interview.type.replace('_', ' ').title()}
-    - Status: {interview.status.replace('_', ' ').title()}
+    - Type: {interview.type.replace("_", " ").title()}
+    - Status: {interview.status.replace("_", " ").title()}
     {"- Notes: " + interview.notes if interview.notes else ""}
 
     📝 INTERVIEW REVIEW FORM:
@@ -515,7 +540,7 @@ async def _send_interviewer_interview_email(interview: Interview, action: str, c
 
     ATTACHMENTS INCLUDED:
     - Candidate Resume: {candidate.full_name}_Resume.pdf
-    - Job Details: {job.title.replace(' ', '_')}_Job_Details.pdf
+    - Job Details: {job.title.replace(" ", "_")}_Job_Details.pdf
     
     Please review the attached documents before the interview.
 
@@ -527,39 +552,43 @@ async def _send_interviewer_interview_email(interview: Interview, action: str, c
     # Prepare attachments for interviewer
     attachments = []
     temp_files_to_cleanup = []
-    
+
     try:
         # Add candidate's resume if available
         resume_path = get_resume_file_path(candidate.id)
         if resume_path:
-            attachments.append({
-                "file_path": resume_path,
-                "filename": f"{candidate.full_name.replace(' ', '_')}_Resume.pdf"
-            })
-        
+            attachments.append(
+                {
+                    "file_path": resume_path,
+                    "filename": f"{candidate.full_name.replace(' ', '_')}_Resume.pdf",
+                }
+            )
+
         # Add job data as PDF file
         job_data_content = job.get_job_data()
         job_data_file = create_temp_pdf_file(
             content=job_data_content,
             filename_prefix=f"job_data_{job.title.replace(' ', '_')}",
-            title=f"Job Details: {job.title}"
+            title=f"Job Details: {job.title}",
         )
         if job_data_file:
-            attachments.append({
-                "file_path": job_data_file,
-                "filename": f"{job.title.replace(' ', '_')}_Job_Details.pdf"
-            })
+            attachments.append(
+                {
+                    "file_path": job_data_file,
+                    "filename": f"{job.title.replace(' ', '_')}_Job_Details.pdf",
+                }
+            )
             temp_files_to_cleanup.append(job_data_file)
-        
+
         # Send email to interviewer with attachments
         await email_service.send_email(
             to_email=interview.interviewer.email,
             subject=subject,
             html_content=html_content,
             text_content=text_content,
-            attachments=attachments
+            attachments=attachments,
         )
-    
+
     finally:
         # Clean up temporary files
         for temp_file in temp_files_to_cleanup:
@@ -572,7 +601,7 @@ def create_interview(db: Session, *, obj_in: InterviewCreate) -> Interview:
     db.add(db_obj)
     db.commit()
     db.refresh(db_obj)
-    
+
     # Send email notification asynchronously
     try:
         loop = asyncio.new_event_loop()
@@ -581,7 +610,7 @@ def create_interview(db: Session, *, obj_in: InterviewCreate) -> Interview:
         loop.close()
     except Exception as e:
         print(f"Failed to send interview creation email: {str(e)}")
-    
+
     return db_obj
 
 
@@ -611,7 +640,18 @@ def get_interviews_by_employer_with_application(
     db: Session, employer_id: int, skip: int = 0, limit: int = 100
 ) -> List[Interview]:
     statement = (
-        select(Interview.id, Interview.date, Interview.type, Interview.status, Interview.notes, Interview.interviewer_id, Interview.application_id, Interview.created_at, Interview.updated_at, Interview.employer_id)
+        select(
+            Interview.id,
+            Interview.date,
+            Interview.type,
+            Interview.status,
+            Interview.notes,
+            Interview.interviewer_id,
+            Interview.application_id,
+            Interview.created_at,
+            Interview.updated_at,
+            Interview.employer_id,
+        )
         .where(Interview.status == InterviewStatus.SCHEDULED)
         .join(Application)
         .join(Job)
@@ -621,6 +661,7 @@ def get_interviews_by_employer_with_application(
         .limit(limit)
     )
     return db.exec(statement).all()
+
 
 def get_interviews_with_application(
     db: Session, skip: int = 0, limit: int = 100, employer_id: int = None
@@ -656,7 +697,7 @@ def update_interview(
     db.add(db_obj)
     db.commit()
     db.refresh(db_obj)
-    
+
     # Send email notification asynchronously
     try:
         loop = asyncio.new_event_loop()
@@ -665,7 +706,7 @@ def update_interview(
         loop.close()
     except Exception as e:
         print(f"Failed to send interview update email: {str(e)}")
-    
+
     return db_obj
 
 
@@ -680,7 +721,7 @@ def delete_interview(db: Session, interview_id: int) -> Optional[Interview]:
             loop.close()
         except Exception as e:
             print(f"Failed to send interview deletion email: {str(e)}")
-        
+
         db.delete(obj)
         db.commit()
     return obj
@@ -713,7 +754,7 @@ def get_interviews_by_candidate(
 ) -> List[Interview]:
     """Get interviews by candidate ID through applications"""
     from models.models import Application
-    
+
     statement = (
         select(Interview)
         .join(Application, Interview.application_id == Application.id)
@@ -723,7 +764,10 @@ def get_interviews_by_candidate(
     )
     return db.exec(statement).all()
 
-def update_interview_status(db: Session, *, db_obj: Interview, obj_in: InterviewUpdate) -> Interview:
+
+def update_interview_status(
+    db: Session, *, db_obj: Interview, obj_in: InterviewUpdate
+) -> Interview:
     obj_data = obj_in.model_dump(exclude_unset=True)
     for field, value in obj_data.items():
         setattr(db_obj, field, value)

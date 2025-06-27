@@ -54,6 +54,8 @@ services:
       - OTP_LENGTH=6
       # Resume storage configuration
       - RESUME_STORAGE_DIR=/resumes
+      - ADMIN_USER=charbel
+      - ADMIN_PASSWORD=charbel
     volumes:
       - ./backend/app/static:/static
       - ./backend/app/resumes:/resumes

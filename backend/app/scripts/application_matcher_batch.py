@@ -13,24 +13,26 @@ import os
 import sys
 import time
 import json
-import logging # Added
-import traceback # Added
+import logging  # Added
+import traceback  # Added
 from datetime import datetime
 from typing import List, Dict, Any, Tuple
 from collections import defaultdict
-from pathlib import Path # Added
+from pathlib import Path  # Added
 
 # Add the parent directory to the path so we can import from the app
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import sqlalchemy # Added for type casting in query
+import sqlalchemy  # Added for type casting in query
 from sqlmodel import Session, select, SQLModel
 from sqlalchemy.orm import selectinload, joinedload
 from sqlalchemy import text
-from core.database import engine
-from crud import crud_match # We will add a new function here
+from core.database import get_admin_engine
+from crud import crud_match  # We will add a new function here
 from models.models import Application, Match, Candidate, Job
-from models.candidate_pydantic import CandidateResume # To validate/structure parsed_resume
+from models.candidate_pydantic import (
+    CandidateResume,
+)  # To validate/structure parsed_resume
 # from schemas import MatchCreate # MatchCreate is for single, we'll adapt
 
 # --- Configuration ---
@@ -49,11 +51,12 @@ LOG_LEVEL = getattr(logging, LOG_LEVEL_STR, logging.INFO)
 logging.basicConfig(
     level=LOG_LEVEL,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[
-        logging.StreamHandler(sys.stdout)
-    ]
+    handlers=[logging.StreamHandler(sys.stdout)],
 )
 logger = logging.getLogger(Path(__file__).stem)
+
+# Use admin engine to bypass RLS
+admin_engine = get_admin_engine()
 
 
 def get_applications_needing_match_grouped_by_job() -> Dict[int, List[Application]]:
@@ -65,7 +68,7 @@ def get_applications_needing_match_grouped_by_job() -> Dict[int, List[Applicatio
         Dict where keys are job_id and values are lists of Application objects for that job.
     """
     applications_by_job: Dict[int, List[Application]] = defaultdict(list)
-    with Session(engine) as db:
+    with Session(admin_engine) as db:
         # Query applications that don't have any matches, joining Candidate for parsed_resume check
         # and Job for job_description check.
         stmt = (
@@ -73,28 +76,44 @@ def get_applications_needing_match_grouped_by_job() -> Dict[int, List[Applicatio
             .join(Candidate, Application.candidate_id == Candidate.id)
             .join(Job, Application.job_id == Job.id)
             .options(
-                joinedload(Application.candidate).joinedload(Candidate.applications), # Eager load candidate
-                joinedload(Application.job) # Eager load job
+                joinedload(Application.candidate).joinedload(
+                    Candidate.applications
+                ),  # Eager load candidate
+                joinedload(Application.job),  # Eager load job
             )
             .where(
-                ~Application.id.in_(select(Match.application_id).distinct()) # Application not in Match table
+                ~Application.id.in_(
+                    select(Match.application_id).distinct()
+                )  # Application not in Match table
             )
             .where(
-                text("NOT (candidate.parsed_resume IS NULL OR candidate.parsed_resume::text = '{}' OR candidate.parsed_resume::text = 'null')")
-            ) # Candidate has valid parsed resume (not NULL, not empty, not 'null')
-            .where(Job.description.is_not(None)) # Job has a description
-            .where(Job.description != "") # Job description is not empty
+                text(
+                    "NOT (candidate.parsed_resume IS NULL OR candidate.parsed_resume::text = '{}' OR candidate.parsed_resume::text = 'null')"
+                )
+            )  # Candidate has valid parsed resume (not NULL, not empty, not 'null')
+            .where(Job.description.is_not(None))  # Job has a description
+            .where(Job.description != "")  # Job description is not empty
         )
 
-        applications_to_process = db.exec(stmt).unique().all() # .unique() because of joins
+        applications_to_process = (
+            db.exec(stmt).unique().all()
+        )  # .unique() because of joins
 
         for app in applications_to_process:
             # Basic checks that should have been covered by the WHERE clauses, but good for sanity.
             if not app.candidate or not app.candidate.parsed_resume:
-                logger.warning(f"Skipping application {app.id}: Candidate {app.candidate_id} has no parsed_resume (should be filtered by query).")
+                logger.warning(
+                    f"Skipping application {app.id}: Candidate {app.candidate_id} has no parsed_resume (should be filtered by query)."
+                )
                 continue
-            if not app.job or not app.job.description or not app.job.description.strip():
-                logger.warning(f"Skipping application {app.id}: Job {app.job_id} has no valid description (should be filtered by query).")
+            if (
+                not app.job
+                or not app.job.description
+                or not app.job.description.strip()
+            ):
+                logger.warning(
+                    f"Skipping application {app.id}: Job {app.job_id} has no valid description (should be filtered by query)."
+                )
                 continue
 
             applications_by_job[app.job_id].append(app)
@@ -103,9 +122,7 @@ def get_applications_needing_match_grouped_by_job() -> Dict[int, List[Applicatio
 
 
 def process_matches_for_job_batch(
-    db: Session,
-    job: Job,
-    applications_for_job: List[Application]
+    db: Session, job: Job, applications_for_job: List[Application]
 ) -> Tuple[int, int]:
     """
     Processes a batch of applications for a single job.
@@ -121,9 +138,11 @@ def process_matches_for_job_batch(
     # This function just orchestrates the call for a given job and its applications.
     if not applications_for_job:
         logger.info(f"Job {job.id}: No applications to process in this batch.")
-        return 0,0
+        return 0, 0
 
-    logger.info(f"Job {job.id}: Preparing to match {len(applications_for_job)} applications.")
+    logger.info(
+        f"Job {job.id}: Preparing to match {len(applications_for_job)} applications."
+    )
 
     try:
         num_succeeded, num_failed = crud_match.create_matches_for_job_and_applicants(
@@ -131,16 +150,21 @@ def process_matches_for_job_batch(
             job=job,
             applications=applications_for_job,
         )
-        
+
         # Commit the match results to the database
         if num_succeeded > 0:
             try:
                 db.commit()
-                logger.info(f"Job {job.id}: Successfully committed {num_succeeded} matches to database.")
+                logger.info(
+                    f"Job {job.id}: Successfully committed {num_succeeded} matches to database."
+                )
                 successful_matches_for_job += num_succeeded
                 failed_matches_for_job += num_failed
             except Exception as commit_error:
-                logger.error(f"Job {job.id}: Error committing {num_succeeded} matches to database: {commit_error}", exc_info=True)
+                logger.error(
+                    f"Job {job.id}: Error committing {num_succeeded} matches to database: {commit_error}",
+                    exc_info=True,
+                )
                 db.rollback()
                 # All matches in this batch are now considered failed due to commit error
                 failed_matches_for_job += len(applications_for_job)
@@ -149,9 +173,12 @@ def process_matches_for_job_batch(
             # No successful matches to commit, just record the failures
             successful_matches_for_job += num_succeeded  # This is 0
             failed_matches_for_job += num_failed
-            
+
     except Exception as e:
-        logger.error(f"Job {job.id}: Unhandled exception in create_matches_for_job_and_applicants for {len(applications_for_job)} applications: {e}", exc_info=True)
+        logger.error(
+            f"Job {job.id}: Unhandled exception in create_matches_for_job_and_applicants for {len(applications_for_job)} applications: {e}",
+            exc_info=True,
+        )
         # Rollback any partial changes
         try:
             db.rollback()
@@ -161,7 +188,9 @@ def process_matches_for_job_batch(
         # all applications in this specific call are considered failed.
         failed_matches_for_job += len(applications_for_job)
 
-    logger.info(f"Job {job.id}: Processed batch of {len(applications_for_job)} applications. Succeeded: {successful_matches_for_job}, Failed: {failed_matches_for_job}")
+    logger.info(
+        f"Job {job.id}: Processed batch of {len(applications_for_job)} applications. Succeeded: {successful_matches_for_job}, Failed: {failed_matches_for_job}"
+    )
     return successful_matches_for_job, failed_matches_for_job
 
 
@@ -175,10 +204,19 @@ def process_all_applications():
 
     if not applications_by_job:
         logger.info("No applications found needing matches with valid prerequisites.")
-        return {"successful_matches": 0, "failed_matches": 0, "total_applications_considered": 0, "jobs_processed": 0}
+        return {
+            "successful_matches": 0,
+            "failed_matches": 0,
+            "total_applications_considered": 0,
+            "jobs_processed": 0,
+        }
 
-    total_applications_to_match = sum(len(apps) for apps in applications_by_job.values())
-    logger.info(f"Found {total_applications_to_match} applications across {len(applications_by_job)} jobs needing matches.")
+    total_applications_to_match = sum(
+        len(apps) for apps in applications_by_job.values()
+    )
+    logger.info(
+        f"Found {total_applications_to_match} applications across {len(applications_by_job)} jobs needing matches."
+    )
 
     overall_successful_matches = 0
     overall_failed_matches = 0
@@ -188,23 +226,31 @@ def process_all_applications():
         jobs_processed_count += 1
         job_object = apps_for_this_job[0].job
 
-        logger.info(f"Processing job {job_id} ('{job_object.title}') with {len(apps_for_this_job)} applications. ({jobs_processed_count}/{len(applications_by_job)} jobs)")
+        logger.info(
+            f"Processing job {job_id} ('{job_object.title}') with {len(apps_for_this_job)} applications. ({jobs_processed_count}/{len(applications_by_job)} jobs)"
+        )
 
         for i in range(0, len(apps_for_this_job), MAX_CANDIDATES_PER_AI_CALL):
-            application_sub_batch = apps_for_this_job[i:i + MAX_CANDIDATES_PER_AI_CALL]
+            application_sub_batch = apps_for_this_job[
+                i : i + MAX_CANDIDATES_PER_AI_CALL
+            ]
             sub_batch_num = i // MAX_CANDIDATES_PER_AI_CALL + 1
             if not application_sub_batch:
                 continue
 
-            logger.info(f"  - Sub-batch {sub_batch_num} with {len(application_sub_batch)} applications for job {job_id}.")
+            logger.info(
+                f"  - Sub-batch {sub_batch_num} with {len(application_sub_batch)} applications for job {job_id}."
+            )
 
             for attempt in range(MAX_RETRIES_PER_JOB_BATCH):
                 succeeded_in_sub_batch = 0
                 failed_in_sub_batch = 0
                 try:
-                    with Session(engine) as db:
-                        succeeded_in_sub_batch, failed_in_sub_batch = process_matches_for_job_batch(
-                            db, job_object, application_sub_batch
+                    with Session(admin_engine) as db:
+                        succeeded_in_sub_batch, failed_in_sub_batch = (
+                            process_matches_for_job_batch(
+                                db, job_object, application_sub_batch
+                            )
                         )
                     # Accumulate results from this attempt
                     # Note: If retrying, ensure not to double-count successes from previous attempts of the same sub-batch.
@@ -214,41 +260,71 @@ def process_all_applications():
                     # A more complex state management would be needed if only failed items from a sub-batch are retried.
 
                     if failed_in_sub_batch == 0:
-                        logger.info(f"  - Sub-batch {sub_batch_num} for job {job_id} processed successfully on attempt {attempt + 1} ({succeeded_in_sub_batch} matches).")
+                        logger.info(
+                            f"  - Sub-batch {sub_batch_num} for job {job_id} processed successfully on attempt {attempt + 1} ({succeeded_in_sub_batch} matches)."
+                        )
                         overall_successful_matches += succeeded_in_sub_batch
                         # overall_failed_matches += failed_in_sub_batch # This is 0 here
                         break
                     else:
-                        logger.warning(f"  - Sub-batch {sub_batch_num} for job {job_id} had {failed_in_sub_batch} failures (and {succeeded_in_sub_batch} successes) on attempt {attempt + 1}.")
+                        logger.warning(
+                            f"  - Sub-batch {sub_batch_num} for job {job_id} had {failed_in_sub_batch} failures (and {succeeded_in_sub_batch} successes) on attempt {attempt + 1}."
+                        )
                         if attempt < MAX_RETRIES_PER_JOB_BATCH - 1:
-                             logger.info(f"  - Retrying sub-batch {sub_batch_num} for job {job_id} in {RETRY_DELAY_SECONDS_JOB}s...")
-                             time.sleep(RETRY_DELAY_SECONDS_JOB)
+                            logger.info(
+                                f"  - Retrying sub-batch {sub_batch_num} for job {job_id} in {RETRY_DELAY_SECONDS_JOB}s..."
+                            )
+                            time.sleep(RETRY_DELAY_SECONDS_JOB)
                         else:
-                            logger.error(f"  - Max retries reached for sub-batch {sub_batch_num} of job {job_id}. {failed_in_sub_batch} app(s) failed, {succeeded_in_sub_batch} app(s) succeeded in this final attempt.")
+                            logger.error(
+                                f"  - Max retries reached for sub-batch {sub_batch_num} of job {job_id}. {failed_in_sub_batch} app(s) failed, {succeeded_in_sub_batch} app(s) succeeded in this final attempt."
+                            )
                             overall_successful_matches += succeeded_in_sub_batch
                             overall_failed_matches += failed_in_sub_batch
 
-                except Exception as e: # Catch errors from process_matches_for_job_batch or session handling
-                    logger.error(f"  - Critical error processing sub-batch {sub_batch_num} for job {job_id} (attempt {attempt + 1}): {e}", exc_info=True)
+                except Exception as e:  # Catch errors from process_matches_for_job_batch or session handling
+                    logger.error(
+                        f"  - Critical error processing sub-batch {sub_batch_num} for job {job_id} (attempt {attempt + 1}): {e}",
+                        exc_info=True,
+                    )
                     if attempt < MAX_RETRIES_PER_JOB_BATCH - 1:
-                        logger.info(f"  - Retrying sub-batch {sub_batch_num} for job {job_id} due to critical error in {RETRY_DELAY_SECONDS_JOB}s...")
+                        logger.info(
+                            f"  - Retrying sub-batch {sub_batch_num} for job {job_id} due to critical error in {RETRY_DELAY_SECONDS_JOB}s..."
+                        )
                         time.sleep(RETRY_DELAY_SECONDS_JOB)
                     else:
-                        logger.error(f"  - Max retries reached for sub-batch {sub_batch_num} of job {job_id} due to critical error. Marking all {len(application_sub_batch)} apps in this sub-batch as failed for this attempt.")
-                        overall_failed_matches += len(application_sub_batch) # Assume all failed if critical error on last attempt
+                        logger.error(
+                            f"  - Max retries reached for sub-batch {sub_batch_num} of job {job_id} due to critical error. Marking all {len(application_sub_batch)} apps in this sub-batch as failed for this attempt."
+                        )
+                        overall_failed_matches += len(
+                            application_sub_batch
+                        )  # Assume all failed if critical error on last attempt
 
-                if failed_in_sub_batch == 0 and attempt < MAX_RETRIES_PER_JOB_BATCH : # Broke from successful attempt
+                if (
+                    failed_in_sub_batch == 0 and attempt < MAX_RETRIES_PER_JOB_BATCH
+                ):  # Broke from successful attempt
                     break
             # End of retry loop for a sub-batch
 
         if jobs_processed_count < len(applications_by_job):
-            logger.info(f"Waiting {INTER_JOB_BATCH_DELAY_SECONDS}s before processing next job...")
+            logger.info(
+                f"Waiting {INTER_JOB_BATCH_DELAY_SECONDS}s before processing next job..."
+            )
             time.sleep(INTER_JOB_BATCH_DELAY_SECONDS)
 
     logger.info(f"Batch application matching completed.")
-    logger.info(f"Results: {overall_successful_matches} successful matches created, {overall_failed_matches} failed matches.")
-    logger.info(f"Total applications considered for matching: {total_applications_to_match} across {jobs_processed_count} jobs.")
-    return {"successful_matches": overall_successful_matches, "failed_matches": overall_failed_matches, "total_applications_considered": total_applications_to_match, "jobs_processed": jobs_processed_count}
+    logger.info(
+        f"Results: {overall_successful_matches} successful matches created, {overall_failed_matches} failed matches."
+    )
+    logger.info(
+        f"Total applications considered for matching: {total_applications_to_match} across {jobs_processed_count} jobs."
+    )
+    return {
+        "successful_matches": overall_successful_matches,
+        "failed_matches": overall_failed_matches,
+        "total_applications_considered": total_applications_to_match,
+        "jobs_processed": jobs_processed_count,
+    }
 
 
 if __name__ == "__main__":

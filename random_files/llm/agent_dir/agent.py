@@ -10,6 +10,7 @@ import asyncio
 from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.providers.openai import OpenAIProvider
 
+
 class agent:
     def __init__(
         self,
@@ -33,9 +34,10 @@ class agent:
         # Handle API keys based on model provider prefix
         if model.startswith("ollama/"):
             self.model = OpenAIModel(
-                model_name=model.split("ollama/")[1], provider=OpenAIProvider(base_url='http://localhost:11434/v1')
+                model_name=model.split("ollama/")[1],
+                provider=OpenAIProvider(base_url="http://localhost:11434/v1"),
             )
-            print(f"ollama model: {model.split("ollama/")[1]}")
+            print(f"ollama model: {model.split('ollama/')[1]}")
         elif model.startswith(("gpt", "openai")):
             os.environ["OPENAI_API_KEY"] = api_key
         elif model.startswith(("anthropic", "claude")):

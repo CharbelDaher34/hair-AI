@@ -6,6 +6,7 @@ Populates the database with realistic company data via API calls.
 
 import os
 import sys
+import logging
 from typing import List, Dict, Optional
 from faker import Faker
 from faker.providers import company, internet, person, lorem, date_time
@@ -13,6 +14,12 @@ import random
 import requests
 import json
 from datetime import datetime, timedelta
+
+# --- Logging Configuration ---
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
 
 # Initialize Faker
 fake = Faker()
@@ -293,23 +300,23 @@ def create_application_data(candidate_id: int, job_id: int) -> Dict:
 
 
 def create_company_via_api(company_data: Dict) -> Optional[Dict]:
-    """Create a company via API call."""
+    """Create a company via API POST request."""
     try:
         response = requests.post(
-            f"{API_BASE_URL}/companies/", headers=HEADERS, json=company_data
+            f"{API_BASE_URL}/companies/", headers=HEADERS, data=json.dumps(company_data)
         )
-
-        if response.status_code == 201:
-            return response.json()
-        else:
-            print(
-                f"Error creating company {company_data['name']}: {response.status_code} - {response.text}"
-            )
-            return None
-
-    except Exception as e:
-        print(f"Exception creating company {company_data['name']}: {e}")
-        return None
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.HTTPError as e:
+        logger.error(
+            f"HTTP error creating company {company_data.get('name', '')}: "
+            f"{e.response.status_code} - {e.response.text}"
+        )
+    except requests.exceptions.RequestException as e:
+        logger.error(
+            f"Request exception creating company {company_data.get('name', '')}: {e}"
+        )
+    return None
 
 
 def create_hr_via_api(hr_data: Dict) -> Optional[Dict]:
@@ -322,13 +329,13 @@ def create_hr_via_api(hr_data: Dict) -> Optional[Dict]:
         if response.status_code == 201:
             return response.json()
         else:
-            print(
+            logger.error(
                 f"Error creating HR user {hr_data['email']}: {response.status_code} - {response.text}"
             )
             return None
 
     except Exception as e:
-        print(f"Exception creating HR user {hr_data['email']}: {e}")
+        logger.error(f"Exception creating HR user {hr_data['email']}: {e}")
         return None
 
 
@@ -344,13 +351,13 @@ def create_form_key_via_api(form_key_data: Dict, auth_token: str) -> Optional[Di
         if response.status_code == 201:
             return response.json()
         else:
-            print(
+            logger.error(
                 f"Error creating form key {form_key_data['name']}: {response.status_code} - {response.text}"
             )
             return None
 
     except Exception as e:
-        print(f"Exception creating form key {form_key_data['name']}: {e}")
+        logger.error(f"Exception creating form key {form_key_data['name']}: {e}")
         return None
 
 
@@ -366,13 +373,13 @@ def create_job_via_api(job_data: Dict, auth_token: str) -> Optional[Dict]:
         if response.status_code == 201:
             return response.json()
         else:
-            print(
+            logger.error(
                 f"Error creating job {job_data['title']}: {response.status_code} - {response.text}"
             )
             return None
 
     except Exception as e:
-        print(f"Exception creating job {job_data['title']}: {e}")
+        logger.error(f"Exception creating job {job_data['title']}: {e}")
         return None
 
 
@@ -383,7 +390,7 @@ def create_candidate_via_api(candidate_data: Dict, auth_token: str) -> Optional[
 
         # Check if PDF file exists
         if not os.path.exists(CANDIDATE_PDF_PATH):
-            print(
+            logger.warning(
                 f"Warning: PDF file not found at {CANDIDATE_PDF_PATH}, creating candidate without resume"
             )
             response = requests.post(
@@ -413,13 +420,13 @@ def create_candidate_via_api(candidate_data: Dict, auth_token: str) -> Optional[
         if response.status_code == 201:
             return response.json()
         else:
-            print(
+            logger.error(
                 f"Error creating candidate {candidate_data['full_name']}: {response.status_code} - {response.text}"
             )
             return None
 
     except Exception as e:
-        print(f"Exception creating candidate {candidate_data['full_name']}: {e}")
+        logger.error(f"Exception creating candidate {candidate_data['full_name']}: {e}")
         return None
 
 
@@ -440,13 +447,13 @@ def create_application_via_api(
         if response.status_code == 201:
             return response.json()
         else:
-            print(
+            logger.error(
                 f"Error creating application: {response.status_code} - {response.text}"
             )
             return None
 
     except Exception as e:
-        print(f"Exception creating application: {e}")
+        logger.error(f"Exception creating application: {e}")
         return None
 
 
@@ -457,10 +464,10 @@ def get_existing_companies() -> List[Dict]:
         if response.status_code == 200:
             return response.json()
         else:
-            print(f"Error fetching companies: {response.status_code}")
+            logger.error(f"Error fetching companies: {response.status_code}")
             return []
     except Exception as e:
-        print(f"Exception fetching companies: {e}")
+        logger.error(f"Exception fetching companies: {e}")
         return []
 
 
@@ -468,7 +475,7 @@ def populate_companies_via_api(num_companies: int = 20) -> List[Dict]:
     """Populate companies via API calls."""
     companies = []
 
-    print(f"Creating {num_companies} companies via API...")
+    logger.info(f"Creating {num_companies} companies via API...")
 
     for i in range(num_companies):
         company_data = create_company_data()
@@ -476,14 +483,14 @@ def populate_companies_via_api(num_companies: int = 20) -> List[Dict]:
 
         if company:
             companies.append(company)
-            print(f"✓ Created company: {company['name']} (ID: {company['id']})")
+            logger.info(f"✓ Created company: {company['name']} (ID: {company['id']})")
         else:
-            print(f"✗ Failed to create company: {company_data['name']}")
+            logger.error(f"✗ Failed to create company: {company_data['name']}")
 
         if (i + 1) % 5 == 0:
-            print(f"Progress: {i + 1}/{num_companies} companies created...")
+            logger.info(f"Progress: {i + 1}/{num_companies} companies created...")
 
-    print(f"Successfully created {len(companies)} companies!")
+    logger.info(f"Successfully created {len(companies)} companies!")
     return companies
 
 
@@ -494,7 +501,7 @@ def populate_hr_users_via_api(
     hr_users = []
     auth_tokens = {}  # Store auth tokens for each company
 
-    print(f"Creating HR users for companies via API...")
+    logger.info(f"Creating HR users for companies via API...")
 
     for company in companies:
         company_id = company["id"]
@@ -522,11 +529,13 @@ def populate_hr_users_via_api(
                 if company_id not in auth_tokens:
                     auth_tokens[company_id] = hr_result.get("access_token")
 
-                print(f"✓ Created HR user: {hr_data['full_name']} for {company_name}")
+                logger.info(
+                    f"✓ Created HR user: {hr_data['full_name']} for {company_name}"
+                )
             else:
-                print(f"✗ Failed to create HR user for {company_name}")
+                logger.error(f"✗ Failed to create HR user for {company_name}")
 
-    print(f"Successfully created {len(hr_users)} HR users!")
+    logger.info(f"Successfully created {len(hr_users)} HR users!")
     return hr_users, auth_tokens
 
 
@@ -536,7 +545,7 @@ def populate_form_keys_via_api(
     """Populate form keys via API calls."""
     form_keys = []
 
-    print(f"Creating form keys for companies via API...")
+    logger.info(f"Creating form keys for companies via API...")
 
     for company in companies:
         company_id = company["id"]
@@ -544,7 +553,9 @@ def populate_form_keys_via_api(
 
         # Skip if no auth token available for this company
         if company_id not in auth_tokens:
-            print(f"⚠ No auth token available for {company_name}, skipping form keys")
+            logger.warning(
+                f"⚠ No auth token available for {company_name}, skipping form keys"
+            )
             continue
 
         auth_token = auth_tokens[company_id]
@@ -571,17 +582,17 @@ def populate_form_keys_via_api(
                                 "field_type": form_key_data["field_type"],
                             }
                         )
-                        print(
+                        logger.info(
                             f"✓ Created form key: {form_key_data['name']} for {company_name}"
                         )
                     else:
-                        print(
+                        logger.error(
                             f"✗ Failed to create form key: {form_key_data['name']} for {company_name}"
                         )
                     break
                 attempts += 1
 
-    print(f"Successfully created {len(form_keys)} form keys!")
+    logger.info(f"Successfully created {len(form_keys)} form keys!")
     return form_keys
 
 
@@ -591,7 +602,7 @@ def populate_jobs_via_api(
     """Populate jobs via API calls."""
     jobs = []
 
-    print(f"Creating jobs for companies via API...")
+    logger.info(f"Creating jobs for companies via API...")
 
     for company in companies:
         company_id = company["id"]
@@ -599,7 +610,9 @@ def populate_jobs_via_api(
 
         # Skip if no auth token available for this company
         if company_id not in auth_tokens:
-            print(f"⚠ No auth token available for {company_name}, skipping jobs")
+            logger.warning(
+                f"⚠ No auth token available for {company_name}, skipping jobs"
+            )
             continue
 
         auth_token = auth_tokens[company_id]
@@ -622,11 +635,11 @@ def populate_jobs_via_api(
                         "job_type": job["job_type"],
                     }
                 )
-                print(f"✓ Created job: {job['title']} for {company_name}")
+                logger.info(f"✓ Created job: {job['title']} for {company_name}")
             else:
-                print(f"✗ Failed to create job for {company_name}")
+                logger.error(f"✗ Failed to create job for {company_name}")
 
-    print(f"Successfully created {len(jobs)} jobs!")
+    logger.info(f"Successfully created {len(jobs)} jobs!")
     return jobs
 
 
@@ -636,7 +649,7 @@ def populate_candidates_via_api(
     """Populate candidates via API calls."""
     candidates = []
 
-    print(f"Creating candidates via API...")
+    logger.info(f"Creating candidates via API...")
 
     for company in companies:
         company_id = company["id"]
@@ -644,7 +657,9 @@ def populate_candidates_via_api(
 
         # Skip if no auth token available for this company
         if company_id not in auth_tokens:
-            print(f"⚠ No auth token available for {company_name}, skipping candidates")
+            logger.warning(
+                f"⚠ No auth token available for {company_name}, skipping candidates"
+            )
             continue
 
         auth_token = auth_tokens[company_id]
@@ -666,13 +681,13 @@ def populate_candidates_via_api(
                         "email": candidate["email"],
                     }
                 )
-                print(
+                logger.info(
                     f"✓ Created candidate: {candidate['full_name']} for {company_name}"
                 )
             else:
-                print(f"✗ Failed to create candidate for {company_name}")
+                logger.error(f"✗ Failed to create candidate for {company_name}")
 
-    print(f"Successfully created {len(candidates)} candidates!")
+    logger.info(f"Successfully created {len(candidates)} candidates!")
     return candidates
 
 
@@ -685,7 +700,7 @@ def populate_applications_via_api(
     """Populate applications via API calls."""
     applications = []
 
-    print(f"Creating applications via API...")
+    logger.info(f"Creating applications via API...")
 
     for job in jobs:
         job_id = job["id"]
@@ -695,7 +710,7 @@ def populate_applications_via_api(
 
         # Skip if no auth token available for this company
         if company_id not in auth_tokens:
-            print(
+            logger.warning(
                 f"⚠ No auth token available for {company_name}, skipping applications"
             )
             continue
@@ -706,7 +721,7 @@ def populate_applications_via_api(
         company_candidates = [c for c in candidates if c["company_id"] == company_id]
 
         if not company_candidates:
-            print(
+            logger.warning(
                 f"⚠ No candidates available for {company_name}, skipping applications for job {job_title}"
             )
             continue
@@ -733,20 +748,20 @@ def populate_applications_via_api(
                         "status": application["status"],
                     }
                 )
-                print(
+                logger.info(
                     f"✓ Created application: {candidate['full_name']} -> {job_title} ({company_name})"
                 )
             else:
-                print(
+                logger.error(
                     f"✗ Failed to create application: {candidate['full_name']} -> {job_title}"
                 )
 
-    print(f"Successfully created {len(applications)} applications!")
+    logger.info(f"Successfully created {len(applications)} applications!")
     return applications
 
 
 def main():
-    """Main function to populate company data via API."""
+    logger.info("--- Starting Company Data Population Script ---")
     print("Starting company data population via API...")
     print(f"API Base URL: {API_BASE_URL}")
     print(f"PDF Path: {CANDIDATE_PDF_PATH}")
@@ -755,10 +770,10 @@ def main():
         # Check if companies already exist
         existing_companies = get_existing_companies()
         if existing_companies:
-            print(f"Found {len(existing_companies)} existing companies.")
+            logger.info(f"Found {len(existing_companies)} existing companies.")
             response = input("Do you want to add more companies? (y/n): ")
             if response.lower() != "y":
-                print("Exiting...")
+                logger.info("Exiting...")
                 return
 
         # Get user input for number of entities
@@ -778,7 +793,7 @@ def main():
                 input("Enter max applications per job (default 2): ") or "2"
             )
         except ValueError:
-            print("Invalid input. Using default values.")
+            logger.info("Invalid input. Using default values.")
             num_companies = 5
             hr_per_company = 2
             keys_per_company = 3
@@ -790,7 +805,7 @@ def main():
         companies = populate_companies_via_api(num_companies)
 
         if not companies:
-            print("No companies were created. Exiting...")
+            logger.error("No companies were created. Exiting...")
             return
 
         # Populate HR users
@@ -812,52 +827,54 @@ def main():
             jobs, candidates, auth_tokens, applications_per_job
         )
 
-        print("\n" + "=" * 70)
-        print("POPULATION SUMMARY")
-        print("=" * 70)
-        print(f"Companies created: {len(companies)}")
-        print(f"HR users created: {len(hr_users)}")
-        print(f"Form keys created: {len(form_keys)}")
-        print(f"Jobs created: {len(jobs)}")
-        print(f"Candidates created: {len(candidates)}")
-        print(f"Applications created: {len(applications)}")
-        print("=" * 70)
+        logger.info("\n" + "=" * 70)
+        logger.info("POPULATION SUMMARY")
+        logger.info("=" * 70)
+        logger.info(f"Companies created: {len(companies)}")
+        logger.info(f"HR users created: {len(hr_users)}")
+        logger.info(f"Form keys created: {len(form_keys)}")
+        logger.info(f"Jobs created: {len(jobs)}")
+        logger.info(f"Candidates created: {len(candidates)}")
+        logger.info(f"Applications created: {len(applications)}")
+        logger.info("=" * 70)
 
         # Display sample data
         if companies:
             sample_company = companies[0]
-            print(f"\nSample company: {sample_company['name']}")
-            print(f"Industry: {sample_company['industry']}")
-            print(f"Website: {sample_company['website']}")
-            print(f"Company ID: {sample_company['id']}")
+            logger.info(f"\nSample company: {sample_company['name']}")
+            logger.info(f"Industry: {sample_company['industry']}")
+            logger.info(f"Website: {sample_company['website']}")
+            logger.info(f"Company ID: {sample_company['id']}")
 
         if jobs:
             sample_job = jobs[0]
-            print(f"\nSample job: {sample_job['title']}")
-            print(f"Company: {sample_job['company_name']}")
-            print(f"Status: {sample_job['status']}")
-            print(f"Type: {sample_job['job_type']}")
+            logger.info(f"\nSample job: {sample_job['title']}")
+            logger.info(f"Company: {sample_job['company_name']}")
+            logger.info(f"Status: {sample_job['status']}")
+            logger.info(f"Type: {sample_job['job_type']}")
 
         if candidates:
             sample_candidate = candidates[0]
-            print(f"\nSample candidate: {sample_candidate['full_name']}")
-            print(f"Email: {sample_candidate['email']}")
-            print(f"Company: {sample_candidate['company_name']}")
+            logger.info(f"\nSample candidate: {sample_candidate['full_name']}")
+            logger.info(f"Email: {sample_candidate['email']}")
+            logger.info(f"Company: {sample_candidate['company_name']}")
 
         if applications:
             sample_application = applications[0]
-            print(f"\nSample application: {sample_application['candidate_name']}")
-            print(f"Job: {sample_application['job_title']}")
-            print(f"Company: {sample_application['company_name']}")
-            print(f"Status: {sample_application['status']}")
+            logger.info(f"\nSample application: {sample_application['candidate_name']}")
+            logger.info(f"Job: {sample_application['job_title']}")
+            logger.info(f"Company: {sample_application['company_name']}")
+            logger.info(f"Status: {sample_application['status']}")
 
-        print("\nData population completed successfully!")
+        logger.info("\nData population completed successfully!")
 
     except KeyboardInterrupt:
-        print("\n\nOperation cancelled by user.")
+        logger.info("\n\nOperation cancelled by user.")
     except Exception as e:
-        print(f"Error during population: {e}")
+        logger.error(f"Error during population: {e}")
         raise
+
+    logger.info("--- Data Population Script Finished ---")
 
 
 if __name__ == "__main__":

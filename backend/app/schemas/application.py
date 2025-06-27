@@ -4,14 +4,17 @@ from models.models import ApplicationBase
 from utils.pydantic_utils import make_optional
 from models.models import CandidateBase, JobBase, MatchBase
 
+
 class CandidateRead(CandidateBase):
-    id:int
-    
+    id: int
+
+
 class JobRead(JobBase):
-    id:int
+    id: int
+
 
 class MatchRead(MatchBase):
-    id:int
+    id: int
 
 
 # New schema for individual form response items

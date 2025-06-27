@@ -8,8 +8,11 @@ from core.database import get_session
 from crud import crud_company
 from schemas import CompanyCreate, CompanyUpdate, CompanyRead
 from core.security import TokenData
+import logging
+from core.dependencies import get_current_user
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.post("/", response_model=CompanyRead, status_code=status.HTTP_201_CREATED)
@@ -20,10 +23,10 @@ def create_company(
     Create a new company.
     """
     try:
-        print(f"Creating company: {company_in}")
+        logger.info(f"Creating company: {company_in}")
         company = crud_company.create_company(db=db, company_in=company_in)
     except Exception as e:
-        print(f"Error creating company: {e}")
+        logger.error(f"Error creating company: {e}", exc_info=True)
         raise e
     return company
 
@@ -35,15 +38,9 @@ def read_recruit_to_companies(
     """
     Get all companies that the current user can recruit to.
     """
-    current_user: Optional[TokenData] = request.state.user
-    if not current_user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
-        )
-
+    current_user = get_current_user(request)
     employer_id = current_user.employer_id
-    print(f"employer_id: {employer_id}")
+    logger.debug(f"employer_id: {employer_id}")
     companies = crud_company.get_recruit_to_companies(db=db, employer_id=employer_id)
     return companies
 
@@ -129,12 +126,7 @@ def get_current_company(
     """
     Get the current company.
     """
-    current_user: Optional[TokenData] = request.state.user
-    if not current_user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
-        )
+    current_user = get_current_user(request)
     company = crud_company.get_company(db=db, employer_id=current_user.employer_id)
     return company
 
@@ -146,12 +138,7 @@ def get_candidates_by_company(
     """
     Get all candidates for the current company.
     """
-    current_user: Optional[TokenData] = request.state.user
-    if not current_user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
-        )
+    current_user = get_current_user(request)
     candidates = crud_candidate.get_candidates_by_company(
         db=db, employer_id=current_user.employer_id
     )
@@ -160,35 +147,27 @@ def get_candidates_by_company(
 
 @router.get("/{employer_id}/candidates", response_model=List[CandidateRead])
 def get_candidates_by_company_id(
-    *, 
-    db: Session = Depends(get_session), 
-    employer_id: int,
-    request: Request
+    *, db: Session = Depends(get_session), employer_id: int, request: Request
 ) -> List[CandidateRead]:
     """
     Get all candidates for a specific company.
     """
-    current_user: Optional[TokenData] = request.state.user
-    if not current_user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
-        )
-    
+    current_user = get_current_user(request)
+
     # Check if user has permission to access this company's candidates
     if current_user.employer_id != employer_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to access this company's candidates",
         )
-    
+
     # Check if company exists
     company = crud_company.get_company(db=db, employer_id=employer_id)
     if not company:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Company not found"
         )
-    
+
     candidates = crud_candidate.get_candidates_by_company(
         db=db, employer_id=employer_id
     )

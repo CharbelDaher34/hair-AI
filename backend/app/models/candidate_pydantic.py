@@ -66,9 +66,11 @@ class EducationItem(BaseModel):
         None, description="Additional notes such as honors or thesis."
     )
 
+
 class skill_type(str, Enum):
     hard = "Hard"
     soft = "Soft"
+
 
 class SkillItem(BaseModel):
     name: str = Field(..., description="Name of the skill, 1 skill per item")
@@ -78,9 +80,7 @@ class SkillItem(BaseModel):
     level: str = Field(
         ..., description="Proficiency level (e.g., Beginner, Intermediate, Expert)."
     )
-    type: skill_type = Field(
-        ..., description="Type of the skill (Hard, Soft)."
-    )
+    type: skill_type = Field(..., description="Type of the skill (Hard, Soft).")
 
 
 class CertificationItem(BaseModel):
@@ -95,7 +95,7 @@ class CertificationItem(BaseModel):
     issue_date: Optional[date | str] = Field(
         None, description="Date when the certification was issued."
     )
-  
+
 
 # Main model with flattened contact fields
 class CandidateResume(BaseModel):
@@ -111,12 +111,12 @@ class CandidateResume(BaseModel):
         None, description="List of education history entries."
     )
     skills: Optional[List[SkillItem]] = Field(
-        None, description="List of skills the candidate possesses, this is extracted from all the resume sections."
+        None,
+        description="List of skills the candidate possesses, this is extracted from all the resume sections.",
     )
     certifications: Optional[List[CertificationItem]] = Field(
         None, description="List of certifications held by the candidate."
     )
-
 
     # created_at: datetime = Field(..., description="Datetime when this record was created.")
     # updated_at: datetime = Field(..., description="Datetime when this record was last updated.")

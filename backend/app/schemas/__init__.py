@@ -4,15 +4,35 @@ from .application import (
     ApplicationRead,
     ApplicationWithDetails,
 )
-from .candidate import CandidateCreate, CandidateUpdate, CandidateRead, CandidateWithDetails, ApplicationWithInterviews
+from .candidate import (
+    CandidateCreate,
+    CandidateUpdate,
+    CandidateRead,
+    CandidateWithDetails,
+    ApplicationWithInterviews,
+)
 from .company import CompanyCreate, CompanyUpdate, CompanyRead
 from .form_key import FormKeyCreate, FormKeyUpdate, FormKeyRead
 from .hr import HRCreate, HRUpdate, HRRead
 from .job import JobCreate, JobUpdate, JobRead, JobAnalytics, JobGeneratedData
-from .job_form_key_constraint import JobFormKeyConstraintCreate, JobFormKeyConstraintUpdate, JobFormKeyConstraintRead
+from .job_form_key_constraint import (
+    JobFormKeyConstraintCreate,
+    JobFormKeyConstraintUpdate,
+    JobFormKeyConstraintRead,
+)
 from .match import MatchCreate, MatchUpdate, MatchRead
-from .recruiter_company_link import RecruiterCompanyLinkCreate, RecruiterCompanyLinkUpdate, RecruiterCompanyLinkRead
-from .interview import InterviewBase, InterviewCreate, InterviewUpdate, InterviewRead, InterviewReadWithApplication
+from .recruiter_company_link import (
+    RecruiterCompanyLinkCreate,
+    RecruiterCompanyLinkUpdate,
+    RecruiterCompanyLinkRead,
+)
+from .interview import (
+    InterviewBase,
+    InterviewCreate,
+    InterviewUpdate,
+    InterviewRead,
+    InterviewReadWithApplication,
+)
 
 __all__ = [
     "ApplicationCreate",

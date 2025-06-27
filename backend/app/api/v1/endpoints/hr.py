@@ -6,36 +6,31 @@ from core.database import get_session
 from crud import crud_hr
 from schemas import HRCreate, HRUpdate, HRRead
 from core.security import TokenData  # For type hinting
+import logging
+from core.dependencies import get_current_user
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
 
 @router.post("/", response_model=HRRead, status_code=status.HTTP_201_CREATED)
 def create_hr(
-    *,
-    db: Session = Depends(get_session),
-    hr_in: HRCreate,
-    request: Request
+    *, db: Session = Depends(get_session), hr_in: HRCreate, request: Request
 ) -> HRRead:
     """
     Create a new HR user/employee.
     """
-    current_user: Optional[TokenData] = request.state.user
-    if not current_user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials or user not found in request state.",
-        )
-    
+    current_user = get_current_user(request)
+
     # Check if email already exists
     if crud_hr.get_hr_by_email(db=db, email=hr_in.email):
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered"
         )
-    
+
     # Set the employer_id from the current user's token
     hr_in.employer_id = current_user.employer_id
-    
+
     hr = crud_hr.create_hr(db=db, hr_in=hr_in)
     return hr
 
@@ -45,16 +40,8 @@ def read_hr(*, db: Session = Depends(get_session), request: Request) -> HRRead:
     """
     Get a specific HR user by ID.
     """
-    current_user: Optional[TokenData] = request.state.user
-    print(current_user)
-    print("Asasf")
-    if not current_user:
-        # This should ideally not be reached if middleware is working,
-        # but good for defense in depth or if an endpoint is mistakenly not protected.
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials or user not found in request state.",
-        )
+    current_user = get_current_user(request)
+    logger.debug(f"Current user: {current_user}")
     hr_id = current_user.id
     hr = crud_hr.get_hr(db=db, hr_id=hr_id)
     if not hr:
@@ -116,13 +103,7 @@ def read_company_employees(
     """
     Get all employees for the current user's company.
     """
-    current_user: Optional[TokenData] = request.state.user
-    if not current_user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials or user not found in request state.",
-        )
-    
+    current_user = get_current_user(request)
     hrs = crud_hr.get_hrs_by_company(
         db=db, employer_id=current_user.employer_id, skip=skip, limit=limit
     )

@@ -20,23 +20,22 @@ class CandidateRead(CandidateBase):
 
 
 class ApplicationRead(ApplicationBase):
-    id:int
-    
-class InterviewRead(InterviewBase):
-    id:int
-class MatchRead(MatchBase):
-    id:int
+    id: int
 
-  
+
+class InterviewRead(InterviewBase):
+    id: int
+
+
+class MatchRead(MatchBase):
+    id: int
+
+
 class ApplicationWithInterviews(ApplicationRead):
     interviews: Optional[List[InterviewRead]] = None
     job: Optional[JobRead] = None
     match: Optional[MatchRead] = None
-    
+
+
 class CandidateWithDetails(CandidateRead):
     applications: Optional[List[ApplicationWithInterviews]] = None
-    
-  
-    
-    
-    

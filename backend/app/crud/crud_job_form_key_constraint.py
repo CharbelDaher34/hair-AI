@@ -28,12 +28,12 @@ def get_job_form_key_constraints_by_job(
         .limit(limit)
     )
     constraints = db.exec(statement).all()
-    
+
     # Ensure form_key relationships are loaded
     for constraint in constraints:
         if constraint.form_key_id and not constraint.form_key:
             db.refresh(constraint, ["form_key"])
-    
+
     return constraints
 
 

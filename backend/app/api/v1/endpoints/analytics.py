@@ -16,6 +16,9 @@ from models.models import (
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime, timedelta
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -240,10 +243,10 @@ def get_company_analytics(request: Request, db: Session = Depends(get_session)):
                 .where(Match.score.isnot(None))
             ).one()
             or 0.0
-        )*100
+        ) * 100
 
     except Exception as e:
-        print(f"Error: {e}")
+        logger.error(f"Error generating company analytics: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
     return CompanyAnalyticsData(
         total_jobs=total_jobs,

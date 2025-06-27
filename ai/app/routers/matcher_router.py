@@ -15,7 +15,9 @@ matcher_instance = Matcher()
 
 class MatchRequest(BaseModel):
     job: Dict = Field(..., description="Job description and requirements")
-    candidates: List[Dict] = Field(..., description="List of candidates to match against the job")
+    candidates: List[Dict] = Field(
+        ..., description="List of candidates to match against the job"
+    )
     weights: Optional[Dict] = Field(
         default=None,
         description="Optional nested dictionary for weights",
@@ -29,14 +31,14 @@ class MatchRequest(BaseModel):
                 "soft_skills": 0.20,
                 "extracted_skills": 0.25,
                 "skills_embedding_similarity": 0.25,
-            }
-        }
+            },
+        },
     )
     fuzzy_threshold: Optional[float] = Field(
         default=80.0,
         ge=0,
         le=100,
-        description="Minimum fuzzy match score for skills (0-100)"
+        description="Minimum fuzzy match score for skills (0-100)",
     )
 
 
@@ -53,7 +55,9 @@ class WeightsUsed(BaseModel):
 class MatchResult(BaseModel):
     candidate: str = Field(..., description="Candidate name")
     score: float = Field(..., description="Overall matching score")
-    score_breakdown: ScoreBreakdown = Field(..., description="Breakdown of score components")
+    score_breakdown: ScoreBreakdown = Field(
+        ..., description="Breakdown of score components"
+    )
     missing_skills: List[str] = Field(..., description="Missing skills")
     extra_skills: List[str] = Field(..., description="Extra skills")
     matching_skills: List[str] = Field(..., description="Matching skills")
@@ -63,7 +67,9 @@ class MatchResult(BaseModel):
 
 class MatchResponse(BaseModel):
     results: List[MatchResult] = Field(..., description="List of matching results")
-    total_candidates: int = Field(..., description="Total number of candidates processed")
+    total_candidates: int = Field(
+        ..., description="Total number of candidates processed"
+    )
 
 
 @router.post("/match_candidates", response_model=MatchResponse)
@@ -93,7 +99,7 @@ async def match_candidates_endpoint(request: MatchRequest):
             job=job_dict,
             candidates=candidates_dicts,
             weights=request.weights,
-            fuzzy_threshold=request.fuzzy_threshold
+            fuzzy_threshold=request.fuzzy_threshold,
         )
 
         # Convert results to response format
@@ -107,14 +113,13 @@ async def match_candidates_endpoint(request: MatchRequest):
                 extra_skills=result["extra_skills"],
                 matching_skills=result["matching_skills"],
                 weights_used=result["weights_used"],
-                analysis=result["analysis"]
+                analysis=result["analysis"],
             )
             print(f"\n\n\n\nMatch result: {match_result}")
             response_results.append(match_result)
 
         return MatchResponse(
-            results=response_results,
-            total_candidates=len(request.candidates)
+            results=response_results, total_candidates=len(request.candidates)
         )
 
     except Exception as e:
@@ -139,13 +144,17 @@ if __name__ == "__main__":
     test_job = {
         "title": "Senior Python Developer",
         "description": "We are looking for an experienced Python developer",
-        "responsibilities": ["Develop web applications", "Write clean code", "Collaborate with team"],
+        "responsibilities": [
+            "Develop web applications",
+            "Write clean code",
+            "Collaborate with team",
+        ],
         "seniority_level": "Senior",
         "job_type": "Full-time",
         "skills": {
             "hard_skills": ["Python", "FastAPI", "PostgreSQL", "Docker"],
-            "soft_skills": ["Communication", "Teamwork", "Problem Solving"]
-        }
+            "soft_skills": ["Communication", "Teamwork", "Problem Solving"],
+        },
     }
 
     test_candidates = [
@@ -156,27 +165,31 @@ if __name__ == "__main__":
                 {"name": "FastAPI", "type": "Hard"},
                 {"name": "MySQL", "type": "Hard"},
                 {"name": "Communication", "type": "Soft"},
-                {"name": "Leadership", "type": "Soft"}
+                {"name": "Leadership", "type": "Soft"},
             ],
-            "work_history": [{
-                "job_title": "Python Developer",
-                "company": "Tech Corp",
-                "summary": "Developed web applications using Python and FastAPI"
-            }]
+            "work_history": [
+                {
+                    "job_title": "Python Developer",
+                    "company": "Tech Corp",
+                    "summary": "Developed web applications using Python and FastAPI",
+                }
+            ],
         },
         {
             "full_name": "Jane Smith",
             "skills": [
                 {"name": "Java", "type": "Hard"},
                 {"name": "Spring Boot", "type": "Hard"},
-                {"name": "Teamwork", "type": "Soft"}
+                {"name": "Teamwork", "type": "Soft"},
             ],
-            "work_history": [{
-                "job_title": "Java Developer",
-                "company": "Enterprise Inc",
-                "summary": "Backend development with Java and Spring"
-            }]
-        }
+            "work_history": [
+                {
+                    "job_title": "Java Developer",
+                    "company": "Enterprise Inc",
+                    "summary": "Backend development with Java and Spring",
+                }
+            ],
+        },
     ]
 
     print("Matcher Router updated successfully!")
