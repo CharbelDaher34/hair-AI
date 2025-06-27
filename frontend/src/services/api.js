@@ -545,9 +545,9 @@ class ApiService {
     return this.request(`/jobs/analytics/${jobId}`);
   }
 
-  async getJobMatches(jobId) {
+  async getJobMatches(jobId, top_5 = false) {
     console.log('getJobMatches called with jobId:', jobId);
-    return this.request(`/jobs/matches/${jobId}`);
+    return this.request(`/jobs/matches/${jobId}?top_5=${top_5}`);
   }
 
   async generateJobDescription(data) {
@@ -609,6 +609,13 @@ class ApiService {
     return this.request(`/interviews/${interviewId}/status`, {
       method: 'PATCH',
       body: JSON.stringify({ status }),
+    });
+  }
+
+  async updateInterviewerReview(interviewId, interviewer_review) {
+    return this.request(`/interviews/${interviewId}/review`, {
+      method: 'PATCH',
+      body: JSON.stringify({ interviewer_review }),
     });
   }
 }

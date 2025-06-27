@@ -41,8 +41,6 @@ class WorkHistoryItem(BaseModel):
     employment_type: EmploymentType = Field(
         ..., description="Type of employment (e.g., Full-time, Part-time)."
     )
-    # naics_code: Optional[str] = Field(None, description="Industry classification code (NAICS).")
-    # naics_industry_name: Optional[str] = Field(None, description="Industry name from NAICS code.")
     start_date: date | str = Field(..., description="Job start date.")
     end_date: Optional[date | str] = Field(
         None, description="Job end date, null if currently employed."
@@ -68,21 +66,21 @@ class EducationItem(BaseModel):
         None, description="Additional notes such as honors or thesis."
     )
 
+
 class skill_type(str, Enum):
     hard = "Hard"
     soft = "Soft"
 
+
 class SkillItem(BaseModel):
-    name: str = Field(..., description="Name of the skill (e.g., Python).")
+    name: str = Field(..., description="Name of the skill, 1 skill per item")
     category: str = Field(
         ..., description="Category of the skill (e.g., Programming Language)."
     )
     level: str = Field(
         ..., description="Proficiency level (e.g., Beginner, Intermediate, Expert)."
     )
-    type: skill_type = Field(
-        ..., description="Type of the skill (e.g., Hard, Soft)."
-    )
+    type: skill_type = Field(..., description="Type of the skill (Hard, Soft).")
 
 
 class CertificationItem(BaseModel):
@@ -97,7 +95,7 @@ class CertificationItem(BaseModel):
     issue_date: Optional[date | str] = Field(
         None, description="Date when the certification was issued."
     )
-  
+
 
 # Main model with flattened contact fields
 class CandidateResume(BaseModel):
@@ -113,12 +111,12 @@ class CandidateResume(BaseModel):
         None, description="List of education history entries."
     )
     skills: Optional[List[SkillItem]] = Field(
-        None, description="List of skills the candidate possesses."
+        None,
+        description="List of skills the candidate possesses, this is extracted from all the resume sections.",
     )
     certifications: Optional[List[CertificationItem]] = Field(
         None, description="List of certifications held by the candidate."
     )
-
 
     # created_at: datetime = Field(..., description="Datetime when this record was created.")
     # updated_at: datetime = Field(..., description="Datetime when this record was last updated.")

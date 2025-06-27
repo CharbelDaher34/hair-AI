@@ -1,9 +1,13 @@
 import traceback
+import logging
 from typing import Callable
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
+
+
+logger = logging.getLogger(__name__)
 
 
 class ErrorTracebackMiddleware(BaseHTTPMiddleware):
@@ -16,19 +20,19 @@ class ErrorTracebackMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         try:
-            print("Request received")
+            logger.debug("Request received")
             return await call_next(request)
         except Exception as e:
             # Get the full traceback
             tb = traceback.format_exc()
 
-            # Print the error and traceback for debugging
-            print("\n=== Error Traceback ===")
-            print(f"Request: {request.method} {request.url}")
-            print(f"Error: {str(e)}")
-            print("Traceback:")
-            print(tb)
-            print("=====================\n")
+            # Log the error and traceback for debugging
+            logger.error(
+                "\n=== Error Traceback ===\n"
+                f"Request: {request.method} {request.url}\n"
+                f"Error: {str(e)}\n"
+                f"Traceback:\n{tb}\n=== End Traceback ===\n"
+            )
 
             # Prepare error response
             error_response = {

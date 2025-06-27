@@ -31,6 +31,7 @@ services:
     ports: 
       - "8017:8017"
     depends_on:
+      - ai
       - db
     environment:
       - POSTGRES_USER=app_user
@@ -51,8 +52,13 @@ services:
       # OTP configuration
       - OTP_EXPIRE_MINUTES=10
       - OTP_LENGTH=6
+      # Resume storage configuration
+      - RESUME_STORAGE_DIR=/resumes
+      - ADMIN_USER=charbel
+      - ADMIN_PASSWORD=charbel
     volumes:
-      - ./backend/app/static:/app/static
+      - ./backend/app/static:/static
+      - ./backend/app/resumes:/resumes
   ai:
     build:
       context: ./ai

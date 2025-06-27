@@ -7,6 +7,7 @@ from schemas import FormKeyRead
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlmodel import Session
 from pydantic import BaseModel, Field
+import logging
 
 from core.database import get_session
 from crud import crud_job, crud_form_key, crud_application
@@ -17,15 +18,17 @@ from models.models import Company, JobType, ExperienceLevel, SeniorityLevel
 from services.resume_upload import AgentClient
 from sqlalchemy import Column
 from sqlalchemy.types import Enum as SQLAlchemyEnum
+from core.dependencies import get_current_user
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.post("/", response_model=JobRead, status_code=status.HTTP_201_CREATED)
 def create_job(
     *, db: Session = Depends(get_session), job_in: JobCreate, request: Request
 ) -> JobRead:
-    current_user: Optional[TokenData] = request.state.user
+    current_user = get_current_user(request)
     if not current_user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -37,7 +40,7 @@ def create_job(
     job_in.created_by_hr_id = current_user.id
     if not job_in.recruited_to_id:
         job_in.recruited_to_id = current_user.employer_id
-    print(f"job_data: {job_in}")
+    logger.debug(f"Job data received: {job_in}")
     try:
         job = crud_job.create_job(db=db, job_in=job_in)
     except Exception as e:
@@ -49,9 +52,9 @@ def create_job(
 def read_job(
     *, db: Session = Depends(get_session), job_id: int, request: Request
 ) -> JobRead:
-    user = request.state.user
+    current_user = get_current_user(request)
     job = crud_job.get_job(db=db, job_id=job_id)
-    if job.recruited_to_id != user.employer_id:
+    if job.recruited_to_id != current_user.employer_id:
         raise HTTPException(
             status_code=403, detail="You are not authorized to access this job"
         )
@@ -68,8 +71,8 @@ def read_jobs(
     limit: int = 100,
     request: Request,
 ) -> List[JobRead]:
-    user = request.state.user
-    employer_id = user.employer_id
+    current_user = get_current_user(request)
+    employer_id = current_user.employer_id
     jobs = crud_job.get_jobs(db=db, skip=skip, limit=limit, employer_id=employer_id)
     for job in jobs:
         job.application_count = crud_application.get_application_count_by_job_id(
@@ -89,8 +92,8 @@ def read_jobs_by_employer(
     closed: bool = False,
     request: Request,
 ) -> List[JobRead]:
-    user = request.state.user
-    employer_id = user.employer_id
+    current_user = get_current_user(request)
+    employer_id = current_user.employer_id
     jobs = crud_job.get_jobs_by_employer(
         db=db, employer_id=employer_id, skip=skip, limit=limit, closed=closed
     )
@@ -107,6 +110,7 @@ def read_jobs_by_status(
 ) -> List[JobRead]:
     return crud_job.get_jobs_by_status(db=db, status=status, skip=skip, limit=limit)
 
+
 @router.patch("/{job_id}/status", response_model=JobRead)
 def update_job_status(
     *, db: Session = Depends(get_session), job_id: int, status: str
@@ -115,6 +119,7 @@ def update_job_status(
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     return crud_job.update_job(db=db, db_job=job, job_in={"status": status})
+
 
 @router.patch("/{job_id}", response_model=JobRead)
 def update_job(
@@ -145,7 +150,7 @@ def get_form_data(
     *, db: Session = Depends(get_session), job_id: int, request: Request
 ) -> JobFormData:
     """Get job data along with its associated form keys"""
-    current_user: Optional[TokenData] = request.state.user
+    current_user = get_current_user(request)
     if not current_user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -195,7 +200,7 @@ def get_job_analytics(
     *, db: Session = Depends(get_session), job_id: int, request: Request
 ) -> JobAnalytics:
     """Get comprehensive analytics for a specific job"""
-    current_user: Optional[TokenData] = request.state.user
+    current_user = get_current_user(request)
     if not current_user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -241,10 +246,14 @@ class JobGenerationRequest(BaseModel):
 
 @router.get("/matches/{job_id}", response_model=MatchResponseWithDetails)
 def get_job_matches(
-    *, db: Session = Depends(get_session), job_id: int, request: Request
+    *,
+    db: Session = Depends(get_session),
+    job_id: int,
+    request: Request,
+    top_5: bool = False,
 ) -> MatchResponseWithDetails:
     """Get all matches for a specific job"""
-    current_user: Optional[TokenData] = request.state.user
+    current_user = get_current_user(request)
     if not current_user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -266,7 +275,9 @@ def get_job_matches(
         )
 
     try:
-        match_candidate_pairs = crud_job.get_job_matches(db=db, job_id=job_id)
+        match_candidate_pairs = crud_job.get_job_matches(
+            db=db, job_id=job_id, top_5=top_5
+        )
 
         matches_with_candidates = []
         for match, candidate in match_candidate_pairs:
@@ -289,7 +300,7 @@ def generate_description(
     request: Request,
 ) -> JobGeneratedData:
     """Generate a description for a job"""
-    current_user: Optional[TokenData] = request.state.user
+    current_user = get_current_user(request)
     if not current_user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -306,8 +317,8 @@ def generate_description(
     Company data: {company_data}
     Job data: {request_data.data}
     """
-    client = AgentClient(
-        system_prompt="""You are an expert in writing and creating job descriptions for companies. You are given company data and job requirements as input text. Generate comprehensive job data based on this information.
+    client = AgentClient()
+    system_prompt = """You are an expert in writing and creating job descriptions for companies. You are given company data and job requirements as input text. Generate comprehensive job data based on this information.
 
 IMPORTANT: You must provide ALL fields in the exact JSON structure specified. Do not leave any field empty or null.
 
@@ -331,8 +342,6 @@ Required JSON structure:
   "job_category": "string - Job category (e.g., Software Engineering, Marketing, etc.)"
 }
 
-Generate realistic and appropriate values for all fields. If specific information is not provided, infer reasonable values based on the job context and company information.""",
-        schema=JobGeneratedData.model_json_schema(),
-        inputs=[input],
-    )
-    return client.parse()
+Generate realistic and appropriate values for all fields. If specific information is not provided, infer reasonable values based on the job context and company information."""
+
+    return client.parse(system_prompt, JobGeneratedData.model_json_schema(), [input])

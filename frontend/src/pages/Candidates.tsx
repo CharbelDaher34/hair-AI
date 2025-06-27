@@ -247,12 +247,15 @@ const Candidates = () => {
                     <TableHead className="font-semibold text-gray-700">Resume</TableHead>
                     <TableHead className="font-semibold text-gray-700">Applications</TableHead>
                     <TableHead className="font-semibold text-gray-700">Date Added</TableHead>
-                    <TableHead className="font-semibold text-gray-700 text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filtered_candidates.map((candidateTable) => (
-                    <TableRow key={candidateTable.candidate.id} className="hover:bg-slate-50 transition-colors">
+                    <TableRow
+                      key={candidateTable.candidate.id}
+                      className="hover:bg-slate-50 transition-colors cursor-pointer"
+                      onClick={() => handle_view_candidate(candidateTable.candidate.id)}
+                    >
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center">
@@ -300,20 +303,6 @@ const Candidates = () => {
                         <span className="text-gray-600">
                           {new Date(candidateTable.candidate.created_at).toLocaleDateString()}
                         </span>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handle_view_candidate(candidateTable.candidate.id)}
-                            className="button-outline shadow-sm hover:shadow-md transition-all duration-300"
-                            disabled={candidate_details_loading}
-                          >
-                            <Eye className="h-4 w-4 mr-1" />
-                            View Details
-                          </Button>
-                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

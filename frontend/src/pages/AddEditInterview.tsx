@@ -263,16 +263,17 @@ const AddEditInterview = () => {
         </div>
         <div className="flex gap-3">
           <Button 
-            variant="outline" 
+            variant="outline"
             onClick={() => navigate("/interviews")} 
             className="shadow-md hover:shadow-lg transition-all duration-300"
           >
             Cancel
           </Button>
           <Button 
+            variant="outline"
             onClick={handle_submit} 
             disabled={submitting} 
-            className="button shadow-lg hover:shadow-xl transition-all duration-300"
+            className="shadow-lg hover:shadow-xl transition-all duration-300"
           >
             {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {is_editing ? "Update Interview" : "Schedule Interview"}

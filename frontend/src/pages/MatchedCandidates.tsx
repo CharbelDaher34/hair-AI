@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CheckCircle, XCircle, Eye, Star, Filter, Users, Briefcase, Search, ChevronDown, Loader2, Info, AlertTriangle, Flag } from "lucide-react";
+import { CheckCircle, XCircle, Eye, Star, Filter, Users, Briefcase, Search, ChevronDown, Loader2, Info, AlertTriangle, Flag, Calendar, FileText } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import apiService from "@/services/api";
@@ -33,13 +33,8 @@ interface Job {
 }
 
 interface ScoreBreakdown {
-  final_score_components: Record<string, number>;
-  skills_score_components: Record<string, number>;
-}
-
-interface WeightsUsed {
-  final_weights: Record<string, number>;
-  skill_weights: Record<string, number>;
+  skills_score: number;
+  overall_similarity: number;
 }
 
 interface MatchedCandidateData {
@@ -47,16 +42,18 @@ interface MatchedCandidateData {
   id: number;
   application_id: number;
   score: number;
-  score_breakdown: ScoreBreakdown;
-  weights_used: WeightsUsed;
-  overall_embedding_similarity: number;
-  skills_embedding_similarity: number;
+  score_breakdown?: ScoreBreakdown;
   matching_skills: string[];
   missing_skills: string[];
   extra_skills: string[];
+  weights_used?: {
+    final_weights?: Record<string, number>;
+    skill_weights?: Record<string, number>;
+  };
   flags?: {
     constraint_violations?: Record<string, string>;
   };
+  analysis?: string;
   created_at: string;
   updated_at: string;
   // Candidate fields
@@ -66,10 +63,6 @@ interface MatchedCandidateData {
   resume_url?: string;
   parsed_resume?: any;
   employer_id?: number;
-
-  // Legacy fields for backward compatibility
-  embedding_similarity?: number;
-  match_percentage?: number;
 }
 
 interface JobMatchesResponse {
@@ -294,42 +287,38 @@ const MatchedCandidatesPage = () => {
                           </PopoverTrigger>
                           <PopoverContent className="w-80 text-sm p-3 space-y-3 bg-white shadow-xl rounded-lg border border-gray-200">
                             <div>
-                              <strong className="font-semibold text-gray-800">Final Score Components</strong>
+                              <strong className="font-semibold text-gray-800">Score Breakdown</strong>
                               <div className="mt-1 space-y-1">
-                                {Object.entries(mc.score_breakdown.final_score_components).map(([key, value]) => (
-                                  <div key={key} className="flex justify-between text-xs">
-                                    <span className="text-gray-600 capitalize">{key.replace(/_/g, " ")}:</span>
-                                    <span className="font-medium text-gray-800">{(value * 100).toFixed(1)}%</span>
+                                {mc.score_breakdown?.skills_score && (
+                                  <div className="flex justify-between text-xs">
+                                    <span className="text-gray-600">Skills Score:</span>
+                                    <span className="font-medium text-gray-800">{(mc.score_breakdown.skills_score * 100).toFixed(1)}%</span>
                                   </div>
-                                ))}
-                              </div>
-                            </div>
-                            <Separator />
-                            <div>
-                              <strong className="font-semibold text-gray-800">Skills Score Components</strong>
-                              <div className="mt-1 space-y-1">
-                                {Object.entries(mc.score_breakdown.skills_score_components).map(([key, value]) => (
-                                  <div key={key} className="flex justify-between text-xs">
-                                    <span className="text-gray-600 capitalize">{key.replace(/_/g, " ")}:</span>
-                                    <span className="font-medium text-gray-800">{(value * 100).toFixed(1)}%</span>
+                                )}
+                                {mc.score_breakdown?.overall_similarity && (
+                                  <div className="flex justify-between text-xs">
+                                    <span className="text-gray-600">Overall Similarity:</span>
+                                    <span className="font-medium text-gray-800">{(mc.score_breakdown.overall_similarity * 100).toFixed(1)}%</span>
                                   </div>
-                                ))}
+                                )}
                               </div>
                             </div>
-                            <Separator />
-                             <div>
-                              <strong className="font-semibold text-gray-800">Similarity Scores</strong>
-                              <div className="mt-1 space-y-1 text-xs">
-                                <div className="flex justify-between">
-                                  <span className="text-gray-600">Overall Embedding:</span>
-                                  <span className="font-medium text-gray-800">{(mc.overall_embedding_similarity * 100).toFixed(1)}%</span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-gray-600">Skills Embedding:</span>
-                                  <span className="font-medium text-gray-800">{(mc.skills_embedding_similarity * 100).toFixed(1)}%</span>
-                                </div>
-                              </div>
-                            </div>
+                            {mc.weights_used && (
+                              <>
+                                <Separator />
+                                {/* <div>
+                                  <strong className="font-semibold text-gray-800">Weights Used</strong>
+                                  <div className="mt-1 space-y-1 text-xs">
+                                    {mc.weights_used.final_weights && Object.entries(mc.weights_used.final_weights).map(([key, value]) => (
+                                      <div key={key} className="flex justify-between">
+                                        <span className="text-gray-600">{key.replace('_', ' ').toUpperCase()}:</span>
+                                        <span className="font-medium text-gray-800">{(value * 100).toFixed(0)}%</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div> */}
+                              </>
+                            )}
                           </PopoverContent>
                         </Popover>
                       )}
@@ -350,7 +339,7 @@ const MatchedCandidatesPage = () => {
                               <div><strong className="font-semibold text-red-600">Missing Skills:</strong> {mc.missing_skills.join(", ")}</div>
                             }
                             {mc.extra_skills && mc.extra_skills.length > 0 && 
-                              <div><strong className="font-semibold text-blue-600">Extra Skills:</strong> {mc.extra_skills.join(", ")}</div>
+                              <div><strong className="font-semibold text-blue-600">Additional Skills:</strong> {mc.extra_skills.join(", ")}</div>
                             }
                           </PopoverContent>
                         </Popover>
@@ -405,6 +394,44 @@ const MatchedCandidatesPage = () => {
                         title="View Application"
                       >
                         <Eye className="h-5 w-5" />
+                      </Button>
+                      {mc.analysis && (
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="text-purple-600 hover:text-purple-800 hover:bg-purple-100 rounded-full p-2 transition-all duration-150"
+                              title="View AI Analysis"
+                            >
+                              <FileText className="h-5 w-5" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-96 max-h-80 overflow-y-auto p-4 bg-white shadow-xl rounded-lg border border-purple-200">
+                            <div className="space-y-3">
+                              <div className="flex items-center gap-2">
+                                <Star className="h-5 w-5 text-purple-600" />
+                                <h4 className="font-semibold text-purple-800">AI Match Analysis</h4>
+                              </div>
+                              <Separator />
+                              <div className="prose prose-sm max-w-none">
+                                <div className="text-gray-700 text-sm leading-relaxed whitespace-pre-wrap">
+                                  {mc.analysis}
+                                </div>
+                              </div>
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                      )}
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="text-green-600 hover:text-green-800 hover:bg-green-100 rounded-full p-2 transition-all duration-150"
+                        onClick={() => navigate(`/interviews/create?application_id=${mc.application_id}`)}
+                        disabled={!mc.application_id}
+                        title="Schedule Interview"
+                      >
+                        <Calendar className="h-5 w-5" />
                       </Button>
                     </TableCell>
                   </TableRow>

@@ -330,8 +330,9 @@ const JobApplicationForm = () => {
       return false;
     }
     
-    // For existing users, resume is optional if they already have one
-    if (!resume_file && !(show_existing_data && existing_candidate?.has_resume)) {
+    // Resume validation: Required for new users, optional for existing users with resume on file
+    const has_existing_resume = show_existing_data && existing_candidate?.has_resume;
+    if (!resume_file && !has_existing_resume) {
       toast.error("Resume is required");
       return false;
     }
@@ -359,6 +360,10 @@ const JobApplicationForm = () => {
       candidate_form_data.append('candidate_in', JSON.stringify(candidate_data));
       if (resume_file) {
         candidate_form_data.append('resume', resume_file);
+      }
+      // Add job_id to automatically associate candidate with job's employer
+      if (job_id) {
+        candidate_form_data.append('job_id', job_id);
       }
 
       const candidate_response = await fetch('http://84.16.230.94:8017/api/v1/candidates/', {
@@ -937,14 +942,22 @@ const JobApplicationForm = () => {
                         className="relative cursor-pointer rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500"
                       >
                         <span>Upload a file</span>
-                        <input id="resume-upload" name="resume-upload" type="file" className="sr-only" onChange={handle_resume_change} accept=".pdf,.doc,.docx" required />
+                        <input 
+                          id="resume-upload" 
+                          name="resume-upload" 
+                          type="file" 
+                          className="sr-only" 
+                          onChange={handle_resume_change} 
+                          accept=".pdf" 
+                          required={!(show_existing_data && existing_candidate?.has_resume)}
+                        />
                       </label>
                       <p className="pl-1">or drag and drop</p>
                     </div>
                     {resume_file ? (
                        <p className="text-sm text-green-600 font-semibold">{resume_file.name} selected</p>
                     ) : (
-                       <p className="text-xs text-gray-500">PDF, DOC, DOCX up to 5MB</p>
+                       <p className="text-xs text-gray-500">PDF</p>
                     )}
                   </div>
                 </div>

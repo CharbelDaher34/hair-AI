@@ -4,9 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Eye, Edit, BarChart3, Trash2, Plus, Search, MoreHorizontal, Settings, Loader2, RefreshCw, Copy, ExternalLink } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Eye, Trash2, Plus, Search, Settings, Loader2, RefreshCw, Copy, ExternalLink, ChevronDown } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "@/components/ui/sonner";
 import apiService from "@/services/api";
@@ -267,7 +267,7 @@ const JobDashboard = () => {
               Configure application form data
             </Link>
           </Button>
-          <Button asChild className="button shadow-lg hover:shadow-xl transition-all duration-300">
+          <Button variant="outline" asChild className="shadow-lg hover:shadow-xl transition-all duration-300">
             <Link to="/jobs/create">
               <Plus className="mr-2 h-4 w-4" />
               Create Job
@@ -327,37 +327,40 @@ const JobDashboard = () => {
               </TableHeader>
               <TableBody>
                   {filteredJobs.map((job, index) => (
-                    <TableRow key={job.id} className="hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50 transition-all duration-200">
+                    <TableRow
+                      key={job.id}
+                      className="hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50 transition-all duration-200 cursor-pointer"
+                      onClick={e => {
+                        // Prevent navigation if Delete button is clicked
+                        if ((e.target as HTMLElement).closest('.job-delete-btn')) return;
+                        window.location.href = `/jobs/${job.id}`;
+                      }}
+                    >
                       <TableCell className="font-semibold text-gray-800">{getJobTitle(job)}</TableCell>
                       <TableCell className="text-gray-600">{formatDate(job.created_at)}</TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
+                      <div onClick={(e) => e.stopPropagation()} className="flex items-center gap-2">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="h-auto p-0 hover:bg-transparent">
-                              <Badge variant={getStatusColor(job.status) as any} className="font-medium cursor-pointer hover:opacity-80 transition-opacity">
+                            <Button variant="outline" className="flex items-center gap-2 capitalize h-8">
+                              <Badge variant={getStatusColor(job.status) as any} className="font-medium">
                                 {job.status ? job.status.charAt(0).toUpperCase() + job.status.slice(1) : 'Unknown'}
                               </Badge>
+                              <ChevronDown className="h-4 w-4 text-muted-foreground" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="start">
-                            <div className="px-2 py-1.5 text-sm font-medium text-gray-700">
-                              Change Status
-                            </div>
-                            <DropdownMenuSeparator />
-                            {getStatusOptions(job.status).map((status) => (
-                              <DropdownMenuItem
-                                key={status}
-                                onClick={() => handleStatusUpdate(job.id, status)}
-                                className="cursor-pointer"
+                          <DropdownMenuContent>
+                            {getStatusOptions(job.status).map(status => (
+                              <DropdownMenuItem 
+                                key={status} 
+                                onSelect={() => handleStatusUpdate(job.id, status)}
+                                className="capitalize"
                               >
-                                <RefreshCw className="mr-2 h-4 w-4" />
                                 {status.charAt(0).toUpperCase() + status.slice(1)}
                               </DropdownMenuItem>
                             ))}
                           </DropdownMenuContent>
                         </DropdownMenu>
-                        
                         {job.status === JobStatus.PUBLISHED && (
                           <Button
                             variant="outline"
@@ -378,37 +381,12 @@ const JobDashboard = () => {
                       </TableCell>
                       <TableCell className="text-gray-600">{job.recruited_to_name || 'N/A'}</TableCell>
                     <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem asChild>
-                            <Link to={`/jobs/${job.id}`}>
-                              <Eye className="mr-2 h-4 w-4" />
-                              View
-                            </Link>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem asChild>
-                            <Link to={`/jobs/${job.id}/edit`}>
-                              <Edit className="mr-2 h-4 w-4" />
-                              Edit
-                            </Link>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem asChild>
-                            <Link to={`/jobs/${job.id}/analytics`}>
-                              <BarChart3 className="mr-2 h-4 w-4" />
-                              Analytics
-                            </Link>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteJob(job)}>
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                        <Button variant="destructive" size="sm" onClick={() => handleDeleteJob(job)} className="job-delete-btn">
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
