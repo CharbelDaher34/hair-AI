@@ -7,7 +7,7 @@ from enum import Enum
 from typing import List, Any, Dict, Optional
 import time
 import logging
-
+from core.config import settings
 logger = logging.getLogger(__name__)
 
 
@@ -59,23 +59,11 @@ class BatchParseItemData(BaseModel):
 
 
 def _get_ai_service_url(ai_url_env: Optional[str] = None) -> str:
-    if ai_url_env:
-        health_url = f"{ai_url_env}/health"
-        logger.info(f"Trying to connect to provided AI URL: {health_url}")
-        try:
-            response = requests.get(health_url, timeout=5)
-            response.raise_for_status()
-            logger.info(f"✅ AI service is running at {ai_url_env}")
-            return ai_url_env
-        except requests.exceptions.RequestException as e:
-            logger.error(
-                f"❌ Could not connect to provided AI URL {health_url}: {e}. "
-                "Falling back to host/port discovery.",
-                exc_info=True,
-            )
+    if settings.AI_URL:
+        return settings.AI_URL
 
-    hosts = [os.getenv("AI_HOST", "ai"), "localhost"]
-    port = os.getenv("AI_PORT", "8011")
+    hosts = ["ai", "localhost"]
+    port = settings.AI_PORT
     retries = 3
     for host in hosts:
         i = 0

@@ -7,7 +7,7 @@ import logging
 from sqlalchemy.orm import Session
 from models.models import Match
 from schemas.match import MatchCreate
-
+from core.config import settings
 logger = logging.getLogger(__name__)
 
 
@@ -16,11 +16,11 @@ def _get_matcher_url():
     Determines the correct base AI service URL by checking health endpoints of potential hosts.
     Returns an empty string if the service is not available.
     """
-    matcher_url = os.getenv("ai_url")
+    matcher_url = settings.AI_URL
     if matcher_url:
         return f"{matcher_url}/matcher/match_candidates"
-    hosts = [os.getenv("AI_HOST", "ai"), "localhost"]
-    port = os.getenv("AI_PORT", "8011")
+    hosts = ["ai", "localhost"]
+    port = settings.AI_PORT
 
     for host in hosts:
         base_url = f"http://{host}:{port}"

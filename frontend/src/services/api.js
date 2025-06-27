@@ -2,23 +2,15 @@ import { toast } from "sonner";
 
 // Determine the API base URL based on environment
 const get_api_base_url = () => {
-  // Use the VITE_API_URL from environment variables if it exists.
-  // This gives us flexibility to set it in different environments (local, Docker, K8s).
-  if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL;
-  }
-
-  // For Kubernetes deployment, use relative URL since nginx will proxy
-  // For local development, use localhost
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    return "http://localhost:8017/api/v1";
-  } else {
-    // In Kubernetes, nginx will proxy /api/ to the backend service
-    return "/api/v1";
-  }
+  // For local development, use VITE_API_URL or localhost
+  // if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+  //   return import.meta.env.VITE_API_URL || "http://localhost:8017/api/v1";
+  // }
+  // In production (nginx), always use relative path
+  return "/api/v1";
 };
 
-const API_V1_PREFIX = get_api_base_url();
+const API_V1_PREFIX = "/api/v1";
 
 class ApiService {
   constructor() {

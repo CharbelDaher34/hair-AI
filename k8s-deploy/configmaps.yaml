@@ -9,7 +9,8 @@ data:
   POSTGRES_SERVER: "postgres-service.recruitment-app.svc.cluster.local"
   POSTGRES_PORT: "5432"
   POSTGRES_HOST_AUTH_METHOD: "trust"
-  AI_SERVICE_URL: "http://ai-service.recruitment-app.svc.cluster.local:8011"
+  AI_URL: "http://ai-service.recruitment-app.svc.cluster.local:8011"
+  AI_PORT: "8011"
   SMTP_HOST: "smtp.gmail.com"
   SMTP_PORT: "587"
   SMTP_USERNAME: "charbeldaher34@gmail.com"
@@ -23,6 +24,8 @@ metadata:
   name: frontend-configmap
   namespace: recruitment-app
 data:
-  # Frontend now uses nginx proxy - no VITE_API_URL needed
-  # API requests are proxied by nginx to the backend service
-  NODE_ENV: "production" 
+  NODE_ENV: "production"
+  VITE_API_URL: "http://84.16.230.94:8017/api/v1"
+
+# Frontend now uses nginx proxy - no VITE_API_URL needed
+# API requests are proxied by nginx to the backend service 
