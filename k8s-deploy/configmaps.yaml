@@ -24,8 +24,8 @@ metadata:
   name: frontend-configmap
   namespace: recruitment-app
 data:
+  PROXY_PASS_URL: "backend-service.recruitment-app.svc.cluster.local:8017"
   NODE_ENV: "production"
-  VITE_API_URL: "http://84.16.230.94:8017/api/v1"
 
 # Frontend now uses nginx proxy - no VITE_API_URL needed
 # API requests are proxied by nginx to the backend service 
