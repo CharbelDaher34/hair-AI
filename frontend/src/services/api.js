@@ -3,9 +3,10 @@ import { toast } from "sonner";
 // Determine the API base URL based on environment
 const get_api_base_url = () => {
   // For local development, use VITE_API_URL or localhost
-  // if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-  //   return import.meta.env.VITE_API_URL || "http://localhost:8017/api/v1";
-  // }
+  backend_url = import.meta.env.VITE_API_URL;
+  if (backend_url) {
+    return backend_url;
+  }
   // In production (nginx), always use relative path
   return "/api/v1";
 };

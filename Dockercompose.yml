@@ -84,7 +84,9 @@ services:
       - backend
       - db
     environment:
+      - PROXY_PASS_URL=backend:8017
       - VITE_DOCKER=true
+      - VITE_API_URL=http://84.16.230.94:8017/api/v1
     volumes:
       - ./frontend/public:/app/public
 volumes:
