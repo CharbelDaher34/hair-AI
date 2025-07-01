@@ -91,17 +91,93 @@ DEFAULT_BANK = [
 BANK_PATH.write_text(json.dumps(DEFAULT_BANK, indent=2))
 QUESTION_BANK = json.loads(BANK_PATH.read_text())
 
+# Adaptive Question Pools
+STRETCH_QUESTIONS = [
+    {
+        "question": "Design a distributed machine learning system that can handle model training across multiple data centers with network partitions. How would you ensure consistency and fault tolerance?",
+        "ideal_answer": "A distributed ML system needs consensus protocols like Raft for coordination, parameter servers or federated learning for distributed training, checkpointing for fault recovery, and techniques like asynchronous SGD or model averaging to handle network partitions. Key considerations include data locality, communication overhead, and handling stragglers.",
+        "tags": ["distributed-systems", "machine-learning", "system-design"],
+        "difficulty": "challenging",
+        "rubric": {
+            "points": [
+                {"criterion": "Distributed Architecture", "weight": 0.3, "description": "Understanding of distributed system components"},
+                {"criterion": "Fault Tolerance", "weight": 0.3, "description": "Strategies for handling failures and network partitions"},
+                {"criterion": "ML-Specific Considerations", "weight": 0.4, "description": "Understanding of distributed training challenges"}
+            ]
+        }
+    },
+    {
+        "question": "Explain how you would implement a real-time recommendation system that can handle 1M+ requests per second with sub-100ms latency while continuously learning from user interactions.",
+        "ideal_answer": "Requires a multi-tier architecture with edge caching, feature stores, online/offline learning pipeline, A/B testing framework, and techniques like approximate nearest neighbors, model quantization, and streaming ML. Key is separating inference from training and using techniques like negative sampling and incremental learning.",
+        "tags": ["system-design", "machine-learning", "scalability"],
+        "difficulty": "challenging",
+        "rubric": {
+            "points": [
+                {"criterion": "System Architecture", "weight": 0.25, "description": "High-level system design for scale"},
+                {"criterion": "Latency Optimization", "weight": 0.25, "description": "Techniques to achieve sub-100ms response"},
+                {"criterion": "Online Learning", "weight": 0.25, "description": "Continuous learning from user interactions"},
+                {"criterion": "Scalability Considerations", "weight": 0.25, "description": "Handling 1M+ QPS requirements"}
+            ]
+        }
+    }
+]
+
+DIAGNOSTIC_QUESTIONS = [
+    {
+        "question": "What is overfitting in machine learning and how can you detect it?",
+        "ideal_answer": "Overfitting occurs when a model learns the training data too well, including noise and irrelevant patterns, leading to poor generalization. It can be detected by monitoring training vs validation loss curves - overfitting shows when training loss continues decreasing while validation loss increases. Prevention methods include regularization, cross-validation, and early stopping.",
+        "tags": ["machine-learning", "fundamentals"],
+        "difficulty": "simple",
+        "rubric": {
+            "points": [
+                {"criterion": "Definition Understanding", "weight": 0.4, "description": "Clear explanation of what overfitting means"},
+                {"criterion": "Detection Methods", "weight": 0.3, "description": "How to identify overfitting in practice"},
+                {"criterion": "Prevention Strategies", "weight": 0.3, "description": "Techniques to prevent overfitting"}
+            ]
+        }
+    },
+    {
+        "question": "Explain the difference between supervised and unsupervised learning with examples.",
+        "ideal_answer": "Supervised learning uses labeled training data to learn a mapping from inputs to outputs (e.g., classification, regression). Examples include email spam detection, image recognition. Unsupervised learning finds patterns in data without labels (e.g., clustering, dimensionality reduction). Examples include customer segmentation, anomaly detection.",
+        "tags": ["machine-learning", "fundamentals"],
+        "difficulty": "simple",
+        "rubric": {
+            "points": [
+                {"criterion": "Supervised Learning", "weight": 0.4, "description": "Understanding of supervised learning concept"},
+                {"criterion": "Unsupervised Learning", "weight": 0.4, "description": "Understanding of unsupervised learning concept"},
+                {"criterion": "Examples", "weight": 0.2, "description": "Relevant examples for both types"}
+            ]
+        }
+    }
+]
 
 ###############################################################################
 # ----------------------------- Data Models ----------------------------------#
 ###############################################################################
-from enum import Enum
 class MessageType(str, Enum):
     clarification = 'clarification'
     answer = 'answer'
+    unrelated = 'unrelated'
+
+class DifficultyLevel(str, Enum):
+    simple = 'simple'
+    intermediate = 'intermediate'
+    challenging = 'challenging'
+
+class RubricPoint(BaseModel):
+    criterion: str = Field(..., description="What is being evaluated")
+    weight: float = Field(..., ge=0.0, le=1.0, description="Weight of this criterion (0-1)")
+    description: str = Field(..., description="Description of what constitutes a good answer for this criterion")
+
+class QuestionRubric(BaseModel):
+    points: List[RubricPoint] = Field(..., description="List of evaluation criteria")
+    total_possible_score: int = Field(default=100, description="Maximum possible score")
+
 class ResumeInput(BaseModel):
     resume_text: str = Field(..., min_length=10)
     job_description: str = Field(..., min_length=10)
+    questions: Optional[List[str]] = None
+    answers: Optional[List[str]] = None
 
 
 class ContextSummary(BaseModel):
@@ -123,6 +199,7 @@ class TailoredQuestion(BaseModel):
     ideal_answer: str = Field(..., description="Expected ideal answer")
     tags: List[str] = Field(..., description="Question topic tags")
     difficulty: str = Field(..., description="Question difficulty level")
+    rubric: Optional[QuestionRubric] = Field(None, description="Structured evaluation rubric")
 
 
 class QuestionBatch(BaseModel):
@@ -135,6 +212,14 @@ class InterviewTurn(BaseModel):
     ideal_answer: str = Field(..., description="The expected answer")
     candidate_answer: str = Field(..., description="The candidate's response")
     timestamp: datetime = Field(default_factory=datetime.now)
+    response_time_seconds: Optional[float] = Field(None, description="Time taken to respond in seconds")
+    clarification_count: int = Field(default=0, description="Number of clarifications requested for this question")
+
+
+class RubricScore(BaseModel):
+    criterion: str = Field(..., description="The evaluation criterion")
+    score: int = Field(..., ge=0, le=100, description="Score for this criterion")
+    feedback: str = Field(..., description="Specific feedback for this criterion")
 
 
 class Evaluation(BaseModel):
@@ -146,12 +231,14 @@ class Evaluation(BaseModel):
         ..., ge=0, le=100, description="Answer completeness score"
     )
     clarity: int = Field(..., ge=0, le=100, description="Communication clarity score")
+    rubric_scores: List[RubricScore] = Field(default_factory=list, description="Detailed rubric-based scores")
     feedback: str = Field(..., description="Detailed feedback for the candidate")
     strengths: List[str] = Field(..., description="Identified strengths in the answer")
     improvements: List[str] = Field(..., description="Areas for improvement")
     follow_up_needed: bool = Field(
         ..., description="Whether a follow-up question is recommended"
     )
+    response_efficiency: int = Field(default=100, ge=0, le=100, description="Score based on response time and clarification count")
 
 
 class InterviewProgress(BaseModel):
@@ -168,6 +255,9 @@ class FinalTranscript(BaseModel):
     overall_score: float = Field(..., description="Overall interview score")
     technical_score: float = Field(..., description="Average technical accuracy")
     communication_score: float = Field(..., description="Average communication clarity")
+    efficiency_score: float = Field(..., description="Average response efficiency")
+    total_clarifications: int = Field(..., description="Total clarification requests made")
+    average_response_time: float = Field(..., description="Average response time in seconds")
     recommendation: str = Field(..., description="Hiring recommendation")
     summary: str = Field(..., description="Interview summary")
     duration: str = Field(..., description="Total interview duration")
@@ -178,6 +268,7 @@ class GeneratedQuestion(BaseModel):
     ideal_answer: str = Field(..., description="Expected ideal answer")
     tags: list[str] = Field(..., description="Question topic tags")
     difficulty: str = Field(..., description="Question difficulty level: simple, intermediate, challenging")
+    rubric: Optional[QuestionRubric] = Field(None, description="Structured evaluation rubric")
 
 
 class GeneratedQuestionBatch(BaseModel):
@@ -259,16 +350,21 @@ evaluation_agent = Agent(
         "You are an expert technical interviewer and evaluator. You will receive an InterviewTurn object containing:\n"
         "- question: The interview question that was asked\n"
         "- ideal_answer: The expected/ideal answer for comparison\n"
-        "- candidate_answer: The candidate's actual response\n\n"
+        "- candidate_answer: The candidate's actual response\n"
+        "- clarification_count: Number of clarifications requested\n"
+        "- response_time_seconds: Time taken to respond\n\n"
         "Your task is to evaluate the candidate_answer against the ideal_answer for the given question.\n"
         "Score each dimension (0-100):\n"
         "- technical_accuracy: How technically correct is the answer?\n"
         "- completeness: How complete/thorough is the answer?\n"
-        "- clarity: How clear and well-communicated is the answer?\n\n"
-        "Calculate overall score as the average of the three dimensions.\n"
+        "- clarity: How clear and well-communicated is the answer?\n"
+        "- response_efficiency: Penalize excessive clarifications (>2) and very slow responses (>180s)\n\n"
+        "If rubric_scores are provided, evaluate each criterion separately and provide specific feedback.\n"
+        "Calculate overall score as the weighted average of all dimensions.\n"
         "Provide constructive feedback, identify strengths, suggest improvements.\n"
         "Set follow_up_needed=true if the answer is unclear or incomplete (score < 60).\n\n"
-        "IMPORTANT: Always evaluate the candidate_answer field, never say the answer is missing."
+        "IMPORTANT: Always evaluate the candidate_answer field, never say the answer is missing.\n"
+        "Consider response efficiency: Deduct points for excessive clarifications or very slow responses."
     ),
     result_retries=3
 )
@@ -284,6 +380,10 @@ class EnhancedInterviewSession:
         self.evaluations: List[Evaluation] = []
         self.start_time = datetime.now()
         self.current_question_index = 0
+        self.question_start_time = None  # Track when current question was asked
+        self.clarification_count_current = 0  # Track clarifications for current question
+        self.is_exam_mode = True  # Exam mode - no immediate feedback
+        self.adaptive_questions_used = []  # Track which adaptive questions were used
 
         # Initialize session
         try:
@@ -320,7 +420,7 @@ class EnhancedInterviewSession:
                 )
             logger.info(f"Context analysis completed for session {self.id}")
 
-            # Generate questions using the AI agent
+            # Generate initial questions using the AI agent
             try:
                 logger.info(f"Generating questions from job description for session {self.id}")
                 gen_result = question_generation_agent.run_sync(
@@ -329,30 +429,32 @@ class EnhancedInterviewSession:
                 )
                 logger.info(f"Question generation agent output: {gen_result}")
                 self.question_batch = gen_result.output
-                # Convert to TailoredQuestion for compatibility
-                self.questions = [
-                    TailoredQuestion(
+                # Convert to TailoredQuestion for compatibility and add rubrics
+                self.questions = []
+                for q in self.question_batch.questions:
+                    rubric = self._create_default_rubric(q.question, q.tags)
+                    self.questions.append(TailoredQuestion(
                         question=q.question,
                         ideal_answer=q.ideal_answer,
                         tags=q.tags,
                         difficulty=q.difficulty,
-                    )
-                    for q in self.question_batch.questions
-                ]
+                        rubric=rubric
+                    ))
             except Exception as e:
                 logger.error(
                     f"AI question generation failed: {str(e)}, using fallback questions"
                 )
                 # Fallback to default questions if AI selection fails
-                fallback_questions = [
-                    TailoredQuestion(
+                fallback_questions = []
+                for q in QUESTION_BANK[:5]:
+                    rubric = self._create_default_rubric(q["question"], q.get("tags", ["general"]))
+                    fallback_questions.append(TailoredQuestion(
                         question=q["question"],
                         ideal_answer=q["ideal_answer"],
                         tags=q.get("tags", ["general"]),
                         difficulty=q.get("difficulty", "intermediate"),
-                    )
-                    for q in QUESTION_BANK[:5]
-                ]
+                        rubric=rubric
+                    ))
                 self.questions = fallback_questions
                 self.question_batch = QuestionBatch(
                     questions=fallback_questions,
@@ -368,138 +470,167 @@ class EnhancedInterviewSession:
                 500, f"Failed to initialize interview session: {str(e)}"
             )
 
+    def _create_default_rubric(self, question: str, tags: List[str]) -> QuestionRubric:
+        """Create a default rubric based on question content and tags."""
+        points = [
+            RubricPoint(
+                criterion="Technical Accuracy",
+                weight=0.4,
+                description="Correctness of technical concepts and facts"
+            ),
+            RubricPoint(
+                criterion="Completeness",
+                weight=0.3,
+                description="Coverage of key aspects and thoroughness"
+            ),
+            RubricPoint(
+                criterion="Clarity & Communication",
+                weight=0.3,
+                description="Clear explanation and logical structure"
+            )
+        ]
+        return QuestionRubric(points=points)
+
     def get_current_question(self) -> Optional[str]:
         """Get the current question without advancing the index."""
         if self.current_question_index < len(self.questions):
+            # Reset tracking for new question
+            if self.question_start_time is None:
+                self.question_start_time = datetime.now()
+                self.clarification_count_current = 0
             return self.questions[self.current_question_index].question
+        return None
+
+    def _select_adaptive_question(self, avg_score: float) -> Optional[TailoredQuestion]:
+        """Select an adaptive question based on performance."""
+        if avg_score >= 80:
+            # High performer - give stretch question
+            available_stretch = [q for q in STRETCH_QUESTIONS if q["question"] not in self.adaptive_questions_used]
+            if available_stretch:
+                selected = available_stretch[0]
+                self.adaptive_questions_used.append(selected["question"])
+                rubric_data = selected.get("rubric", {})
+                rubric = None
+                if rubric_data and "points" in rubric_data:
+                    rubric = QuestionRubric(
+                        points=[RubricPoint(**point) for point in rubric_data["points"]]
+                    )
+                return TailoredQuestion(
+                    question=selected["question"],
+                    ideal_answer=selected["ideal_answer"],
+                    tags=selected["tags"],
+                    difficulty=selected["difficulty"],
+                    rubric=rubric or self._create_default_rubric(selected["question"], selected["tags"])
+                )
+        elif avg_score <= 50:
+            # Struggling candidate - give diagnostic question
+            available_diagnostic = [q for q in DIAGNOSTIC_QUESTIONS if q["question"] not in self.adaptive_questions_used]
+            if available_diagnostic:
+                selected = available_diagnostic[0]
+                self.adaptive_questions_used.append(selected["question"])
+                rubric_data = selected.get("rubric", {})
+                rubric = None
+                if rubric_data and "points" in rubric_data:
+                    rubric = QuestionRubric(
+                        points=[RubricPoint(**point) for point in rubric_data["points"]]
+                    )
+                return TailoredQuestion(
+                    question=selected["question"],
+                    ideal_answer=selected["ideal_answer"],
+                    tags=selected["tags"],
+                    difficulty=selected["difficulty"],
+                    rubric=rubric or self._create_default_rubric(selected["question"], selected["tags"])
+                )
         return None
 
     def advance_to_next_question(self) -> Optional[str]:
         """Advance to the next question and return it."""
         self.current_question_index += 1
+        self.question_start_time = None  # Reset for next question
+        
+        # Check if we should add an adaptive question
+        if len(self.evaluations) >= 2:  # Need at least 2 evaluations to determine performance
+            avg_score = sum(e.score for e in self.evaluations) / len(self.evaluations)
+            adaptive_q = self._select_adaptive_question(avg_score)
+            if adaptive_q:
+                # Insert adaptive question at current position
+                self.questions.insert(self.current_question_index, adaptive_q)
+                logger.info(f"Added adaptive question (avg_score: {avg_score:.1f}): {adaptive_q.question[:50]}...")
+        
         return self.get_current_question()
 
-    async def process_answer(self, answer: str) -> tuple[Evaluation, InterviewProgress, bool]:
-        """Process the candidate's answer and return evaluation with progress and a flag for unrelated answer."""
+    async def process_answer(self, answer: str) -> tuple[Evaluation, InterviewProgress]:
+        """Process the candidate's answer and return evaluation with progress."""
         if self.current_question_index >= len(self.questions):
             raise ValueError("No more questions available")
 
         current_q = self.questions[self.current_question_index]
+        
+        # Calculate response time
+        response_time = None
+        if self.question_start_time:
+            response_time = (datetime.now() - self.question_start_time).total_seconds()
 
-        # Create interview turn
+        # Create interview turn with enhanced tracking
         turn = InterviewTurn(
             question=current_q.question,
             ideal_answer=current_q.ideal_answer,
             candidate_answer=answer,
+            response_time_seconds=response_time,
+            clarification_count=self.clarification_count_current
         )
 
-        unrelated = False
         try:
-            # Debug logging
-            logger.info(f"Evaluating answer for session {self.id}: '{answer[:50]}...'")
-            logger.info(f"Question: '{current_q.question}'")
-            logger.info(f"Expected: '{current_q.ideal_answer[:50]}...'")
+            # Enhanced evaluation prompt with rubric
+            rubric_info = ""
+            if current_q.rubric:
+                rubric_info = "\n\nEVALUATION RUBRIC:\n"
+                for point in current_q.rubric.points:
+                    rubric_info += f"- {point.criterion} (weight: {point.weight}): {point.description}\n"
 
-            # Check if answer is unrelated (very low similarity)
-            # Use rapidfuzz for a quick check
-            sim = fuzz.partial_ratio(answer.lower(), current_q.question.lower())
-            logger.info(f"Answer-question similarity: {sim}")
-            if sim < 20 and len(answer.strip()) > 0:
-                unrelated = True
-
-            # Evaluate the answer
             eval_prompt = (
                 f"Please evaluate this interview response:\n\n"
                 f"QUESTION: {current_q.question}\n\n"
                 f"CANDIDATE'S ANSWER: {answer}\n\n"
                 f"EXPECTED ANSWER: {current_q.ideal_answer}\n\n"
-                f"Please provide detailed evaluation with scores for technical accuracy, completeness, and clarity."
+                f"RESPONSE TIME: {response_time:.1f}s\n"
+                f"CLARIFICATIONS REQUESTED: {self.clarification_count_current}\n"
+                f"{rubric_info}\n"
+                f"Please provide detailed evaluation with scores for technical accuracy, completeness, clarity, and response efficiency."
             )
 
-            logger.info(f"Sending evaluation prompt: {eval_prompt[:200]}...")
+            logger.info(f"Evaluating answer for session {self.id}: '{answer[:30]}...' (time: {response_time:.1f}s, clarifications: {self.clarification_count_current})")
 
             eval_result = await evaluation_agent.run(eval_prompt, deps=turn)
             evaluation = eval_result.output
 
-            logger.info(
-                f"Received evaluation: score={evaluation.score}, tech={evaluation.technical_accuracy}, complete={evaluation.completeness}, clarity={evaluation.clarity}"
-            )
+            # Calculate response efficiency score
+            efficiency_score = 100
+            if self.clarification_count_current > 2:
+                efficiency_score -= (self.clarification_count_current - 2) * 10
+            if response_time and response_time > 180:  # 3 minutes
+                efficiency_score -= min(30, (response_time - 180) / 60 * 5)
+            evaluation.response_efficiency = max(0, efficiency_score)
 
-            # Fallback scoring if needed
-            if (
-                evaluation.score == 0
-                and evaluation.technical_accuracy == 0
-                and evaluation.completeness == 0
-            ):
-                answer_lower = answer.lower()
-                ideal_lower = current_q.ideal_answer.lower()
-                if len(answer.strip()) < 5:
-                    tech_score = 10
-                    completeness_score = 10
-                    clarity_score = 20
-                elif any(
-                    word in answer_lower
-                    for word in ["mutable", "immutable", "list", "tuple"]
-                ):
-                    tech_score = 60
-                    completeness_score = 50
-                    clarity_score = 60
-                else:
-                    tech_score = 30
-                    completeness_score = 30
-                    clarity_score = 40
-
-                evaluation = Evaluation(
-                    score=(tech_score + completeness_score + clarity_score) // 3,
-                    technical_accuracy=tech_score,
-                    completeness=completeness_score,
-                    clarity=clarity_score,
-                    feedback=f"Based on your answer '{answer}', here's my assessment: "
-                    + (
-                        "Good understanding of mutability concepts!"
-                        if tech_score > 50
-                        else "Consider elaborating on the key differences between these data structures."
-                    ),
-                    strengths=["Answered the question"]
-                    if len(answer.strip()) > 5
-                    else [],
-                    improvements=[
-                        "Provide more detailed explanation",
-                        "Include specific examples",
-                    ],
-                    follow_up_needed=False,
-                )
-
-            # Only store the turn and evaluation if not unrelated
-            if not unrelated:
-                self.turns.append(turn)
-                self.evaluations.append(evaluation)
+            # Store the turn and evaluation
+            self.turns.append(turn)
+            self.evaluations.append(evaluation)
 
             # Calculate progress
             progress = self._calculate_progress()
 
             logger.info(
-                f"Processed answer for session {self.id}, question {self.current_question_index + 1}, score: {evaluation.score}"
+                f"Processed answer for session {self.id}, question {self.current_question_index + 1}, score: {evaluation.score}, efficiency: {evaluation.response_efficiency}"
             )
-            return evaluation, progress, unrelated
+            return evaluation, progress
 
         except Exception as e:
             logger.error(f"Failed to process answer for session {self.id}: {str(e)}")
-            # Provide fallback evaluation
-            fallback_evaluation = Evaluation(
-                score=50,
-                technical_accuracy=50,
-                completeness=50,
-                clarity=50,
-                feedback="Unable to evaluate answer due to system error. Please try again.",
-                strengths=["Answer received"],
-                improvements=["System evaluation unavailable"],
-                follow_up_needed=False,
-            )
-            if not unrelated:
-                self.evaluations.append(fallback_evaluation)
-            progress = self._calculate_progress()
-            return fallback_evaluation, progress, unrelated
+            raise RuntimeError(f"Unable to evaluate answer due to system error: {str(e)}")
+
+    def increment_clarification_count(self):
+        """Increment clarification count for current question."""
+        self.clarification_count_current += 1
 
     def _calculate_progress(self) -> InterviewProgress:
         """Calculate current interview progress."""
@@ -529,32 +660,58 @@ class EnhancedInterviewSession:
         communication_score = sum(e.clarity for e in self.evaluations) / len(
             self.evaluations
         )
+        efficiency_score = sum(e.response_efficiency for e in self.evaluations) / len(
+            self.evaluations
+        )
 
-        # Generate recommendation
-        if overall_score >= 80:
-            recommendation = "Strong Hire - Candidate demonstrates excellent technical knowledge and communication skills."
-        elif overall_score >= 65:
-            recommendation = (
-                "Hire - Candidate shows good technical competency with room for growth."
-            )
+        # Calculate communication metrics
+        total_clarifications = sum(turn.clarification_count for turn in self.turns)
+        valid_response_times = [turn.response_time_seconds for turn in self.turns if turn.response_time_seconds is not None]
+        average_response_time = sum(valid_response_times) / max(len(valid_response_times), 1)
+
+        # Enhanced recommendation based on multiple factors
+        if overall_score >= 80 and efficiency_score >= 70:
+            recommendation = "Strong Hire - Candidate demonstrates excellent technical knowledge, communication skills, and efficiency."
+        elif overall_score >= 65 and efficiency_score >= 60:
+            recommendation = "Hire - Candidate shows good technical competency with reasonable efficiency."
         elif overall_score >= 50:
-            recommendation = (
-                "Borderline - Consider for junior roles or with additional training."
-            )
+            if efficiency_score < 50:
+                recommendation = "Borderline - Good technical knowledge but needs improvement in communication efficiency."
+            else:
+                recommendation = "Borderline - Consider for junior roles or with additional training."
         else:
             recommendation = "No Hire - Candidate needs significant development before being ready for this role."
 
-        # Generate summary
+        # Generate enhanced summary
         strengths = []
         improvements = []
         for eval in self.evaluations:
             strengths.extend(eval.strengths)
             improvements.extend(eval.improvements)
 
+        # Add efficiency insights
+        efficiency_insights = []
+        if total_clarifications == 0:
+            efficiency_insights.append("excellent question comprehension")
+        elif total_clarifications <= 2:
+            efficiency_insights.append("good question comprehension")
+        else:
+            efficiency_insights.append("frequent clarification requests")
+
+        if average_response_time <= 120:
+            efficiency_insights.append("quick response times")
+        elif average_response_time <= 300:
+            efficiency_insights.append("reasonable response times")
+        else:
+            efficiency_insights.append("slower response times")
+
         summary = (
             f"Candidate completed {len(self.evaluations)} questions with an overall score of {overall_score:.1f}%. "
-            f"Key strengths: {', '.join(set(strengths)[:3])}. "
-            f"Areas for improvement: {', '.join(set(improvements)[:3])}."
+            f"Technical competency: {technical_score:.1f}%, Communication: {communication_score:.1f}%, "
+            f"Efficiency: {efficiency_score:.1f}%. "
+            f"Key strengths: {', '.join(list(set(strengths))[:3])}. "
+            f"Communication efficiency: {', '.join(efficiency_insights)}. "
+            f"Areas for improvement: {', '.join(list(set(improvements))[:3])}."
         )
 
         # Calculate duration
@@ -568,6 +725,9 @@ class EnhancedInterviewSession:
             overall_score=overall_score,
             technical_score=technical_score,
             communication_score=communication_score,
+            efficiency_score=efficiency_score,
+            total_clarifications=total_clarifications,
+            average_response_time=average_response_time,
             recommendation=recommendation,
             summary=summary,
             duration=duration_str,
@@ -621,12 +781,57 @@ app = FastAPI(title="Enhanced Agentic Interview Bot", version="2.0")
 sessions: Dict[str, EnhancedInterviewSession] = {}
 
 
+# Mock data for /api/session_data
+MOCK_SESSION_DATA = {
+    "resume_text": "AI Engineer with 3+ years of experience in developing and deploying machine learning models. Proven ability to architect and implement end-to-end MLOps pipelines. Passionate about leveraging AI to solve complex real-world problems.\n- Senior AI Engineer, TechCorp (2021-Present)\n- Led the development of a real-time recommendation engine, improving user engagement by 25%.\n- Designed and deployed scalable training pipelines on AWS using SageMaker, Lambda, and Step Functions.\n- Optimized model inference latency by 40% through quantization and graph optimization.\nSkills: Python, C++, Go, PyTorch, TensorFlow, Scikit-learn, Hugging Face, Docker, Kubernetes, Kubeflow, MLflow, AWS SageMaker, SQL, NoSQL, Spark, Pandas, NumPy.",
+    "job_description": "Role: AI Engineer\nResponsibilities:\n- Design, build, train, and deploy machine learning models.\n- Develop and maintain scalable MLOps infrastructure for model lifecycle management.\n- Collaborate with data scientists to productize ML prototypes.\n- Research and implement state-of-the-art algorithms to tackle business challenges.\n- Ensure model performance, scalability, and reliability in production.\nQualifications:\n- BS/MS in Computer Science or related field.\n- Strong experience in Python and ML frameworks (PyTorch, TensorFlow).\n- Hands-on experience with cloud platforms (AWS, GCP, or Azure).\n- Solid software engineering fundamentals.\n- Familiarity with CI/CD, Docker, and Kubernetes is a plus.",
+    "questions": [
+        "What is the difference between PyTorch and TensorFlow?",
+        "How would you deploy a machine learning model using AWS SageMaker?"
+    ],
+    "answers": [
+        "PyTorch is more pythonic and dynamic, while TensorFlow is more static and production-oriented."
+    ]
+}
+
+@app.get("/api/session_data")
+async def get_mock_session_data():
+    """Return mock session data for frontend initialization."""
+    return MOCK_SESSION_DATA
+
 @app.post("/session")
 async def create_session(req: ResumeInput):
     """Create a new interview session."""
     try:
-        sess = EnhancedInterviewSession(req.resume_text, req.job_description)
+        # Use provided or mock data
+        resume = req.resume_text or MOCK_SESSION_DATA["resume_text"]
+        job = req.job_description or MOCK_SESSION_DATA["job_description"]
+        questions = req.questions or MOCK_SESSION_DATA.get("questions")
+        answers = req.answers or MOCK_SESSION_DATA.get("answers")
+
+        sess = EnhancedInterviewSession(resume, job)
         sessions[sess.id] = sess
+
+        # If questions are provided, override the generated questions
+        if questions:
+            sess.questions = [
+                TailoredQuestion(
+                    question=q,
+                    ideal_answer="",  # Could be filled by AI or left blank
+                    tags=[],
+                    difficulty="intermediate"
+                ) for q in questions
+            ]
+        # If answers are provided, pre-fill interview turns (optional, for demo)
+        if answers:
+            for idx, ans in enumerate(answers):
+                if idx < len(sess.questions):
+                    turn = InterviewTurn(
+                        question=sess.questions[idx].question,
+                        ideal_answer=sess.questions[idx].ideal_answer,
+                        candidate_answer=ans
+                    )
+                    sess.turns.append(turn)
 
         first_question = sess.get_current_question()
         if not first_question:
@@ -637,7 +842,7 @@ async def create_session(req: ResumeInput):
             "first_question": first_question,
             "context_summary": sess.context.summary,
             "total_questions": len(sess.questions),
-            "selection_reasoning": sess.question_batch.reasoning,
+            "selection_reasoning": getattr(sess.question_batch, 'reasoning', ''),
         }
     except Exception as e:
         logger.error(f"Failed to create session: {str(e)}")
@@ -656,6 +861,9 @@ async def websocket_interview(websocket: WebSocket, session_id: str):
     logger.info(f"WebSocket connected for session {session_id}")
 
     async def send_clarification(user_question: str):
+        # Increment clarification count
+        session.increment_clarification_count()
+        
         # Use LLM to generate a clarification/explanation for the current question
         current_q = session.questions[session.current_question_index]
         clarification_prompt = (
@@ -673,6 +881,11 @@ async def websocket_interview(websocket: WebSocket, session_id: str):
             )
             result = clarification_agent.run_sync(clarification_prompt, deps=user_question)
             clarification = result.output if hasattr(result, 'output') else str(result)
+            
+            # Check if too many clarifications
+            if session.clarification_count_current > 2:
+                clarification += f"\n\nNote: You have requested {session.clarification_count_current} clarifications for this question. Please try to provide your best answer."
+            
             # Always return the clarification to the user
             await websocket.send_json({"type": "clarification", "data": {"clarification": clarification}})
         except Exception as e:
@@ -680,6 +893,10 @@ async def websocket_interview(websocket: WebSocket, session_id: str):
             clarification = "I'm sorry, I couldn't generate a clarification at this time. Please try to answer the question as best you can."
             await websocket.send_json({"type": "clarification", "data": {"clarification": clarification}})
 
+    async def send_unrelated(user_question: str):
+        await websocket.send_json({"type": "unrelated", "data": {"unrelated": "Please answer the question as best you can."}})
+
+    
     try:
         while True:
             # Receive candidate answer
@@ -692,7 +909,9 @@ async def websocket_interview(websocket: WebSocket, session_id: str):
             if message_type == MessageType.clarification:
                 await send_clarification(answer_strip)
                 continue
-
+            elif message_type == MessageType.unrelated:
+                await send_unrelated(answer_strip)
+                continue
             if answer_strip.lower() in ["quit", "exit", "end"]:
                 final_report = session.generate_final_report()
                 await websocket.send_json(
@@ -702,34 +921,49 @@ async def websocket_interview(websocket: WebSocket, session_id: str):
                 break
 
             # Process the answer
-            evaluation, progress, unrelated = await session.process_answer(answer)
+            evaluation, progress = await session.process_answer(answer)
 
-            # If unrelated, ask for follow-up and do not advance question index
-            if unrelated:
-                follow_up = "Your answer does not seem related to the question. Please answer only the question asked."
-                await websocket.send_json(
-                    {"type": "follow_up", "data": {"question": follow_up}}
-                )
-                continue
-
-            # Send evaluation feedback
-            await websocket.send_json(
-                {
-                    "type": "evaluation",
+            # EXAM MODE: No immediate feedback, just acknowledgment and progress
+            if session.is_exam_mode:
+                # Send simple acknowledgment
+                await websocket.send_json({
+                    "type": "answer_received",
                     "data": {
-                        "score": evaluation.score,
-                        "feedback": evaluation.feedback,
-                        "strengths": evaluation.strengths,
-                        "improvements": evaluation.improvements,
-                        "technical_accuracy": evaluation.technical_accuracy,
-                        "completeness": evaluation.completeness,
-                        "clarity": evaluation.clarity,
-                    },
-                }
-            )
-
-            # Send progress update
-            await websocket.send_json({"type": "progress", "data": progress.model_dump(mode="json")})
+                        "message": "Answer received. Moving to next question...",
+                        "question_number": progress.current_question,
+                        "total_questions": progress.total_questions
+                    }
+                })
+                
+                # Send progress update (but without scores)
+                await websocket.send_json({
+                    "type": "progress", 
+                    "data": {
+                        "current_question": progress.current_question,
+                        "total_questions": progress.total_questions,
+                        "time_elapsed": progress.time_elapsed
+                        # Note: No average_score in exam mode
+                    }
+                })
+            else:
+                # COACHING MODE: Immediate feedback (not implemented in this version)
+                await websocket.send_json(
+                    {
+                        "type": "evaluation",
+                        "data": {
+                            "score": evaluation.score,
+                            "feedback": evaluation.feedback,
+                            "strengths": evaluation.strengths,
+                            "improvements": evaluation.improvements,
+                            "technical_accuracy": evaluation.technical_accuracy,
+                            "completeness": evaluation.completeness,
+                            "clarity": evaluation.clarity,
+                            "response_efficiency": evaluation.response_efficiency,
+                        },
+                    }
+                )
+                # Send progress update
+                await websocket.send_json({"type": "progress", "data": progress.model_dump(mode="json")})
 
             # Move to next question
             next_question = session.advance_to_next_question()
@@ -738,7 +972,7 @@ async def websocket_interview(websocket: WebSocket, session_id: str):
                     {"type": "next_question", "data": {"question": next_question}}
                 )
             else:
-                # Interview complete
+                # Interview complete - show final report
                 final_report = session.generate_final_report()
                 await websocket.send_json(
                     {"type": "final_report", "data": final_report.model_dump(mode="json")}
@@ -948,33 +1182,10 @@ HTML_INTERFACE = """
         }
         /* Modal Overlay Styles */
         .modal-overlay {
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            width: 100vw; height: 100vh;
-            background: rgba(44, 62, 80, 0.85);
-            z-index: 2000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: opacity 0.5s;
+            display: none;
         }
         .modal-content {
-            background: #fff;
-            border-radius: 18px;
-            box-shadow: 0 8px 40px rgba(0,0,0,0.18);
-            padding: 40px 30px 30px 30px;
-            max-width: 900px;
-            width: 100%;
-            animation: modalIn 0.6s cubic-bezier(.68,-0.55,.27,1.55);
-        }
-        @keyframes modalIn {
-            0% { transform: scale(0.95) translateY(40px); opacity: 0; }
-            100% { transform: scale(1) translateY(0); opacity: 1; }
-        }
-        .modal-overlay.hide {
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.5s;
+            display: none;
         }
         .evaluation-table {
             width: 100%;
@@ -1013,18 +1224,7 @@ HTML_INTERFACE = """
             .evaluation-table th, .evaluation-table td { font-size: 13px; padding: 6px 4px; }
         }
         .job-edit-textarea {
-            width: 100%;
-            min-height: 180px;
-            font-size: 15px;
-            font-family: 'Consolas', 'Courier New', monospace;
-            background: #fff;
-            border: 1.5px solid #b6c6e3;
-            border-radius: 7px;
-            padding: 12px;
-            resize: vertical;
-            margin-top: 5px;
-            margin-bottom: 0;
-            box-sizing: border-box;
+            display: none;
         }
     </style>
 </head>
@@ -1036,57 +1236,10 @@ HTML_INTERFACE = """
         </div>
         
         <div class="content">
-            <!-- Modal Overlay for Setup -->
-            <div id="setupOverlay" class="modal-overlay">
-                <div id="setupInfo" class="modal-content">
-                    <div class="job-resume-container">
-                        <div class="info-box">
-                            <h3>📄 Candidate Resume</h3>
-                            <pre id="resume-text">
-**Summary:**
-AI Engineer with 3+ years of experience in developing and deploying machine learning models. Proven ability to architect and implement end-to-end MLOps pipelines. Passionate about leveraging AI to solve complex real-world problems.
-
-**Experience:**
-- Senior AI Engineer, TechCorp (2021-Present)
-  - Led the development of a real-time recommendation engine, improving user engagement by 25%.
-  - Designed and deployed scalable training pipelines on AWS using SageMaker, Lambda, and Step Functions.
-  - Optimized model inference latency by 40% through quantization and graph optimization.
-
-**Skills:**
-- Programming: Python (Expert), C++, Go
-- ML/DL: PyTorch, TensorFlow, Scikit-learn, Hugging Face
-- MLOps: Docker, Kubernetes, Kubeflow, MLflow, AWS SageMaker
-- Data: SQL, NoSQL, Spark, Pandas, NumPy
-                            </pre>
-                        </div>
-                        <div class="info-box">
-                            <h3>💼 Job Description</h3>
-                            <textarea id="job-text" class="job-edit-textarea">
-**Role:** AI Engineer
-
-**Responsibilities:**
-- Design, build, train, and deploy machine learning models.
-- Develop and maintain scalable MLOps infrastructure for model lifecycle management.
-- Collaborate with data scientists to productize ML prototypes.
-- Research and implement state-of-the-art algorithms to tackle business challenges.
-- Ensure model performance, scalability, and reliability in production.
-
-**Qualifications:**
-- BS/MS in Computer Science or related field.
-- Strong experience in Python and ML frameworks (PyTorch, TensorFlow).
-- Hands-on experience with cloud platforms (AWS, GCP, or Azure).
-- Solid software engineering fundamentals.
-- Familiarity with CI/CD, Docker, and Kubernetes is a plus.
-                            </textarea>
-                        </div>
-                    </div>
-                    <button id="startBtn" class="btn">🚀 Start Interview</button>
-                </div>
+            <div id="contextPanel" class="context-panel" style="margin-bottom: 24px; padding: 18px 24px; background: #eaf6ff; border-radius: 10px; border: 1.5px solid #b6c6e3; color: #234;">
+                <!-- Context info will be injected here -->
             </div>
-            <!-- End Modal Overlay -->
-
-            <div id="interviewSection" class="hidden">
-                <div id="contextInfo" class="message bot"><div class="content-wrapper"></div></div>
+            <div id="interviewSection">
                 <div id="chat"></div>
                 <div class="input-area">
                     <input 
@@ -1104,47 +1257,40 @@ AI Engineer with 3+ years of experience in developing and deploying machine lear
         let ws;
         let currentSession = null;
 
-        document.getElementById('startBtn').onclick = async () => {
-            const resume = document.getElementById('resume-text').textContent.trim();
-            const job = document.getElementById('job-text').value.trim();
-            document.getElementById('startBtn').disabled = true;
-            showLoading('Creating interview session...');
+        async function startInterviewWithMockData() {
+            showLoading('Loading session data...');
             try {
+                const resp = await fetch('/api/session_data');
+                const mockData = await resp.json();
+                // Start session with mock data
                 const response = await fetch('/session', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ resume_text: resume, job_description: job })
+                    body: JSON.stringify(mockData)
                 });
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}: ${await response.text()}`);
                 }
                 const data = await response.json();
                 currentSession = data;
-                // Animate modal overlay out
-                const overlay = document.getElementById('setupOverlay');
-                overlay.classList.add('hide');
-                setTimeout(() => {
-                    overlay.style.display = 'none';
-                    document.getElementById('interviewSection').classList.remove('hidden');
-                }, 500);
-                const contextInfo = document.querySelector('#contextInfo .content-wrapper');
-                contextInfo.innerHTML = `
-                    <strong>📊 Interview Setup Complete</strong><br>
-                    <strong>Context:</strong> ${data.context_summary}<br>
-                    <strong>Questions:</strong> ${data.total_questions} selected<br>
-                    <strong>Reasoning:</strong> ${data.selection_reasoning}<br>
-                    <hr style="margin: 10px 0; border-color: #ddd;">
-                    <strong>First Question:</strong> ${data.first_question}
+                // Show context info in the info panel, not in chat
+                const contextPanel = document.getElementById('contextPanel');
+                contextPanel.innerHTML = `
+                    <strong>Interview Context</strong><br>
+                    <span style="color:#357;">${data.context_summary}</span><br>
+                    <span style="font-size:0.98em;">Questions selected: <b>${data.total_questions}</b></span><br>
+                    <span style="font-size:0.98em;">Reasoning: <i>${data.selection_reasoning}</i></span>
                 `;
+                // Show the first question as a bot message in the chat
+                addMessage('bot', `📝 <strong>First Question:</strong> ${data.first_question}`);
                 connectWebSocket(data.session_id);
             } catch (error) {
                 console.error('Error creating session:', error);
                 alert('Failed to create interview session. Check the console for details.');
-                document.getElementById('startBtn').disabled = false;
             } finally {
                 hideLoading();
             }
-        };
+        }
 
         function connectWebSocket(sessionId) {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -1169,6 +1315,9 @@ AI Engineer with 3+ years of experience in developing and deploying machine lear
 
         function handleWebSocketMessage(message) {
             switch (message.type) {
+                case 'answer_received':
+                    showAnswerReceived(message.data);
+                    break;
                 case 'evaluation':
                     showEvaluation(message.data);
                     break;
@@ -1190,6 +1339,17 @@ AI Engineer with 3+ years of experience in developing and deploying machine lear
             }
         }
 
+        function showAnswerReceived(data) {
+            const receivedHtml = `
+                <div class="message system">
+                    ✅ ${data.message}<br>
+                    <small>Question ${data.question_number} of ${data.total_questions} completed</small>
+                </div>
+            `;
+            document.getElementById('chat').innerHTML += receivedHtml;
+            scrollToBottom();
+        }
+
         function showEvaluation(data) {
             const scoreClass = data.score >= 70 ? 'high' : data.score >= 50 ? 'medium' : 'low';
             const evaluationHtml = `
@@ -1201,12 +1361,14 @@ AI Engineer with 3+ years of experience in developing and deploying machine lear
                             <th>Technical</th>
                             <th>Completeness</th>
                             <th>Clarity</th>
+                            <th>Efficiency</th>
                         </tr>
                         <tr>
                             <td class="score-cell score-${scoreClass}">${data.score}/100</td>
                             <td>${data.technical_accuracy}/100</td>
                             <td>${data.completeness}/100</td>
                             <td>${data.clarity}/100</td>
+                            <td>${data.response_efficiency || 'N/A'}/100</td>
                         </tr>
                     </table>
                     <span class="eval-section-label">💬 Feedback:</span>
@@ -1222,11 +1384,16 @@ AI Engineer with 3+ years of experience in developing and deploying machine lear
         }
 
         function showProgress(data) {
+            // In exam mode, don't show average score
+            const progressContent = data.average_score !== undefined 
+                ? `Current Average: ${data.average_score.toFixed(1)}/100<br>`
+                : '';
+            
             const progressHtml = `
                 <div class="message progress">
                     <strong>📈 Progress Update</strong><br>
                     Question ${data.current_question}/${data.total_questions} completed<br>
-                    Current Average: ${data.average_score.toFixed(1)}/100<br>
+                    ${progressContent}
                     Time Elapsed: ${data.time_elapsed}
                 </div>
             `;
@@ -1236,7 +1403,9 @@ AI Engineer with 3+ years of experience in developing and deploying machine lear
 
         function showFinalReport(data) {
             const scoreClass = data.overall_score >= 70 ? 'high' : data.overall_score >= 50 ? 'medium' : 'low';
-            // Build Q&A table
+            const efficiencyClass = data.efficiency_score >= 70 ? 'high' : data.efficiency_score >= 50 ? 'medium' : 'low';
+            
+            // Build enhanced Q&A table with response times and clarifications
             let qaTable = `<table class="evaluation-table" style="margin-top:18px;">
                 <tr>
                     <th>#</th>
@@ -1244,17 +1413,22 @@ AI Engineer with 3+ years of experience in developing and deploying machine lear
                     <th>Your Answer</th>
                     <th>Ideal Answer</th>
                     <th>Score</th>
+                    <th>Time</th>
+                    <th>Clarifications</th>
                 </tr>`;
             for (let i = 0; i < data.turns.length; i++) {
                 const turn = data.turns[i];
                 const eval_ = data.evaluations[i];
                 const turnScoreClass = eval_ && eval_.score >= 70 ? 'score-high' : eval_ && eval_.score >= 50 ? 'score-medium' : 'score-low';
+                const responseTime = turn.response_time_seconds ? `${Math.round(turn.response_time_seconds)}s` : 'N/A';
                 qaTable += `<tr>
                     <td>${i + 1}</td>
                     <td style="min-width:160px;max-width:260px;">${turn.question}</td>
                     <td style="min-width:140px;max-width:220px;">${turn.candidate_answer}</td>
                     <td style="min-width:140px;max-width:220px;">${turn.ideal_answer}</td>
                     <td class="score-cell ${turnScoreClass}">${eval_ ? eval_.score : '-'}/100</td>
+                    <td>${responseTime}</td>
+                    <td>${turn.clarification_count || 0}</td>
                 </tr>`;
             }
             qaTable += `</table>`;
@@ -1263,11 +1437,19 @@ AI Engineer with 3+ years of experience in developing and deploying machine lear
                 <div class="message bot">
                     <div class="content-wrapper">
                         <strong>🎯 Interview Complete!</strong><br><br>
-                        <span class="score ${scoreClass}">Final Score: ${data.overall_score.toFixed(1)}/100</span><br>
-                        <small>Technical: ${data.technical_score.toFixed(1)} | Communication: ${data.communication_score.toFixed(1)}</small><br><br>
+                        <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 15px;">
+                            <div><span class="score ${scoreClass}">Overall: ${data.overall_score.toFixed(1)}/100</span></div>
+                            <div><span class="score">Technical: ${data.technical_score.toFixed(1)}/100</span></div>
+                            <div><span class="score">Communication: ${data.communication_score.toFixed(1)}/100</span></div>
+                            <div><span class="score ${efficiencyClass}">Efficiency: ${data.efficiency_score.toFixed(1)}/100</span></div>
+                        </div>
+                        <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 15px; font-size: 0.9em;">
+                            <div>📋 Total Clarifications: <strong>${data.total_clarifications}</strong></div>
+                            <div>⏱️ Avg Response Time: <strong>${Math.round(data.average_response_time)}s</strong></div>
+                            <div>🕒 Duration: <strong>${data.duration}</strong></div>
+                        </div>
                         <strong>📋 Summary:</strong> ${data.summary}<br><br>
                         <strong>🎯 Recommendation:</strong> ${data.recommendation}<br><br>
-                        <strong>⏱️ Duration:</strong> ${data.duration}<br><br>
                         <hr style="margin:18px 0;">
                         <strong>📝 Questions & Answers:</strong>
                         ${qaTable}
@@ -1332,6 +1514,9 @@ AI Engineer with 3+ years of experience in developing and deploying machine lear
                 sendAnswer();
             }
         };
+
+        // Start interview automatically on page load
+        window.onload = startInterviewWithMockData;
     </script>
 </body>
 </html>
@@ -1343,32 +1528,10 @@ async def home():
     return HTML_INTERFACE
 
 
-async def test_evaluation():
-    """Test the evaluation system with sample data."""
-    test_turn = InterviewTurn(
-        question="Explain the difference between a Python list and tuple.",
-        ideal_answer="A list is mutable and typically used for homogenous items, while a tuple is immutable and often used for heterogeneous data. Lists use square brackets [], tuples use parentheses ().",
-        candidate_answer="list is mutable, but tuple is not mutable",
-    )
-
-    try:
-        result = await evaluation_agent.run(
-            "Please evaluate this test response.", deps=test_turn
-        )
-        print("✅ Test Evaluation Result:")
-        print(f"Score: {result.output.score}")
-        print(f"Feedback: {result.output.feedback}")
-        return True
-    except Exception as e:
-        print(f"❌ Test failed: {e}")
-        return False
 
 
 if __name__ == "__main__":
     import sys
 
-    if len(sys.argv) > 1 and sys.argv[1] == "test":
-        asyncio.run(test_evaluation())
-    else:
-        logger.info("Starting Enhanced Agentic Interview Bot...")
-        uvicorn.run(app, host="0.0.0.0", port=8635, log_level="info")
+    logger.info("Starting Enhanced Agentic Interview Bot...")
+    uvicorn.run(app, host="0.0.0.0", port=8635, log_level="info")

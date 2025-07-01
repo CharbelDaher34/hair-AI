@@ -67,7 +67,7 @@ services:
     container_name: ai
     restart: on-failure
     ports: 
-      - "8011:8011"
+      - "8015:8011"
     environment:
       - API_KEY=AIzaSyDp8n_AmYsspADJBaNpkJvBdlch1-9vkhw
     volumes:
