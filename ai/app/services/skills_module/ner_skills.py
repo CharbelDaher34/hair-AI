@@ -4,25 +4,23 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import spacy
-from rapidfuzz import fuzz
 from sklearn.metrics.pairwise import cosine_similarity
-from skillNer.skill_extractor_class import SkillExtractor
-from skillNer.general_params import SKILL_DB
-from spacy.matcher import PhraseMatcher
-
+from gliner import GLiNER
+import torch
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
 class skill_ner:
-    # — spaCy + SkillNer setup — #
+    # — spaCy + GLiNER setup — #
     _nlp = None
     try:
         _nlp = spacy.load("en_core_web_trf")
     except OSError:
         _nlp = spacy.load("en_core_web_lg")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    _skill_extractor = SkillExtractor(_nlp, SKILL_DB, PhraseMatcher)
+    _gliner_model = GLiNER.from_pretrained("knowledgator/gliner-x-large",device=device)
     _VEC_CACHE: Dict[str, np.ndarray] = {}
 
     @classmethod
@@ -83,25 +81,18 @@ class skill_ner:
             if not text or not isinstance(text, str):
                 return []
 
-            anns = cls._skill_extractor.annotate(text)
-            if not anns or "results" not in anns:
+            labels = ["soft skills", "technical skills"]
+            entities = cls._gliner_model.predict_entities(text, labels, threshold=0.5)
+            
+            if not entities:
                 return []
 
-            out = set()
+            skills = set()
+            for entity in entities:
+                if entity and "text" in entity and entity["text"]:
+                    skills.add(entity["text"].strip())
 
-            # Safely extract full matches
-            if "full_matches" in anns["results"] and anns["results"]["full_matches"]:
-                for m in anns["results"]["full_matches"]:
-                    if m and "doc_node_value" in m and m["doc_node_value"]:
-                        out.add(m["doc_node_value"].strip())
-
-            # Safely extract ngram scored matches
-            if "ngram_scored" in anns["results"] and anns["results"]["ngram_scored"]:
-                for ng in anns["results"]["ngram_scored"]:
-                    if ng and "doc_node_value" in ng and ng["doc_node_value"]:
-                        out.add(ng["doc_node_value"].strip())
-
-            return sorted(out)
+            return sorted(skills)
         except Exception as e:
             logger.error(f"Error extracting skills from text: {e}")
             return []
@@ -155,7 +146,7 @@ class skill_ner:
                 else:
                     missing.append((j_raw, j))  # keep cleaned form for next step
 
-            # 2. Hybrid match for the still-missing ones
+            # 2. Cosine similarity match for the still-missing ones
             true_missing = []
             for j_raw, j in missing:
                 try:
@@ -166,15 +157,13 @@ class skill_ner:
                             continue
                         try:
                             v_c = cls._vec(c)
-                            sem = float(
+                            sim = float(
                                 cosine_similarity(
                                     v_j.reshape(1, -1), v_c.reshape(1, -1)
                                 )[0, 0]
                             )
-                            fuz = fuzz.token_set_ratio(j, c) / 100.0
-                            comp = 0.6 * sem + 0.4 * fuz
-                            if comp > best["score"]:
-                                best = {"idx": idx, "score": comp}
+                            if sim > best["score"]:
+                                best = {"idx": idx, "score": sim}
                         except Exception as e:
                             logger.warning(
                                 f"Error computing similarity for '{j}' and '{c}': {e}"
@@ -284,38 +273,25 @@ class skill_ner:
 
 
 if __name__ == "__main__":
-    job = [
-        "Python",
-        "Machine Learning",
-        "Deep Learning",
-        "Cloud Computing",
-        "Data Engineering",
-        "Communication",
-        "Teamwork",
-    ]
-    cand = [
-        "python",
-        "ml",
-        "deep learn",
-        "aws cloud",
-        "data engineer",
-        "communicate",
-        "team collaboration",
-        "extra skill",
-    ]
+    # Test with GLiNER-based skill extraction
+    job_text = """
+    We are looking for a Python developer with experience in Machine Learning and Deep Learning.
+    The candidate should have strong communication skills and be able to work in a team environment.
+    Cloud Computing experience with AWS and Data Engineering skills are required.
+    """
+    
+    candidate_text = """
+    I have 5 years of experience in python programming and machine learning.
+    I've worked with deep learning frameworks and have excellent communication abilities.
+    I'm experienced in team collaboration and have worked with AWS cloud services.
+    I also have data engineer experience and additional skills in project management.
+    """
 
-    print("Scores for each job⇄candidate pair:\n")
-    for j in job:
-        for c in cand:
-            # clean & embed
-            j_cl = skill_ner._clean(j)
-            c_cl = skill_ner._clean(c)
-            vj = skill_ner._vec(j_cl)
-            vc = skill_ner._vec(c_cl)
-            sem = float(cosine_similarity(vj.reshape(1, -1), vc.reshape(1, -1))[0, 0])
-            fuz = fuzz.token_set_ratio(j_cl, c_cl) / 100.0
-            comp = 0.6 * sem + 0.4 * fuz
-            print(
-                f"{j:17s} ↔ {c:17s}  |  sem={sem:.2f}, fuzz={fuz:.2f}, comp={comp:.2f}"
-            )
-    print("\nNow run get_skill_match_details to see which pairs exceed your threshold.")
+    print("Job Skills:", skill_ner.extract_skills(job_text))
+    print("Candidate Skills:", skill_ner.extract_skills(candidate_text))
+    
+    details = skill_ner.get_skill_match_details(job_text, candidate_text)
+    print(f"\nMatch Percentage: {details['match_percentage']}%")
+    print(f"Matching Skills: {len(details['skill_analysis']['matching_skills'])}")
+    print(f"Missing Skills: {len(details['skill_analysis']['missing_skills'])}")
+    print(f"Extra Skills: {len(details['skill_analysis']['extra_skills'])}")

@@ -9,6 +9,7 @@ WORKDIR /app
 # Copy requirements first for better caching
 COPY app/pyproject.toml .
 COPY app/uv.lock .
+RUN apt-get update && apt-get install -y libboost-all-dev
 
 # Install dependencies and sync the virtual environment
 RUN uv lock && \
