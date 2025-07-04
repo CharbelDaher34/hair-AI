@@ -1,23 +1,12 @@
-- fix profile size page
-- flow logic handling
-- filter on tables
-- better display new cnadidate in the create appluication
-
-create data shar3iye
+- for each company , type of interviews
+- each employee can do diffrent types of interviews
+- for each job we have a sequential interview process
+- when an hr will schedule an interview, the interviews should be like the sequence created before
 
 
 
 
-error handling, phome key violation
-dim job selection undtil candidate is selected, add appluication
-filter interviews by employer id
+report structure:
 
-
-
-
-
-
-
-newwww
-
-salary  monthyl or yearly?
+-chapter2: system design + data structure
+-chapter3: hair implementation and results

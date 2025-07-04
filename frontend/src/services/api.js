@@ -122,6 +122,10 @@ class ApiService {
     return this.request('/companies/by_hr/');
   }
 
+  async getCompanyInterviewTypes() {
+    return this.request('/companies/interview_types/');
+  }
+
   async getCandidatesForCurrentCompany() {
     return this.request('/companies/candidates/');
   }
@@ -550,6 +554,12 @@ class ApiService {
     });
   }
 
+  async generateTailoredQuestions(jobId) {
+    return this.request(`/jobs/generate_tailored_questions/job/${jobId}`, {
+      method: 'POST',
+    });
+  }
+
   async getCompanyAnalytics() {
     return this.request(`/analytics/company/`);
   }
@@ -610,6 +620,10 @@ class ApiService {
       method: 'PATCH',
       body: JSON.stringify({ interviewer_review }),
     });
+  }
+
+  async getNextInterviewCategory(applicationId) {
+    return this.request(`/interviews/next-interview-category/${applicationId}`);
   }
 }
 

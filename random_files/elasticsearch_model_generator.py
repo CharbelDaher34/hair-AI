@@ -595,104 +595,6 @@ class ElasticsearchModelGenerator:
             self._filter_model_class = QueryFilters
         return self._filter_model_class
 
-    #     def generate_system_prompt(self) -> str:
-    #         """
-    #         Generate a system prompt for LLM-based filter extraction.
-
-    #         Returns:
-    #             System prompt string for natural language to filter conversion
-    #         """
-    #         model_info = self.get_model_info()
-
-    #         system_prompt = f"""
-    # Today is {datetime.now().strftime("%Y-%m-%d")}
-
-    # You are an expert assistant that converts natural language queries into structured database filters. Your task is to analyze user queries and translate them into precise filter conditions.
-
-    # ## Available Schema Fields:
-    # {json.dumps(model_info, indent=2)}
-
-    # ## Supported Operators:
-    # - "<" (less than) - for numbers and dates
-    # - ">" (greater than) - for numbers and dates
-    # - "isin" (is in list) - for checking if value is in a list of options
-    # - "notin" (not in list) - for checking if value is NOT in a list of options
-    # - "is" (equals) - for exact matches
-    # - "different" (not equals) - for exclusions
-    # - "between" - for range queries (not yet implemented)
-
-    # ## Chain of Thought Process:
-    # When analyzing a query, follow these steps:
-
-    # 1. **Identify Time References**: Look for temporal keywords (last summer, yesterday, this month, etc.)
-    # 2. **Extract Entities**: Find specific values mentioned (amounts, names, categories, etc.)
-    # 3. **Determine Intent**: Understand what the user wants to filter or find
-    # 4. **Map to Schema**: Match identified concepts to available schema fields
-    # 5. **Choose Operators**: Select appropriate operators based on the query type
-    # 6. **Validate Values**: Ensure values match field types and enum constraints
-
-    # ## Examples:
-
-    # ### Example 1: Time-based Query
-    # **Query**: "what did i spend my money last summer?"
-    # **Chain of Thought**:
-    # - Time reference: "last summer" → June-August of previous year
-    # - Intent: Find spending/transactions in that period
-    # - Schema mapping: Need date field for time filtering
-    # - Operator: ">" and "<" for date range, or "between"
-    # - Result: Filter by transaction date between 2023-06-01 and 2023-08-31
-
-    # ### Example 2: Category-based Query
-    # **Query**: "show me all my restaurant purchases"
-    # **Chain of Thought**:
-    # - Entity: "restaurant"
-    # - Intent: Filter by merchant category
-    # - Schema mapping: Look for category/merchant type fields
-    # - Operator: "is" or "isin" if multiple restaurant categories exist
-    # - Result: Filter where category_type is "restaurant" or similar
-
-    # ### Example 3: Amount-based Query
-    # **Query**: "transactions over $100"
-    # **Chain of Thought**:
-    # - Entity: "$100" → numeric value 100
-    # - Intent: Filter by transaction amount
-    # - Schema mapping: Find amount/value field
-    # - Operator: ">" for greater than
-    # - Result: Filter where amount > 100
-
-    # ### Example 4: Card-based Query
-    # **Query**: "purchases made with my credit card but not debit card"
-    # **Chain of Thought**:
-    # - Entities: "credit card", "debit card"
-    # - Intent: Include credit, exclude debit
-    # - Schema mapping: card_type or card_kind field
-    # - Operators: "is" for credit, "different" for excluding debit
-    # - Result: Multiple filters - card_type is "credit" AND card_type different "debit"
-
-    # ### Example 5: Complex Query
-    # **Query**: "expensive coffee purchases from Starbucks in the last 3 months"
-    # **Chain of Thought**:
-    # - Time: "last 3 months" → date range
-    # - Amount: "expensive" → subjective, maybe > $5 for coffee
-    # - Merchant: "Starbucks" → specific receiver name
-    # - Category: "coffee" → might map to restaurant/cafe category
-    # - Multiple filters needed with AND logic
-
-    # ## Important Guidelines:
-
-    # 1. **Date Handling**: Convert relative dates (last month, yesterday) to absolute ISO dates (YYYY-MM-DD)
-    # 2. **Enum Values**: Only use values that exist in the enum lists provided in the schema
-    # 3. **Multiple Filters**: Create separate filter objects for each condition - they will be combined with AND logic
-    # 4. **Ambiguous Queries**: When unclear, prefer broader filters rather than overly restrictive ones
-    # 5. **Missing Information**: If a query references data not available in the schema, explain what's missing
-
-    # ## Response Format:
-    # Always return a valid JSON object matching the QueryFilters schema with a "filters" array containing Query objects.
-
-    # Now, analyze the user's query and provide the appropriate filters:
-    # """
-    #         return system_prompt
-
     def generate_system_prompt(self) -> str:
         """
         Generate a system prompt for LLM-based filter extraction supporting
@@ -905,6 +807,169 @@ Now read the user's question and output **only** the JSON object described above
         result = await self._llm_client.llm_agent.run([query])
         return result
 
+    def FilterToElasticQuery(self, query_filters: dict) -> List[Dict[str, Any]]:
+        """
+        Convert QueryFilters model output to Elasticsearch query DSL.
+        
+        Args:
+            query_filters: Dictionary containing filters from the model output
+            
+        Returns:
+            List of Elasticsearch queries, one for each filter slice
+        """
+        if not query_filters or "filters" not in query_filters:
+            return []
+
+        def _keyword_field(f: str) -> str:
+            """Return field.keyword unless field already has a dot path at end or appears numeric/date."""
+            if f.endswith(".keyword"):
+                return f
+            # heuristics: if last part of path is already 'keyword', skip
+            last = f.split(".")[-1]
+            # If last part likely numeric/date field names we still try keyword. We cannot know. We'll just add keyword.
+            return f"{f}.keyword"
+
+        elastic_queries: List[Dict[str, Any]] = []
+
+        for filter_slice in query_filters["filters"]:
+            if not filter_slice:
+                continue
+
+            must_clauses: List[Dict[str, Any]] = []
+
+            for filter_condition in filter_slice:
+                field = filter_condition["field"]
+                operator = filter_condition["operator"]
+                value = filter_condition["value"]
+
+                # Determine if field likely string (heuristic: value is str and not ISO date pattern)
+                is_string = isinstance(value, str) and not (len(value) == 10 and value[4] == "-" and value[7] == "-")
+
+                exact_field = _keyword_field(field) if is_string else field
+
+                if operator == ">":
+                    must_clauses.append({"range": {field: {"gt": value}}})
+                elif operator == "<":
+                    must_clauses.append({"range": {field: {"lt": value}}})
+                elif operator == "is":
+                    must_clauses.append({"term": {exact_field: value}})
+                elif operator == "different":
+                    must_clauses.append({"bool": {"must_not": {"term": {exact_field: value}}}})
+                elif operator == "isin":
+                    if isinstance(value, list):
+                        if len(value) == 2 and all(isinstance(v, str) and len(v) == 10 and v.count("-") == 2 for v in value):
+                            must_clauses.append({"range": {field: {"gte": value[0], "lte": value[1]}}})
+                        else:
+                            must_clauses.append({"terms": {exact_field: value}})
+                    else:
+                        must_clauses.append({"term": {exact_field: value}})
+                elif operator == "notin":
+                    if isinstance(value, list):
+                        must_clauses.append({"bool": {"must_not": {"terms": {exact_field: value}}}})
+                    else:
+                        must_clauses.append({"bool": {"must_not": {"term": {exact_field: value}}}})
+                elif operator == "between":
+                    if isinstance(value, list) and len(value) == 2:
+                        must_clauses.append({"range": {field: {"gte": value[0], "lte": value[1]}}})
+
+            elastic_query = {"query": {"bool": {"must": must_clauses}}} if must_clauses else {"query": {"match_all": {}}}
+            elastic_queries.append(elastic_query)
+
+        return elastic_queries
+
+    def ExecuteElasticQueries(self, elastic_queries: List[Dict[str, Any]], size: int = 100) -> List[Dict[str, Any]]:
+        """
+        Execute multiple Elasticsearch queries and return results.
+        
+        Args:
+            elastic_queries: List of Elasticsearch query DSL dictionaries
+            size: Maximum number of results per query
+            
+        Returns:
+            List of query results, one for each input query
+        """
+        results = []
+        
+        for query in elastic_queries:
+            try:
+                # Add size parameter to query
+                query["size"] = size
+                
+                # Execute the query
+                response = self.es_client.search(index=self.index_name, body=query)
+                
+                # Extract hits and metadata
+                result = {
+                    "total_hits": response["hits"]["total"]["value"] if isinstance(response["hits"]["total"], dict) else response["hits"]["total"],
+                    "documents": [hit["_source"] for hit in response["hits"]["hits"]],
+                    "query": query
+                }
+                results.append(result)
+                
+            except Exception as e:
+                results.append({
+                    "error": str(e),
+                    "query": query,
+                    "total_hits": 0,
+                    "documents": []
+                })
+        
+        return results
+
+    def QueryFromNaturalLanguage(self, query: str, execute: bool = True, size: int = 100) -> Dict[str, Any]:
+        """
+        Complete pipeline: Convert natural language to filters, then to Elasticsearch queries, and optionally execute.
+        
+        Args:
+            query: Natural language query string
+            execute: Whether to execute the queries against Elasticsearch
+            size: Maximum number of results per query slice
+            
+        Returns:
+            Dictionary containing filters, elastic queries, and optionally results
+        """
+        # Generate filters from natural language
+        filters = self.generate_filters_from_query(query)
+        
+        # Convert to Elasticsearch queries
+        elastic_queries = self.FilterToElasticQuery(filters)
+        
+        response = {
+            "natural_language_query": query,
+            "extracted_filters": filters,
+            "elasticsearch_queries": elastic_queries
+        }
+        
+        # Execute queries if requested
+        if execute and elastic_queries:
+            results = self.ExecuteElasticQueries(elastic_queries, size)
+            response["results"] = results
+            
+        return response
+
+    async def QueryFromNaturalLanguageAsync(self, query: str, execute: bool = True, size: int = 100) -> Dict[str, Any]:
+        """
+        Async version of complete pipeline.
+        """
+        # Generate filters from natural language
+        filters = await self.generate_filters_from_query_async(query)
+        
+        # Convert to Elasticsearch queries
+        elastic_queries = self.FilterToElasticQuery(filters)
+        
+        response = {
+            "natural_language_query": query,
+            "extracted_filters": filters,
+            "elasticsearch_queries": elastic_queries
+        }
+        
+        # Execute queries if requested
+        if execute and elastic_queries:
+            results = self.ExecuteElasticQueries(elastic_queries, size)
+            response["results"] = results
+            
+        return response
+
 
 import asyncio
 
@@ -919,7 +984,33 @@ async def main(query: str):
         ],
         fields_to_ignore=["user_id", "card_number"],
     )
-    print(json.dumps(await client.generate_filters_from_query_async(query), indent=2))
+    
+    # Get complete results from database
+    result = await client.QueryFromNaturalLanguageAsync(query, execute=True, size=10)
+    
+    print(f"\n=== Query: {query} ===")
+    print(f"\nExtracted Filters:")
+    print(json.dumps(result["extracted_filters"], indent=2))
+    
+    print(f"\nElasticsearch Queries:")
+    for i, eq in enumerate(result["elasticsearch_queries"]):
+        print(f"Query {i+1}:")
+        print(json.dumps(eq, indent=2))
+    
+    if "results" in result:
+        print(f"\nDatabase Results:")
+        for i, res in enumerate(result["results"]):
+            print(f"\nSlice {i+1} - Total Hits: {res['total_hits']}")
+            if "error" in res:
+                print(f"Error: {res['error']}")
+            else:
+                print(f"Documents ({len(res['documents'])}):")
+                for j, doc in enumerate(res['documents'][:3]):  # Show first 3 docs
+                    print(f"  Doc {j+1}: {json.dumps(doc, indent=4, default=str)}")
+                if len(res['documents']) > 3:
+                    print(f"  ... and {len(res['documents']) - 3} more documents")
+    else:
+        print("\nNo results - queries not executed")
 
 
 # client.print_model_summary()
@@ -928,7 +1019,7 @@ if __name__ == "__main__":
     # asyncio.run(main("what did my income change between july and august last year?"))
 
     asyncio.run(
-        main("compare the spending on hotels last year and on food using my gold card?")
+        main("what are my spendings using my gold card vs card kind credit?")
     )
 
 # client.print_model_summary()

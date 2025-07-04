@@ -37,10 +37,20 @@ interface HR {
   email: string;
 }
 
+interface NextInterviewResponse {
+  interview_category: string | null;
+  step_number: number | null;
+  total_steps: number;
+  completed_interviews: string[];
+  interview_sequence: string[];
+  is_complete: boolean;
+  message: string;
+}
+
 const INTERVIEW_TYPES = [
   { value: "phone", label: "Phone" },
-  { value: "online", label: "Online" },
-  { value: "in_person", label: "In Person" },
+  { value: "video", label: "Video" },
+  { value: "live", label: "Live/In-Person" },
 ];
 
 const AddEditInterview = () => {
@@ -62,6 +72,8 @@ const AddEditInterview = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [next_interview_data, setNextInterviewData] = useState<NextInterviewResponse | null>(null);
+  const [job_interview_categories, setJobInterviewCategories] = useState<string[]>([]);
 
   // Fetch applications data
   const fetch_applications = async () => {
@@ -96,6 +108,42 @@ const AddEditInterview = () => {
     }
   };
 
+
+
+  // Fetch next interview category for application
+  const fetch_next_interview_category = async (application_id: string) => {
+    try {
+      const data = await apiService.getNextInterviewCategory(parseInt(application_id));
+      setNextInterviewData(data);
+      
+      // Extract unique categories from the job's interview sequence
+      if (data.interview_sequence && Array.isArray(data.interview_sequence)) {
+        const unique_categories = [...new Set(data.interview_sequence as string[])];
+        setJobInterviewCategories(unique_categories);
+      }
+      
+      // Auto-populate the interview category if available
+      if (data.interview_category && !is_editing) {
+        setInterviewData(prev => ({
+          ...prev,
+          category: data.interview_category
+        }));
+      }
+      
+      return data;
+    } catch (err) {
+      console.error("Error fetching next interview category:", err);
+      setNextInterviewData(null);
+      setJobInterviewCategories([]);
+      toast({
+        title: "Info",
+        description: "Could not determine next interview category. Please select manually.",
+        variant: "default",
+      });
+      return null;
+    }
+  };
+
   // Fetch interview data for editing
   const fetch_interview = async (interview_id: string) => {
     try {
@@ -111,6 +159,11 @@ const AddEditInterview = () => {
         interviewer_id: data.interviewer_id?.toString() || "",
         category: data.category || "",
       });
+
+      // Fetch interview categories for this application
+      if (data.application_id) {
+        await fetch_next_interview_category(data.application_id.toString());
+      }
     } catch (err) {
       console.error("Error fetching interview:", err);
       setError("Failed to fetch interview details");
@@ -142,6 +195,8 @@ const AddEditInterview = () => {
               ...prev,
               application_id: application_id
             }));
+            // Fetch next interview category for this application
+            await fetch_next_interview_category(application_id);
           }
         }
       } catch (err) {
@@ -167,6 +222,18 @@ const AddEditInterview = () => {
   const get_selected_application = () => {
     if (!Array.isArray(applications)) return undefined;
     return applications.find(app => app.id.toString() === interview_data.application_id);
+  };
+
+  // Handler for application selection change
+  const handle_application_change = async (application_id: string) => {
+    setInterviewData(prev => ({
+      ...prev,
+      application_id: application_id
+    }));
+    
+    if (application_id) {
+      await fetch_next_interview_category(application_id);
+    }
   };
 
   const handle_submit = async () => {
@@ -303,7 +370,7 @@ const AddEditInterview = () => {
                 </Label>
                 <Select
                   value={interview_data.application_id}
-                  onValueChange={(value) => setInterviewData({...interview_data, application_id: value})}
+                  onValueChange={handle_application_change}
                 >
                   <SelectTrigger className="h-12 shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500">
                     <SelectValue placeholder="Select an application" />
@@ -327,6 +394,57 @@ const AddEditInterview = () => {
                   <div>
                     <strong className="text-gray-700">Position:</strong>{" "}
                     <span className="text-gray-800 font-medium">{selected_application.job.title}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Interview Sequence Progress */}
+              {next_interview_data && (
+                <div className="p-4 bg-gradient-to-r from-green-50 to-blue-50 rounded-lg border border-green-100 shadow-sm">
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-green-600" />
+                      <strong className="text-gray-700">Interview Progress</strong>
+                    </div>
+                    
+                    {next_interview_data.is_complete ? (
+                      <div className="text-green-700 font-medium">
+                        ✅ All interviews completed for this position
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="text-blue-700 font-medium">
+                          Next: {next_interview_data.interview_category?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} 
+                          (Step {next_interview_data.step_number} of {next_interview_data.total_steps})
+                        </div>
+                        
+                        {/* Progress Bar */}
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div 
+                            className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
+                            style={{ width: `${((next_interview_data.step_number! - 1) / next_interview_data.total_steps) * 100}%` }}
+                          />
+                        </div>
+                        
+                        {/* Interview Sequence */}
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {next_interview_data.interview_sequence.map((type, index) => (
+                            <span
+                              key={index}
+                              className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                next_interview_data.completed_interviews.includes(type)
+                                  ? 'bg-green-100 text-green-700'
+                                  : type === next_interview_data.interview_category
+                                  ? 'bg-blue-100 text-blue-700 ring-2 ring-blue-300'
+                                  : 'bg-gray-100 text-gray-600'
+                              }`}
+                            >
+                              {index + 1}. {type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -407,6 +525,11 @@ const AddEditInterview = () => {
                 <div className="space-y-2">
                   <Label htmlFor="category" className="text-sm font-semibold text-gray-700">
                     Category
+                    {next_interview_data?.interview_category && !is_editing && (
+                      <span className="ml-2 text-xs text-blue-600 font-medium">
+                        (Recommended: {next_interview_data.interview_category.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())})
+                      </span>
+                    )}
                   </Label>
                   <Select
                     value={interview_data.category}
@@ -416,11 +539,16 @@ const AddEditInterview = () => {
                       <SelectValue placeholder="Select interview category" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="technical">Technical</SelectItem>
-                      <SelectItem value="behavioral">Behavioral</SelectItem>
-                      <SelectItem value="hr_screening">HR Screening</SelectItem>
-                      <SelectItem value="final">Final</SelectItem>
-                      <SelectItem value="culture_fit">Culture Fit</SelectItem>
+                      {job_interview_categories.map((category) => (
+                        <SelectItem key={category} value={category}>
+                          <div className="flex items-center justify-between w-full">
+                            <span>{category.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>
+                            {category === next_interview_data?.interview_category && !is_editing && (
+                              <span className="text-xs text-blue-600 font-medium ml-2">Next</span>
+                            )}
+                          </div>
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>

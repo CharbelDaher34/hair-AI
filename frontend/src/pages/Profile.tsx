@@ -22,6 +22,7 @@ interface CompanyData {
   website?: string;
   bio?: string;
   logo_url?: string;
+  interviews_types?: string[];
 }
 
 interface HRData {
@@ -33,6 +34,7 @@ interface HRData {
   department?: string;
   created_at?: string;
   updated_at?: string;
+  interviews_types?: string[];
 }
 
 interface RecruiterCompanyLink {
@@ -79,6 +81,9 @@ const Profile = () => {
     password: "",
   });
 
+
+  const [new_interview_type, set_new_interview_type] = useState("");
+  const [employee_interview_types, set_employee_interview_types] = useState<{[key: number]: string[]}>({});
 
   useEffect(() => {
     load_profile_data();
@@ -144,20 +149,30 @@ const Profile = () => {
     try {
       const employees_data = await apiService.getCompanyEmployees();
       set_employees(employees_data);
+      
+      // Initialize employee interview types state
+      const interview_types_map: {[key: number]: string[]} = {};
+      employees_data.forEach((employee: HRData) => {
+        interview_types_map[employee.id] = employee.interviews_types || [];
+      });
+      set_employee_interview_types(interview_types_map);
     } catch (error: any) {
       console.error("Failed to load employees:", error);
     }
   };
 
   const handle_company_form_change = (field: string, value: string) => {
-    set_company_form(prev => ({ ...prev, [field]: value }));
+    if (field === "interviews_types") {
+      const parsed_value = JSON.parse(value);
+      set_company_form(prev => ({ ...prev, [field]: parsed_value }));
+    } else {
+      set_company_form(prev => ({ ...prev, [field]: value }));
+    }
   };
 
   const handle_personal_form_change = (field: string, value: string) => {
     set_personal_form(prev => ({ ...prev, [field]: value }));
   };
-
-
 
   const handle_new_company_form_change = (field: string, value: string) => {
     set_new_company_form(prev => ({ ...prev, [field]: value }));
@@ -203,8 +218,6 @@ const Profile = () => {
       set_is_saving(false);
     }
   };
-
-
 
   const add_recruitable_company = async () => {
     if (!new_company_form.name.trim()) {
@@ -343,6 +356,69 @@ const Profile = () => {
   const cancel_personal_edit = () => {
     set_personal_form(hr_data || {});
     set_is_editing_personal(false);
+  };
+
+  const AddInterviewType = () => {
+    if (!new_interview_type.trim()) return;
+    
+    const current_types = company_form.interviews_types || [];
+    const normalized_type = new_interview_type.trim().toLowerCase().replace(/\s+/g, '_');
+    
+    if (!current_types.includes(normalized_type)) {
+      const updated_types = [...current_types, normalized_type];
+      handle_company_form_change("interviews_types", JSON.stringify(updated_types));
+    }
+    
+    set_new_interview_type("");
+  };
+
+  const RemoveInterviewType = (interview_type: string) => {
+    const current_types = company_form.interviews_types || [];
+    const updated_types = current_types.filter(type => type !== interview_type);
+    handle_company_form_change("interviews_types", JSON.stringify(updated_types));
+  };
+
+
+
+  const HandleEmployeeInterviewTypeToggle = (employee_id: number, interview_type: string) => {
+    const current_types = employee_interview_types[employee_id] || [];
+    const updated_types = current_types.includes(interview_type)
+      ? current_types.filter(type => type !== interview_type)
+      : [...current_types, interview_type];
+    
+    set_employee_interview_types(prev => ({
+      ...prev,
+      [employee_id]: updated_types
+    }));
+  };
+
+  const SaveEmployeeInterviewTypes = async (employee_id: number) => {
+    set_is_saving(true);
+    try {
+      const interview_types = employee_interview_types[employee_id] || [];
+      await apiService.updateHR(employee_id, { interviews_types: interview_types });
+      
+      // Update the local employee data to reflect the change
+      set_employees(prev => 
+        prev.map(employee => 
+          employee.id === employee_id 
+            ? { ...employee, interviews_types: interview_types }
+            : employee
+        )
+      );
+      
+      toast.success("Employee interview types updated successfully!");
+    } catch (error: any) {
+      toast.error("Failed to update employee interview types", {
+        description: error?.message || "An unexpected error occurred.",
+      });
+    } finally {
+      set_is_saving(false);
+    }
+  };
+
+  const FormatInterviewType = (type: string) => {
+    return type.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
   };
 
   if (is_loading) {
@@ -491,6 +567,66 @@ const Profile = () => {
                     placeholder="Tell us about your company culture and values"
                     className="shadow-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500 resize-none"
                   />
+                </div>
+
+                <div className="space-y-4">
+                  <Label className="text-sm font-semibold text-gray-700">Interview Types</Label>
+                  <p className="text-sm text-gray-600">Manage the types of interviews your company conducts</p>
+                  
+                  {is_editing_company && (
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Add new interview type..."
+                        value={new_interview_type}
+                        onChange={(e) => set_new_interview_type(e.target.value)}
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter') {
+                            AddInterviewType();
+                          }
+                        }}
+                        className="flex-1"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={AddInterviewType}
+                        disabled={!new_interview_type.trim()}
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Add
+                      </Button>
+                    </div>
+                  )}
+                  
+                  <div className="space-y-2">
+                    {(company_form.interviews_types || []).length === 0 ? (
+                      <p className="text-sm text-gray-500 italic">No interview types configured</p>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {(company_form.interviews_types || []).map((interview_type, index) => (
+                          <div
+                            key={index}
+                            className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border"
+                          >
+                            <span className="text-sm font-medium text-gray-700">
+                              {FormatInterviewType(interview_type)}
+                            </span>
+                            {is_editing_company && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => RemoveInterviewType(interview_type)}
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50 h-6 w-6 p-0"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {is_editing_company && (
@@ -721,52 +857,88 @@ const Profile = () => {
                       Add employees to manage your company's HR team.
                     </p>
                   </div>
-                ) : (
-                                      <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Name</TableHead>
-                          <TableHead>Email</TableHead>
-                          <TableHead>Role</TableHead>
-                          <TableHead>Department</TableHead>
-                          <TableHead>Added</TableHead>
-                          <TableHead></TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {employees.map((employee) => (
-                          <TableRow key={employee.id}>
-                            <TableCell className="font-medium">
-                              {employee.full_name}
-                            </TableCell>
-                            <TableCell>
-                              {employee.email}
-                            </TableCell>
-                            <TableCell>
-                              <span className="capitalize">{employee.role.replace('_', ' ')}</span>
-                            </TableCell>
-                            <TableCell>
-                              {employee.department || "-"}
-                            </TableCell>
-                            <TableCell>
-                              {employee.created_at ? new Date(employee.created_at).toLocaleDateString() : "-"}
-                            </TableCell>
-                            <TableCell>
-                              {employee.id !== hr_data?.id && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => remove_employee(employee.id)}
-                                  disabled={is_saving}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
+                                ) : (
+                  <div className="space-y-6">
+                    {employees.map((employee) => (
+                      <Card key={employee.id} className="border border-gray-200 shadow-sm">
+                        <CardContent className="p-6">
+                          <div className="flex items-start justify-between mb-4">
+                            <div className="flex-1">
+                              <h3 className="text-lg font-semibold text-gray-900">{employee.full_name}</h3>
+                              <p className="text-sm text-gray-600">{employee.email}</p>
+                              <div className="flex gap-4 mt-2 text-sm text-gray-500">
+                                <span>Role: <span className="capitalize">{employee.role.replace('_', ' ')}</span></span>
+                                <span>Department: {employee.department || "-"}</span>
+                                <span>Added: {employee.created_at ? new Date(employee.created_at).toLocaleDateString() : "-"}</span>
+                              </div>
+                            </div>
+                            {employee.id !== hr_data?.id && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => remove_employee(employee.id)}
+                                disabled={is_saving}
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                          
+                          <Separator className="my-4" />
+                          
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                              <Label className="text-sm font-semibold text-gray-700">Interview Types</Label>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => SaveEmployeeInterviewTypes(employee.id)}
+                                disabled={is_saving}
+                                className="text-xs"
+                              >
+                                <Save className="h-3 w-3 mr-1" />
+                                Save
+                              </Button>
+                            </div>
+                            <p className="text-xs text-gray-600">Select interview types this employee can conduct</p>
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                              {(company_data?.interviews_types || []).length === 0 ? (
+                                <p className="text-xs text-gray-500 italic col-span-full">
+                                  No interview types configured for company. Please configure company interview types first.
+                                </p>
+                              ) : (
+                                (company_data?.interviews_types || []).map((interview_type) => (
+                                  <div key={`${employee.id}_${interview_type}`} className="flex items-center space-x-2">
+                                    <input
+                                      type="checkbox"
+                                      id={`employee_${employee.id}_${interview_type}`}
+                                      checked={(employee_interview_types[employee.id] || []).includes(interview_type)}
+                                      onChange={() => HandleEmployeeInterviewTypeToggle(employee.id, interview_type)}
+                                      className="h-3 w-3 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                    />
+                                    <Label
+                                      htmlFor={`employee_${employee.id}_${interview_type}`}
+                                      className="text-xs font-medium text-gray-700 cursor-pointer"
+                                    >
+                                      {FormatInterviewType(interview_type)}
+                                    </Label>
+                                  </div>
+                                ))
                               )}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                            </div>
+                            {(employee_interview_types[employee.id] || []).length > 0 && (
+                              <div className="mt-3 p-2 bg-blue-50 rounded-md">
+                                <p className="text-xs text-blue-800 font-medium">
+                                  Selected: {(employee_interview_types[employee.id] || []).map(type => FormatInterviewType(type)).join(', ')}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
                 )}
               </CardContent>
             </Card>

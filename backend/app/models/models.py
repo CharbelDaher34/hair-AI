@@ -38,6 +38,17 @@ class CompanyBase(TimeBase):
     domain: Optional[str] = Field(
         default=None, description="The domain of the company example: @gmail.com"
     )
+    interviews_types: Optional[List[str]] = Field(default=None, sa_column=Column(JSON))
+    def get_company_data(self)->str:
+        return f"""
+        # Company Information
+        Company Name: {self.name}
+        Description: {self.description}
+        Industry: {self.industry}
+        Bio: {self.bio}
+        Website: {self.website}
+        Logo URL: {self.logo_url}
+        """
 
 
 class Company(CompanyBase, table=True):
@@ -75,6 +86,7 @@ class HRBase(TimeBase):
     employer_id: int = Field(foreign_key="company.id", ondelete="CASCADE")
     role: str
     department: Optional[str] = Field(default=None)
+    interviews_types: Optional[List[str]] = Field(default=None, sa_column=Column(JSON))
 
 
 class HR(HRBase, table=True):
@@ -185,6 +197,11 @@ class skills_base(SQLModel):
     hard_skills: list[str] = Field(default=[])
     soft_skills: list[str] = Field(default=[])
 
+class TailoredQuestion(SQLModel):
+    question: str
+    ideal_answer: str
+    tags: list[str]
+    difficulty: str
 
 class compensation_base(SQLModel):
     base_salary: int = Field(
@@ -236,6 +253,10 @@ class JobBase(TimeBase):
     job_category: Optional[str] = Field(default=None)
     responsibilities: Optional[list[str]] = Field(default=None, sa_column=Column(JSON))
     skills: skills_base = Field(default=None, sa_column=Column(JSON))
+    interviews_sequence: Optional[List[str]] = Field(default=None, sa_column=Column(JSON))
+    tailored_questions: Optional[List[TailoredQuestion]] = Field(default=None, sa_column=Column(JSON))
+    
+    
 
     @field_validator("compensation", "skills")
     def validate_compensation_and_skills(cls, v, info):
@@ -272,7 +293,18 @@ class JobBase(TimeBase):
                     raise ValueError("skills.soft_skills must be a list")
 
         return v
-
+    def get_job_data(self):
+        """
+        Get a comprehensive text representation of the job data.
+        """
+        return f"""
+        Job ID: {self.id}
+        Title: {self.title}
+        Description: {self.description}
+        Compensation: {self.compensation}
+        Skills: {self.skills}
+        Responsibilities: {self.responsibilities}
+        """
 
 class Job(JobBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)

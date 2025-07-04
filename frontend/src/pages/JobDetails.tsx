@@ -19,6 +19,13 @@ interface Skills {
   soft_skills?: string[];
 }
 
+interface TailoredQuestion {
+  question: string;
+  ideal_answer: string;
+  tags: string[];
+  difficulty: string;
+}
+
 interface Job {
   id: number;
   title: string;
@@ -32,6 +39,8 @@ interface Job {
   job_category?: string;
   responsibilities?: string[];
   skills: Skills;
+  interviews_sequence?: string[];
+  tailored_questions?: TailoredQuestion[];
   status: string;
   recruited_to_id?: number;
   created_at?: string;
@@ -126,6 +135,10 @@ const JobDetails = () => {
     return value.split('_').map(word => 
       word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
     ).join(' ');
+  };
+
+  const format_interview_type = (type: string) => {
+    return type.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
   };
 
   if (is_loading) {
@@ -256,6 +269,143 @@ const JobDetails = () => {
                     </div>
                   </div>
                 )}
+              </CardContent>
+            </Card>
+          )}
+
+          {job.interviews_sequence && job.interviews_sequence.length > 0 && (
+            <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-xl font-bold text-gray-800">Interview Process</CardTitle>
+                <CardDescription>Candidates will go through {job.interviews_sequence.length} interview steps</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {job.interviews_sequence.map((interview_type, index) => (
+                    <div key={`${interview_type}-${index}`} className="relative">
+                      {/* Connection line for all except last item */}
+                      {index < job.interviews_sequence.length - 1 && (
+                        <div className="absolute left-6 top-12 w-0.5 h-8 bg-gradient-to-b from-blue-300 to-blue-500"></div>
+                      )}
+                      
+                      <div className="flex items-start space-x-4">
+                        {/* Step number circle */}
+                        <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-lg">
+                          <span className="text-white font-bold text-sm">{index + 1}</span>
+                        </div>
+                        
+                        {/* Interview details */}
+                        <div className="flex-1 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-4 border border-blue-200 shadow-sm">
+                          <h4 className="font-semibold text-gray-900 text-lg mb-1">
+                            {format_interview_type(interview_type)}
+                          </h4>
+                          <p className="text-sm text-gray-600">
+                            {index === 0 && "Initial screening and evaluation"}
+                            {index === job.interviews_sequence.length - 1 && index > 0 && "Final interview round"}
+                            {index > 0 && index < job.interviews_sequence.length - 1 && `Interview round ${index + 1}`}
+                          </p>
+                          
+                          {/* Progress indicator */}
+                          <div className="mt-3 flex items-center space-x-2">
+                            <div className="flex-1 bg-gray-200 rounded-full h-2">
+                              <div 
+                                className="bg-gradient-to-r from-blue-500 to-purple-600 h-2 rounded-full transition-all duration-300"
+                                style={{ width: `${((index + 1) / job.interviews_sequence.length) * 100}%` }}
+                              ></div>
+                            </div>
+                            <span className="text-xs text-gray-500 font-medium">
+                              Step {index + 1} of {job.interviews_sequence.length}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {/* Completion indicator */}
+                  <div className="mt-6 p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center">
+                        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-green-800">Interview Process Complete</h4>
+                        <p className="text-sm text-green-600">Candidate evaluation and decision making</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {job.tailored_questions && job.tailored_questions.length > 0 && (
+            <Card className="card shadow-lg hover:shadow-xl transition-all duration-300 border-0">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-xl font-bold text-gray-800">Interview Questions</CardTitle>
+                <CardDescription>
+                  {job.tailored_questions.length} tailored question{job.tailored_questions.length !== 1 ? 's' : ''} for this position
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  {job.tailored_questions.map((question, index) => (
+                    <div key={index} className="border border-gray-200 rounded-lg p-5 bg-gradient-to-r from-gray-50 to-blue-50">
+                      <div className="flex items-start justify-between mb-4">
+                        <Badge variant="outline" className="text-sm font-medium">
+                          Question {index + 1}
+                        </Badge>
+                        <div className="flex items-center space-x-2">
+                          {question.tags.map((tag, tagIndex) => (
+                            <Badge key={tagIndex} variant="secondary" className="text-xs">
+                              {tag}
+                            </Badge>
+                          ))}
+                          <Badge 
+                            variant={
+                              question.difficulty === 'easy' ? 'default' : 
+                              question.difficulty === 'medium' ? 'secondary' : 
+                              'destructive'
+                            }
+                            className="text-xs"
+                          >
+                            {question.difficulty}
+                          </Badge>
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-4">
+                        <div>
+                          <h4 className="font-semibold text-gray-900 mb-2 flex items-center">
+                            <span className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm mr-2">
+                              Q
+                            </span>
+                            Question
+                          </h4>
+                          <p className="text-gray-700 leading-relaxed pl-8">
+                            {question.question}
+                          </p>
+                        </div>
+                        
+                        <div className="border-t border-gray-200 pt-4">
+                          <h4 className="font-semibold text-gray-900 mb-2 flex items-center">
+                            <span className="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-sm mr-2">
+                              A
+                            </span>
+                            Ideal Answer
+                          </h4>
+                          <div className="pl-8 bg-green-50 border-l-4 border-green-400 p-3 rounded-r-lg">
+                            <p className="text-gray-700 leading-relaxed">
+                              {question.ideal_answer}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </CardContent>
             </Card>
           )}

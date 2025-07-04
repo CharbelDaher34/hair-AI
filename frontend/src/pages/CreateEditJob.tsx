@@ -9,7 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Copy, ExternalLink, Loader2, Sparkles, Building2, DollarSign, Briefcase, Target, Users, Settings } from "lucide-react";
+import { Copy, ExternalLink, Loader2, Sparkles, Building2, DollarSign, Briefcase, Target, Users, Settings, Plus, HelpCircle, X, Edit3 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
 import apiService from "@/services/api";
@@ -68,6 +68,13 @@ interface Skills {
   soft_skills?: string[] | null;
 }
 
+interface TailoredQuestion {
+  question: string;
+  ideal_answer: string;
+  tags: string[];
+  difficulty: string;
+}
+
 // Enums matching the backend
 const JobStatus = {
   DRAFT: "draft",
@@ -123,6 +130,8 @@ const CreateEditJob = () => {
       hard_skills: [],
       soft_skills: [],
     } as Skills,
+    interviews_sequence: [],
+    tailored_questions: [],
     status: JobStatus.DRAFT,
     recruited_to_id: null,
     auto_generate: false,
@@ -132,6 +141,7 @@ const CreateEditJob = () => {
   const [constraints, set_constraints] = useState<Record<number, any>>({});
   const [form_keys, set_form_keys] = useState<FormKey[]>([]);
   const [recruit_to_companies, set_recruit_to_companies] = useState<Company[]>([]);
+  const [company_interview_types, set_company_interview_types] = useState<string[]>([]);
   const [is_loading, set_is_loading] = useState(true);
   const [is_submitting, set_is_submitting] = useState(false);
   const [error, set_error] = useState<string | null>(null);
@@ -139,6 +149,8 @@ const CreateEditJob = () => {
   const [ai_input, set_ai_input] = useState<string>("");
   const [is_generating, set_is_generating] = useState(false);
   const [ai_generated_fields, set_ai_generated_fields] = useState<Set<string>>(new Set());
+  const [is_generating_questions, set_is_generating_questions] = useState(false);
+  const [editing_question_index, set_editing_question_index] = useState<number | null>(null);
 
   const fetch_form_keys = async () => {
     try {
@@ -165,6 +177,21 @@ const CreateEditJob = () => {
       toast({
         title: "Warning",
         description: "Failed to fetch recruit-to companies",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const fetch_company_interview_types = async () => {
+    try {
+      const response = await apiService.getCompanyInterviewTypes();
+      set_company_interview_types(response || []);
+    } catch (error) {
+      console.error('Failed to fetch company interview types:', error);
+      // Don't set error state for this as it's not critical
+      toast({
+        title: "Warning",
+        description: "Failed to fetch company interview types",
         variant: "destructive",
       });
     }
@@ -218,6 +245,16 @@ const CreateEditJob = () => {
               ? Object.values(job.skills.soft_skills) 
               : []
         },
+        interviews_sequence: Array.isArray(job.interviews_sequence) 
+          ? job.interviews_sequence 
+          : job.interviews_sequence && typeof job.interviews_sequence === 'object' 
+            ? Object.values(job.interviews_sequence) 
+            : [],
+        tailored_questions: Array.isArray(job.tailored_questions) 
+          ? job.tailored_questions 
+          : job.tailored_questions && typeof job.tailored_questions === 'object' 
+            ? Object.values(job.tailored_questions) 
+            : [],
         status: job.status || JobStatus.DRAFT,
         recruited_to_id: recruited_to_value,
         auto_generate: false, // This is a UI state, not from backend model
@@ -265,10 +302,11 @@ const CreateEditJob = () => {
       set_error(null);
       
       try {
-        // Always fetch form keys and recruit-to companies
+        // Always fetch form keys, recruit-to companies, and company interview types
         await Promise.all([
           fetch_form_keys(),
-          fetch_recruit_to_companies()
+          fetch_recruit_to_companies(),
+          fetch_company_interview_types()
         ]);
         
         // Only fetch job data if we're editing and have a job ID
@@ -426,6 +464,14 @@ const CreateEditJob = () => {
 
     // Normalize array fields to ensure they're proper arrays
     payload.responsibilities = normalizeArray(payload.responsibilities);
+    payload.interviews_sequence = normalizeArray(payload.interviews_sequence);
+    
+    // Handle tailored_questions - ensure it's a proper array
+    if (payload.tailored_questions && Array.isArray(payload.tailored_questions)) {
+      payload.tailored_questions = payload.tailored_questions.filter(q => q && q.question && q.ideal_answer);
+    } else {
+      payload.tailored_questions = [];
+    }
     
     if (payload.skills) {
       payload.skills.hard_skills = normalizeArray(payload.skills.hard_skills);
@@ -527,6 +573,137 @@ const CreateEditJob = () => {
         [subfield]: value,
       },
     }));
+  };
+
+  const format_interview_type = (type: string) => {
+    return type.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+  };
+
+  const add_interview_to_sequence = (interview_type: string) => {
+    if (!job_data.interviews_sequence.includes(interview_type)) {
+      set_job_data(prev => ({
+        ...prev,
+        interviews_sequence: [...prev.interviews_sequence, interview_type]
+      }));
+    }
+  };
+
+  const remove_interview_from_sequence = (interview_type: string) => {
+    set_job_data(prev => ({
+      ...prev,
+      interviews_sequence: prev.interviews_sequence.filter(type => type !== interview_type)
+    }));
+  };
+
+  const move_interview_in_sequence = (from_index: number, to_index: number) => {
+    const new_sequence = [...job_data.interviews_sequence];
+    const [moved_item] = new_sequence.splice(from_index, 1);
+    new_sequence.splice(to_index, 0, moved_item);
+    
+    set_job_data(prev => ({
+      ...prev,
+      interviews_sequence: new_sequence
+    }));
+  };
+
+  const handle_generate_questions = async () => {
+    if (!current_job_id || !is_editing) {
+      toast({
+        title: "Save Required",
+        description: "Please save the job first before generating questions.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    set_is_generating_questions(true);
+    try {
+      const response = await apiService.generateTailoredQuestions(parseInt(current_job_id));
+      console.log("Raw API response:", response); // Debug log
+      
+      const questions = Array.isArray(response)
+        ? response
+        : Array.isArray(response?.tailored_questions)
+          ? response.tailored_questions
+          : [];
+      
+      console.log("Extracted questions:", questions); // Debug log
+      
+      if (questions.length > 0) {
+        set_job_data(prev => {
+          const updated_questions = [...prev.tailored_questions, ...questions];
+          console.log("Updating tailored_questions:", updated_questions); // Debug log
+          return {
+            ...prev,
+            tailored_questions: updated_questions
+          };
+        });
+        toast({
+          title: "Success",
+          description: `${questions.length} tailored questions have been generated and added!`,
+        });
+      } else {
+        console.warn("No questions found in response:", response);
+        toast({
+          title: "Warning",
+          description: "No questions were generated. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Failed to generate questions:", error);
+      toast({
+        title: "Error",
+        description: "Failed to generate tailored questions. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      set_is_generating_questions(false);
+    }
+  };
+
+  const add_question = () => {
+    const new_question: TailoredQuestion = {
+      question: "",
+      ideal_answer: "",
+      tags: [],
+      difficulty: "medium"
+    };
+    set_job_data(prev => ({
+      ...prev,
+      tailored_questions: [...prev.tailored_questions, new_question]
+    }));
+    set_editing_question_index(job_data.tailored_questions.length);
+  };
+
+  const update_question = (index: number, field: keyof TailoredQuestion, value: any) => {
+    const updated_questions = [...job_data.tailored_questions];
+    if (field === 'tags' && typeof value === 'string') {
+      updated_questions[index] = {
+        ...updated_questions[index],
+        [field]: value.split(',').map(tag => tag.trim()).filter(tag => tag)
+      };
+    } else {
+      updated_questions[index] = {
+        ...updated_questions[index],
+        [field]: value
+      };
+    }
+    set_job_data(prev => ({
+      ...prev,
+      tailored_questions: updated_questions
+    }));
+  };
+
+  const remove_question = (index: number) => {
+    const updated_questions = job_data.tailored_questions.filter((_, i) => i !== index);
+    set_job_data(prev => ({
+      ...prev,
+      tailored_questions: updated_questions
+    }));
+    if (editing_question_index === index) {
+      set_editing_question_index(null);
+    }
   };
 
   if (is_loading) {
@@ -743,8 +920,8 @@ const CreateEditJob = () => {
                   title="Job Attributes" 
                   description="Type, experience, and seniority requirements"
                 />
-            </CardHeader>
-            <CardContent className="space-y-6">
+              </CardHeader>
+              <CardContent className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="space-y-2">
                     <Label htmlFor="job_type" className="text-sm font-medium">
@@ -882,6 +1059,294 @@ const CreateEditJob = () => {
                     />
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Interview Sequence */}
+            <Card className="border-0 shadow-lg">
+              <CardHeader>
+                <SectionHeader 
+                  icon={Users} 
+                  title="Interview Sequence" 
+                  description="Configure the sequence of interviews for this position"
+                />
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {company_interview_types.length === 0 ? (
+                  <div className="text-center py-6">
+                    <p className="text-gray-500 mb-4">No interview types configured for your company</p>
+                    <Button variant="outline" onClick={() => navigate("/profile")} className="w-full">
+                      Configure Interview Types
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Available Interview Types</Label>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                        {company_interview_types
+                          .filter(type => !job_data.interviews_sequence.includes(type))
+                          .map((interview_type) => (
+                            <Button
+                              key={interview_type}
+                              variant="outline"
+                              size="sm"
+                              onClick={() => add_interview_to_sequence(interview_type)}
+                              className="justify-start text-xs"
+                            >
+                              <Plus className="h-3 w-3 mr-1" />
+                              {format_interview_type(interview_type)}
+                            </Button>
+                          ))}
+                      </div>
+                      {company_interview_types.every(type => job_data.interviews_sequence.includes(type)) && (
+                        <p className="text-xs text-gray-500 italic">All available interview types have been added to the sequence</p>
+                      )}
+                    </div>
+
+                    <Separator />
+
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Interview Sequence ({job_data.interviews_sequence.length} steps)</Label>
+                      {job_data.interviews_sequence.length === 0 ? (
+                        <p className="text-sm text-gray-500 italic">No interviews configured. Add interview types above to create a sequence.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {job_data.interviews_sequence.map((interview_type, index) => (
+                            <div
+                              key={`${interview_type}-${index}`}
+                              className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200"
+                            >
+                              <div className="flex items-center space-x-3">
+                                <Badge variant="secondary" className="text-xs font-mono">
+                                  {index + 1}
+                                </Badge>
+                                <span className="text-sm font-medium text-gray-700">
+                                  {format_interview_type(interview_type)}
+                                </span>
+                              </div>
+                              <div className="flex items-center space-x-1">
+                                {index > 0 && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => move_interview_in_sequence(index, index - 1)}
+                                    className="h-6 w-6 p-0"
+                                  >
+                                    ↑
+                                  </Button>
+                                )}
+                                {index < job_data.interviews_sequence.length - 1 && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => move_interview_in_sequence(index, index + 1)}
+                                    className="h-6 w-6 p-0"
+                                  >
+                                    ↓
+                                  </Button>
+                                )}
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => remove_interview_from_sequence(interview_type)}
+                                  className="h-6 w-6 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                >
+                                  ×
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Tailored Questions */}
+            <Card className="border-0 shadow-lg">
+              <CardHeader>
+                <SectionHeader 
+                  icon={HelpCircle} 
+                  title="Tailored Questions" 
+                  description="Interview questions specific to this position"
+                />
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <Button
+                      variant="outline"
+                      onClick={add_question}
+                      className="flex items-center space-x-2"
+                    >
+                      <Plus className="h-4 w-4" />
+                      <span>Add Question</span>
+                    </Button>
+                    
+                    {is_editing && (
+                      <Button
+                        onClick={handle_generate_questions}
+                        disabled={is_generating_questions}
+                        className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                      >
+                        {is_generating_questions ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Generating...
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="mr-2 h-4 w-4" />
+                            Generate with AI
+                          </>
+                        )}
+                      </Button>
+                    )}
+                  </div>
+                  
+                  {!is_editing && (
+                    <p className="text-sm text-gray-500 italic">
+                      Save the job first to generate AI questions
+                    </p>
+                  )}
+                </div>
+
+                {job_data.tailored_questions.length === 0 ? (
+                  <div className="text-center py-8 border-2 border-dashed border-gray-200 rounded-lg">
+                    <HelpCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-500 mb-4">No questions added yet</p>
+                    <p className="text-sm text-gray-400">
+                      Add questions manually or use AI to generate them based on the job description
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {job_data.tailored_questions.map((question, index) => (
+                      <div
+                        key={index}
+                        className="p-4 border border-gray-200 rounded-lg bg-gray-50"
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <Badge variant="outline" className="text-xs">
+                            Question {index + 1}
+                          </Badge>
+                          <div className="flex items-center space-x-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => set_editing_question_index(
+                                editing_question_index === index ? null : index
+                              )}
+                              className="h-6 w-6 p-0"
+                            >
+                              <Edit3 className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => remove_question(index)}
+                              className="h-6 w-6 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+
+                        {editing_question_index === index ? (
+                          <div className="space-y-3">
+                            <div>
+                              <Label className="text-xs font-medium">Question</Label>
+                              <Textarea
+                                value={question.question}
+                                onChange={(e) => update_question(index, 'question', e.target.value)}
+                                placeholder="Enter the interview question..."
+                                rows={2}
+                                className="resize-none"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs font-medium">Ideal Answer</Label>
+                              <Textarea
+                                value={question.ideal_answer}
+                                onChange={(e) => update_question(index, 'ideal_answer', e.target.value)}
+                                placeholder="Describe what would be an ideal answer..."
+                                rows={3}
+                                className="resize-none"
+                              />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <Label className="text-xs font-medium">Tags (comma-separated)</Label>
+                                <Input
+                                  value={question.tags.join(', ')}
+                                  onChange={(e) => update_question(index, 'tags', e.target.value)}
+                                  placeholder="e.g., technical, problem-solving"
+                                  className="h-8"
+                                />
+                              </div>
+                              <div>
+                                <Label className="text-xs font-medium">Difficulty</Label>
+                                <Select
+                                  value={question.difficulty}
+                                  onValueChange={(value) => update_question(index, 'difficulty', value)}
+                                >
+                                  <SelectTrigger className="h-8">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="easy">Easy</SelectItem>
+                                    <SelectItem value="medium">Medium</SelectItem>
+                                    <SelectItem value="hard">Hard</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => set_editing_question_index(null)}
+                              className="w-full"
+                            >
+                              Done Editing
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <div>
+                              <Label className="text-xs font-medium text-gray-600">Question</Label>
+                              <p className="text-sm text-gray-900 mt-1">{question.question || "No question set"}</p>
+                            </div>
+                            <div>
+                              <Label className="text-xs font-medium text-gray-600">Ideal Answer</Label>
+                              <p className="text-sm text-gray-700 mt-1 line-clamp-2">
+                                {question.ideal_answer || "No ideal answer set"}
+                              </p>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-2">
+                                {question.tags.map((tag, tagIndex) => (
+                                  <Badge key={tagIndex} variant="secondary" className="text-xs">
+                                    {tag}
+                                  </Badge>
+                                ))}
+                              </div>
+                              <Badge 
+                                variant={question.difficulty === 'easy' ? 'default' : 
+                                       question.difficulty === 'medium' ? 'secondary' : 'destructive'}
+                                className="text-xs"
+                              >
+                                {question.difficulty}
+                              </Badge>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>

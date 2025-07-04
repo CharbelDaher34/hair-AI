@@ -1,7 +1,10 @@
 #!python
+from sqlalchemy import create_engine
 from sqlalchemy_schemadisplay import create_schema_graph
-from core.database import engine
 from models.models import target_metadata
+def get_admin_engine():
+    # charbel:charbel@84.16.230.94:5437/matching_db
+    return create_engine("postgresql://charbel:charbel@84.16.230.94:5437/matching_db", echo=False)
 
 
 def generate_schema_diagram(output_path: str = "dbschema.png"):
@@ -14,10 +17,14 @@ def generate_schema_diagram(output_path: str = "dbschema.png"):
         metadata=target_metadata,
         show_datatypes=True,
         show_indexes=True,
-        rankdir="LR",
+        rankdir="RL",
         concentrate=True,
-        engine=engine,
+        engine=get_admin_engine(),
+         
     )
+ 
+
+
     graph.write_png(output_path)
 
 

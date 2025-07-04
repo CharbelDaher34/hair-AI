@@ -8,13 +8,13 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlmodel import Session
 from pydantic import BaseModel, Field
 import logging
-
+import asyncio
 from core.database import get_session
 from crud import crud_job, crud_form_key, crud_application
 from schemas import JobCreate, JobUpdate, JobRead, CompanyRead, MatchRead
 from schemas import JobAnalytics, JobGeneratedData
 from core.security import TokenData
-from models.models import Company, JobType, ExperienceLevel, SeniorityLevel
+from models.models import Company, JobType, ExperienceLevel, SeniorityLevel, TailoredQuestion
 from services.resume_upload import AgentClient
 from sqlalchemy import Column
 from sqlalchemy.types import Enum as SQLAlchemyEnum
@@ -345,3 +345,39 @@ Required JSON structure:
 Generate realistic and appropriate values for all fields. If specific information is not provided, infer reasonable values based on the job context and company information."""
 
     return client.parse(system_prompt, JobGeneratedData.model_json_schema(), [input])
+
+
+class TailoredQuestionsResponse(BaseModel):
+    tailored_questions: list[TailoredQuestion]
+
+@router.post("/generate_tailored_questions/job/{job_id}", response_model=TailoredQuestionsResponse)
+def generate_tailored_questions(
+    *,
+    db: Session = Depends(get_session),
+    job_id: int,
+    request: Request,
+) -> TailoredQuestionsResponse:
+    """Generate tailored questions for a job"""
+    current_user = get_current_user(request)
+    if not current_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+        )
+    job = crud_job.get_job(db=db, job_id=job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    input = f"""
+    Job data: {job.get_job_data()}
+    """
+    client = AgentClient()
+    system_prompt = """
+    You are an expert in writing and creating tailored questions for jobs. You are given a job description as input text. Generate tailored questions for the job based on the job description.
+
+    IMPORTANT: You must provide ALL fields in the exact JSON structure specified. Do not leave any field empty or null.
+
+    Required JSON structure:
+    """
+    questions = client.parse(system_prompt, TailoredQuestionsResponse.model_json_schema(), [input])
+    return questions
+    

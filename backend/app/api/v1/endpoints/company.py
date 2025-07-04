@@ -172,3 +172,21 @@ def get_candidates_by_company_id(
         db=db, employer_id=employer_id
     )
     return candidates
+
+
+@router.get("/interview_types/", response_model=List[str])
+def get_company_interview_types(
+    *, db: Session = Depends(get_session), request: Request
+) -> List[str]:
+    """
+    Get the interview types that the current user's company can perform.
+    """
+    current_user = get_current_user(request)
+    company = crud_company.get_company(db=db, employer_id=current_user.employer_id)
+    
+    if not company:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Company not found"
+        )
+    
+    return company.interviews_types or []

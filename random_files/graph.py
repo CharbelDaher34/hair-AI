@@ -12,6 +12,8 @@ from pydantic import BaseModel, Field
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.providers.openai import OpenAIProvider
+from pydantic_ai.providers.openrouter import OpenRouterProvider
+
 from pydantic_graph import BaseNode, End, Graph, GraphRunContext
 
 # ───────── LOGGING SETUP ──────────
@@ -26,7 +28,8 @@ LOCAL_PROVIDER = OpenAIProvider(base_url="http://localhost:11434/v1")
 DEFAULT_MODEL_ID = "ollama/qwen3:8b"
 MODEL_NAME = DEFAULT_MODEL_ID.split("ollama/")[1]
 LOCAL_MODEL = OpenAIModel(model_name=MODEL_NAME, provider=LOCAL_PROVIDER)
-
+# MODEL_NAME = "mistralai/mistral-small-3.2-24b-instruct:free"
+# LOCAL_MODEL = OpenAIModel(model_name=MODEL_NAME,provider=OpenRouterProvider(api_key="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"))
 # ───────── Pydantic MODELS ─────────
 class ResumeInput(BaseModel):
     email: str = Field(..., min_length=5, pattern=r'^[^@]+@[^@]+\.[^@]+$')
@@ -65,6 +68,7 @@ class InterviewTurn(BaseModel):
     followup_response_time_seconds: float | None = None
     paste_count: int = 0
     tab_switch_count: int = 0
+    copy_count: int = 0
     # NEW: Full conversation history for this turn
     conversation_history: list[dict] = Field(default_factory=list)  # List of ConversationEntry dicts
 
@@ -305,6 +309,7 @@ class InterviewState:
     _current_turn: InterviewTurn | None = None  # Track current turn being built
     _paste_count: int = 0
     _tab_switch_count: int = 0
+    _copy_count: int = 0
     # NEW: Current turn conversation history
     _current_conversation: list[ConversationEntry] = field(default_factory=list)
     
@@ -436,19 +441,22 @@ class AwaitResponse(BaseNode[InterviewState]):
             answer = data["answer"]
             paste_count = int(data.get("paste_count", 0))
             tab_switch_count = int(data.get("tab_switch_count", 0))
+            copy_count = int(data.get("copy_count", 0))
         except Exception:
             answer = msg
             paste_count = 0
             tab_switch_count = 0
+            copy_count = 0
         ctx.state._answer = answer
         ctx.state._paste_count = paste_count
         ctx.state._tab_switch_count = tab_switch_count
+        ctx.state._copy_count = copy_count
         
         # Add candidate response to conversation history
         ctx.state.add_conversation_entry("candidate", answer, "response")
         
         response_time = (datetime.now() - ctx.state._t_question).total_seconds()
-        logger.info(f"💬 Received candidate response in {response_time:.1f}s (paste: {paste_count}, tab: {tab_switch_count})")
+        logger.info(f"💬 Received candidate response in {response_time:.1f}s (paste: {paste_count}, tab: {tab_switch_count}, copy: {copy_count})")
         logger.info(f"Response length: {len(ctx.state._answer)} characters")
         logger.info(f"Response preview: {ctx.state._answer[:100]}...")
         return ClassifyResponse()
@@ -540,7 +548,8 @@ class CheckFollowUp(BaseNode[InterviewState]):
                 candidate_answer=ctx.state._answer,
                 response_time_seconds=(datetime.now() - ctx.state._t_question).total_seconds(),
                 paste_count=getattr(ctx.state, '_paste_count', 0),
-                tab_switch_count=getattr(ctx.state, '_tab_switch_count', 0)
+                tab_switch_count=getattr(ctx.state, '_tab_switch_count', 0),
+                copy_count=getattr(ctx.state, '_copy_count', 0)
             )
         
         # Enhanced follow-up decision prompt with full conversation context
@@ -618,6 +627,7 @@ class EvaluateAnswer(BaseNode[InterviewState]):
             ).total_seconds()
             ctx.state._current_turn.paste_count = getattr(ctx.state, '_paste_count', 0)
             ctx.state._current_turn.tab_switch_count = getattr(ctx.state, '_tab_switch_count', 0)
+            ctx.state._current_turn.copy_count = getattr(ctx.state, '_copy_count', 0)
             logger.info(f"📝 Recording follow-up answer for session {ctx.state.session_id}")
             ctx.state._is_followup = False  # Reset flag
         
@@ -629,7 +639,8 @@ class EvaluateAnswer(BaseNode[InterviewState]):
                 candidate_answer=ctx.state._answer,
                 response_time_seconds=(datetime.now() - ctx.state._t_question).total_seconds(),
                 paste_count=getattr(ctx.state, '_paste_count', 0),
-                tab_switch_count=getattr(ctx.state, '_tab_switch_count', 0)
+                tab_switch_count=getattr(ctx.state, '_tab_switch_count', 0),
+                copy_count=getattr(ctx.state, '_copy_count', 0)
             )
         
         t = ctx.state._current_turn
@@ -1407,9 +1418,10 @@ HTML_INTERFACE = """
   let ws;
   let isConnected = false;
   let userEmail = '';
-  // --- Track copy and tab switches ---
+  // --- Track copy, paste and tab switches ---
   let pasteCount = 0;
   let tabSwitchCount = 0;
+  let copyCount = 0;
   let lastQuestionId = null;
 
   // Setup form handling
@@ -1482,6 +1494,11 @@ HTML_INTERFACE = """
     pasteCount++;
   });
 
+  // Track copy events
+  input.addEventListener('copy', function() {
+    copyCount++;
+  });
+
   // Track tab switches
   document.addEventListener('visibilitychange', function() {
     if (document.visibilityState === 'hidden') {
@@ -1492,6 +1509,7 @@ HTML_INTERFACE = """
   function resetInteractionCounters() {
     pasteCount = 0;
     tabSwitchCount = 0;
+    copyCount = 0;
   }
 
   function handleMessage(e) {
@@ -1694,7 +1712,8 @@ HTML_INTERFACE = """
     ws.send(JSON.stringify({
       answer: message,
       paste_count: pasteCount,
-      tab_switch_count: tabSwitchCount
+      tab_switch_count: tabSwitchCount,
+      copy_count: copyCount
     }));
     input.value = '';
     input.style.height = 'auto';

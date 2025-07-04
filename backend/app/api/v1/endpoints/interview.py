@@ -8,7 +8,7 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
-from crud import crud_interview
+from crud import crud_interview, crud_job, crud_application
 from schemas import (
     InterviewCreate,
     InterviewUpdate,
@@ -557,3 +557,78 @@ def submit_interview_review(
     except Exception as e:
         logger.error(f"Error submitting review: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/next-interview-category/{application_id}")
+def get_next_interview_category(
+    *,
+    db: Session = Depends(get_session),
+    application_id: int,
+    request: Request,
+) -> dict:
+    """
+    Get the next interview category in the sequence for a given application.
+    Returns the interview category that should be scheduled next based on:
+    1. The job's interview sequence (categories like hr_screening, technical, etc.)
+    2. The interviews already completed for this application
+    """
+    current_user: Optional[TokenData] = request.state.user
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    # Get the application
+    application = crud_application.get_application(db=db, application_id=application_id)
+    if not application:
+        raise HTTPException(status_code=404, detail="Application not found")
+
+    # Get the job
+    job = crud_job.get_job(db=db, job_id=application.job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    # Check if job has an interview sequence
+    if not job.interviews_sequence or len(job.interviews_sequence) == 0:
+        raise HTTPException(
+            status_code=400, 
+            detail="No interview sequence configured for this job"
+        )
+
+    # Get all interviews for this application
+    existing_interviews = crud_interview.get_interviews_by_application_id(
+        db=db, application_id=application_id
+    )
+
+    # Extract the categories of completed/scheduled interviews
+    completed_interview_categories = [interview.category for interview in existing_interviews if interview.category]
+
+    # Find the next interview category in the sequence
+    next_interview_category = None
+    next_step_number = None
+    
+    for index, interview_category in enumerate(job.interviews_sequence):
+        if interview_category not in completed_interview_categories:
+            next_interview_category = interview_category
+            next_step_number = index + 1
+            break
+
+    # Check if all interviews are completed
+    if next_interview_category is None:
+        return {
+            "message": "All interviews in the sequence have been completed",
+            "interview_category": None,
+            "step_number": None,
+            "total_steps": len(job.interviews_sequence),
+            "completed_interviews": completed_interview_categories,
+            "interview_sequence": job.interviews_sequence,
+            "is_complete": True
+        }
+
+    return {
+        "interview_category": next_interview_category,
+        "step_number": next_step_number,
+        "total_steps": len(job.interviews_sequence),
+        "completed_interviews": completed_interview_categories,
+        "interview_sequence": job.interviews_sequence,
+        "is_complete": False,
+        "message": f"Next interview: {next_interview_category} (Step {next_step_number} of {len(job.interviews_sequence)})"
+    }
