@@ -89,6 +89,29 @@ services:
       - VITE_API_URL=http://84.16.230.94:8017/api/v1
     volumes:
       - ./frontend/public:/app/public
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11439:11439"  # Correct internal and external port
+    environment:
+      - OLLAMA_HOST=0.0.0.0:11439  # Ensure Ollama binds to correct port
+    volumes:
+      - ./ollama-data:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    entrypoint: ["sh", "-c", "ollama serve & sleep 5 && ollama run qwen3:8b && tail -f /dev/null"]
+    restart: unless-stopped
+
+
 volumes:
   local_pgdata:
   pgadmin-data:
+  ollama_data:
+    name: ollama_data

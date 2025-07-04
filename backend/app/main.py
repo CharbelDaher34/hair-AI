@@ -33,6 +33,7 @@ from api.v1.endpoints import (
     scripts,
     analytics,
     chatbot,
+    ai_interviewer,
 )
 # from api.v1.endpoints import auth as auth_router
 
@@ -192,6 +193,9 @@ app.add_middleware(
     allow_methods=["*"],  # Or specify methods: ["GET", "POST", "PUT", "DELETE"]
     allow_headers=["*"],  # Or specify headers
 )
+# Include AI interviewer router BEFORE auth middleware (no auth required for candidates)
+app.include_router(ai_interviewer.router, prefix="/api/v1/ai-interviewer", tags=["ai-interviewer"])
+
 # Add AuthMiddleware - this should generally be after CORS but before most route-specific logic
 app.add_middleware(AuthMiddleware)
 

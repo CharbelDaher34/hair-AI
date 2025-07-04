@@ -416,6 +416,17 @@ class CandidateBase(TimeBase):
     parsed_resume: Optional[CandidateResume] = Field(
         default=None, sa_column=Column(JSON)
     )
+    def get_candidate_data(self):
+        return f"""
+        Candidate ID: {self.id}
+        Full Name: {self.full_name}
+        Email: {self.email}
+        Phone: {self.phone}
+        Resume URL: {self.resume_url}
+        Parsed Resume: {self.parsed_resume}
+        Created At: {self.created_at.strftime("%B %d, %Y at %I:%M %p") if self.created_at else "Not available"}
+        Updated At: {self.updated_at.strftime("%B %d, %Y at %I:%M %p") if self.updated_at else "Not available"}
+        """
 
 
 class Candidate(CandidateBase, table=True):
@@ -528,6 +539,13 @@ class MatchBase(TimeBase):
     flags: Optional[Dict] = Field(default=None, sa_column=Column(JSON))
 
     analysis: Optional[str] = Field(default=None)
+    
+    # AI Interview Report
+    ai_interview_report: Optional[Dict] = Field(
+        default=None, 
+        sa_column=Column(JSON),
+        description="Complete AI interview report including questions, answers, evaluations, and final scores"
+    )
 
 
 class Match(MatchBase, table=True):

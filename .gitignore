@@ -214,3 +214,6 @@ dist-ssr
 resumes/*
 backend/app/resumes/*
 *.json
+ollama-data/*
+backend/app/alembic.ini
+backend/app/alembic/*

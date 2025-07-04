@@ -24,6 +24,7 @@ PUBLIC_PATHS_PREFIXES = [
     "/api/v1/applications",  # Public application creation
     "/api/v1/interviews/review-form",
     "/api/v1/interviews/submit-review",
+    "/api/v1/ai-interviewer",
 ]
 
 # Define paths that require authentication
