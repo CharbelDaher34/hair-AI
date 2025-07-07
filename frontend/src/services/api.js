@@ -577,9 +577,12 @@ class ApiService {
 
   // Interview endpoints
   async createInterview(interviewData) {
-    return this.request('/interviews/', {
+    const { is_ai_interview, ...restData } = interviewData;
+    const queryParams = is_ai_interview ? '?ai_interview=true' : '';
+    
+    return this.request(`/interviews/${queryParams}`, {
       method: 'POST',
-      body: JSON.stringify(interviewData),
+      body: JSON.stringify(restData),
     });
   }
 

@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 from crud import crud_interview, crud_job, crud_application
-from schemas import (
+from schemas.interview import (
     InterviewCreate,
     InterviewUpdate,
     InterviewRead,
@@ -36,6 +36,7 @@ def create_interview(
     *,
     db: Session = Depends(get_session),
     interview_in: InterviewCreate,
+    ai_interview : bool = False,
     request: Request,
 ) -> Any:
     """
@@ -44,10 +45,9 @@ def create_interview(
     current_user: Optional[TokenData] = request.state.user
     if not current_user:
         raise HTTPException(status_code=401, detail="Unauthorized")
-
     if not interview_in.interviewer_id:
         interview_in.interviewer_id = current_user.employer_id
-    interview = crud_interview.create_interview(db=db, obj_in=interview_in)
+    interview = crud_interview.create_interview(db=db, obj_in=interview_in, ai_interview=ai_interview)
     return interview
 
 

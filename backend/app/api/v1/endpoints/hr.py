@@ -4,7 +4,7 @@ from sqlmodel import Session
 
 from core.database import get_session
 from crud import crud_hr
-from schemas import HRCreate, HRUpdate, HRRead
+from schemas.hr import HRCreate, HRUpdate, HRRead
 from core.security import TokenData  # For type hinting
 import logging
 from core.dependencies import get_current_user

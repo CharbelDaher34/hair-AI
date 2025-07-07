@@ -1,13 +1,13 @@
 from __future__ import annotations
 import secrets, asyncio, logging, json
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from enum import Enum
 from typing import Union
 from contextlib import contextmanager
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, APIRouter
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, APIRouter, Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, RunContext
@@ -653,6 +653,13 @@ live_interview_graph = Graph(
     ]
 )
 
+## display the graph
+live_interview_graph.mermaid_save(
+    "interview_workflow.png",
+    start_node=AskQuestion
+)
+logger.info("✅ Interview graph diagram saved as interview_workflow.png")
+    
 # ───────── FASTAPI APP ─────────
 router = APIRouter()
 sessions: dict[str, InterviewState] = {}
@@ -1494,8 +1501,47 @@ HTML_INTERFACE = """
 """
 
 @router.get('/interview/{interview_id}', response_class=HTMLResponse)
-async def get_interview_page(interview_id: int):
-    return HTML_INTERFACE
+async def get_interview_page(interview_id: int, request: Request):
+    with next(get_session()) as db:
+        interview = db.get(Interview, interview_id)
+        if not interview:
+            return HTMLResponse("<h2>Interview not found.</h2>", status_code=404)
+        # Check AI interview completion
+        application = db.get(Application, interview.application_id)
+        if not application:
+            return HTMLResponse("<h2>Application not found.</h2>", status_code=404)
+        match = db.exec(select(Match).where(Match.application_id == application.id)).one_or_none()
+        if match and match.ai_interview_report:
+            return HTMLResponse("""
+                <html><head><title>AI Interview Already Completed</title></head>
+                <body style='font-family:sans-serif;text-align:center;padding:40px;'>
+                <h2>✅ AI Interview Already Completed</h2>
+                <p>You have already completed this AI prescreening interview. Thank you!</p>
+                </body></html>
+            """)
+        # Check date window
+        now = datetime.utcnow()
+        interview_start = interview.date
+        interview_end = interview_start + timedelta(days=3)
+        if now < interview_start:
+            return HTMLResponse(f"""
+                <html><head><title>AI Interview Not Yet Open</title></head>
+                <body style='font-family:sans-serif;text-align:center;padding:40px;'>
+                <h2>⏳ AI Interview Not Yet Open</h2>
+                <p>Your AI interview will open on <b>{interview_start.strftime('%B %d, %Y at %I:%M %p UTC')}</b>.</p>
+                <p>Please return after this time to complete your prescreening interview.</p>
+                </body></html>
+            """)
+        if now >= interview_end:
+            return HTMLResponse(f"""
+                <html><head><title>AI Interview Window Closed</title></head>
+                <body style='font-family:sans-serif;text-align:center;padding:40px;'>
+                <h2>🚫 AI Interview Window Closed</h2>
+                <p>The window to complete this AI prescreening interview has passed.</p>
+                <p>The interview was available from <b>{interview_start.strftime('%B %d, %Y at %I:%M %p UTC')}</b> to <b>{interview_end.strftime('%B %d, %Y at %I:%M %p UTC')}</b>.</p>
+                </body></html>
+            """)
+        return HTML_INTERFACE
 
 @router.websocket('/ws/interview/{interview_id}')
 async def ws_endpoint(websocket: WebSocket, interview_id: int):

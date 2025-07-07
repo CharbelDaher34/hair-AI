@@ -12,6 +12,7 @@ from sqlmodel import Session, select
 from sqlalchemy import text
 
 
+
 def test_data_without_rls():
     """Test what data exists in the database without RLS restrictions"""
     print("=== Testing data WITHOUT RLS (using admin connection) ===")

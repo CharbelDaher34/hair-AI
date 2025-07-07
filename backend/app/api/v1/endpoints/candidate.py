@@ -297,7 +297,7 @@ You should extract:
                         )
                         break  # Exit retry loop if candidate is missing
                     crud_candidate.update_candidate(
-                        session, db_candidate=candidate, candidate_in=parsed_result
+                        session, db_candidate=candidate, candidate_in={"parsed_resume": parsed_result}
                     )
                 logger.info("Database updated for candidate %s", candidate_id)
                 break  # Exit retry loop on success

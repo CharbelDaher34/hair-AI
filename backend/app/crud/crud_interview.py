@@ -28,7 +28,7 @@ def _log_info(*values: object, **_: object) -> None:
 print = _log_info  # type: ignore
 
 
-async def _send_interview_email(interview: Interview, action: str, db: Session) -> None:
+async def _send_interview_email(interview: Interview, action: str, db: Session, ai_interview: bool = False) -> None:
     """
     Send email notification for interview operations to both candidate and interviewer.
 
@@ -68,16 +68,18 @@ async def _send_interview_email(interview: Interview, action: str, db: Session) 
         interview_date = interview.date.strftime("%B %d, %Y at %I:%M %p")
 
         # Send email to candidate
-        await _send_candidate_interview_email(
-            interview, action, candidate, job, interview_date
-        )
-
-        # Send email to interviewer if exists
-        if interview.interviewer:
-            await _send_interviewer_interview_email(
+        if not ai_interview:
+            await _send_candidate_interview_email(
                 interview, action, candidate, job, interview_date
             )
 
+            # Send email to interviewer if exists
+            if interview.interviewer:
+                await _send_interviewer_interview_email(
+                    interview, action, candidate, job, interview_date
+                )
+        elif ai_interview:
+            await _send_ai_interview_email(interview, action, candidate, job, interview_date)
     except Exception as e:
         # Log error but don't fail the operation
         print(f"Failed to send interview email: {str(e)}")
@@ -292,7 +294,7 @@ async def _send_candidate_interview_email(
 
 
 async def _send_interviewer_interview_email(
-    interview: Interview, action: str, candidate, job, interview_date: str
+    interview: Interview, action: str, candidate, job, interview_date: str, ai_interview: bool = False
 ) -> None:
     """Send interview notification email to the interviewer."""
 
@@ -595,9 +597,108 @@ async def _send_interviewer_interview_email(
             cleanup_temp_file(temp_file)
 
 
-def create_interview(db: Session, *, obj_in: InterviewCreate) -> Interview:
-    db_obj = Interview(**obj_in.model_dump())
+async def _send_ai_interview_email(interview: Interview, action: str, candidate, job, interview_date: str) -> None:
+    from datetime import datetime, timedelta
+    company_name = job.employer.name if job.employer else "Company"
+    subject = f"AI Prescreening Interview Scheduled - {job.title} at {company_name}"
 
+    dt = datetime.strptime(interview_date, "%B %d, %Y at %I:%M %p")
+    ai_window_date = (dt + timedelta(days=3)).strftime("%B %d, %Y at %I:%M %p")
+    interview_link = f"http://84.16.230.94:8017/api/v1/ai-interviewer/interview/{interview.id}"
+
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset='utf-8'>
+        <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+        <title>AI Prescreening Interview</title>
+        <style>
+            body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f8f9fa; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }}
+            .container {{ background: #fff; padding: 40px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.08); }}
+            .header {{ text-align: center; margin-bottom: 30px; }}
+            .logo {{ font-size: 24px; font-weight: bold; color: #6366f1; margin-bottom: 10px; }}
+            .title {{ font-size: 26px; font-weight: bold; color: #1f2937; margin-bottom: 10px; }}
+            .subtitle {{ color: #6b7280; font-size: 16px; }}
+            .details {{ background: #f3f4f6; padding: 25px; border-radius: 10px; margin: 25px 0; }}
+            .detail-row {{ display: flex; justify-content: space-between; margin-bottom: 10px; padding: 8px 0; border-bottom: 1px solid #e5e7eb; }}
+            .detail-label {{ font-weight: bold; color: #374151; }}
+            .detail-value {{ color: #6b7280; }}
+            .cta-btn {{ display: inline-block; background: #6366f1; color: #fff; padding: 14px 28px; border-radius: 8px; font-size: 18px; font-weight: bold; text-decoration: none; margin: 30px 0 10px 0; transition: background 0.2s; }}
+            .cta-btn:hover {{ background: #4338ca; }}
+            .footer {{ text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 14px; }}
+        </style>
+    </head>
+    <body>
+        <div class='container'>
+            <div class='header'>
+                <div class='logo'>🏢 {company_name}</div>
+                <h1 class='title'>AI Prescreening Interview</h1>
+                <p class='subtitle'>Hello {candidate.full_name},</p>
+            </div>
+            <div class='details'>
+                <div class='detail-row'><span class='detail-label'>Position:</span><span class='detail-value'>{job.title}</span></div>
+                <div class='detail-row'><span class='detail-label'>Company:</span><span class='detail-value'>{company_name}</span></div>
+                <div class='detail-row'><span class='detail-label'>AI Interview Opens:</span><span class='detail-value'>{interview_date}</span></div>
+                <div class='detail-row'><span class='detail-label'>AI Interview Closes:</span><span class='detail-value'>{ai_window_date}</span></div>
+            </div>
+            <p style='font-size: 16px; color: #374151; margin-top: 20px;'>
+                We are excited to invite you to a <strong>prescreening interview with our AI system</strong> as part of the hiring process for <strong>{job.title}</strong> at <strong>{company_name}</strong>.
+            </p>
+            <p style='font-size: 15px; color: #4b5563;'>
+                You can complete this interview at your convenience any time between the opening and closing dates above. Please ensure you complete the interview before the closing date.
+            </p>
+            <div style='text-align:center;'>
+                <a href='{interview_link}' class='cta-btn' target='_blank'>Start AI Interview</a>
+                <div style='margin-top:8px; font-size:13px; color:#6b7280;'>If the button does not work, copy and paste this link into your browser:<br><span style='word-break:break-all;'>{interview_link}</span></div>
+            </div>
+            <p style='font-size: 15px; color: #4b5563;'>
+                Good luck! We look forward to your responses.
+            </p>
+            <div class='footer'>
+                <p>This is an automated message. Please contact HR if you have any questions.</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
+    text_content = f"""
+    AI Prescreening Interview - {company_name}
+
+    Hello {candidate.full_name},
+
+    You have been invited to a prescreening interview with our AI system for the position of {job.title} at {company_name}.
+
+    Interview Window:
+    - Opens: {interview_date}
+    - Closes: {ai_window_date}
+
+    Interview Link: {interview_link}
+
+    You can complete this interview at your convenience any time between the opening and closing dates above. Please ensure you complete the interview before the closing date.
+
+    Good luck! We look forward to your responses.
+
+    Please contact HR if you have any questions.
+    This is an automated message.
+    """
+
+    await email_service.send_email(
+        to_email=candidate.email,
+        subject=subject,
+        html_content=html_content,
+        text_content=text_content,
+    )
+
+
+def create_interview(db: Session, *, obj_in: InterviewCreate, ai_interview: bool = False) -> Interview:
+    db_obj = Interview(**obj_in.model_dump())
+    if ai_interview:
+        logger.info(f"Creating AI interview for application {obj_in.application_id}")
+        db_obj.interviewer_id = None
+        db_obj.status = InterviewStatus.SCHEDULED
+        db_obj.category = "ai"
     db.add(db_obj)
     db.commit()
     db.refresh(db_obj)
@@ -606,7 +707,7 @@ def create_interview(db: Session, *, obj_in: InterviewCreate) -> Interview:
     try:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        loop.run_until_complete(_send_interview_email(db_obj, "created", db))
+        loop.run_until_complete(_send_interview_email(db_obj, "created", db, ai_interview=ai_interview))
         loop.close()
     except Exception as e:
         print(f"Failed to send interview creation email: {str(e)}")
@@ -689,7 +790,7 @@ def get_interviews_with_application(
 
 
 def update_interview(
-    db: Session, *, db_obj: Interview, obj_in: InterviewUpdate
+    db: Session, *, db_obj: Interview, obj_in: InterviewUpdate, ai_interview: bool = False
 ) -> Interview:
     obj_data = obj_in.model_dump(exclude_unset=True)
     for field, value in obj_data.items():
@@ -702,7 +803,7 @@ def update_interview(
     try:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        loop.run_until_complete(_send_interview_email(db_obj, "updated", db))
+        loop.run_until_complete(_send_interview_email(db_obj, "updated", db, ai_interview=ai_interview))
         loop.close()
     except Exception as e:
         print(f"Failed to send interview update email: {str(e)}")

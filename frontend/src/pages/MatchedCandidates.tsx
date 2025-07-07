@@ -13,6 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import apiService from "@/services/api";
 import { toast } from "@/components/ui/sonner";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from "@/components/ui/dialog";
 
 // Interfaces based on your existing structure and potential API responses
 interface Candidate {
@@ -63,6 +64,7 @@ interface MatchedCandidateData {
   resume_url?: string;
   parsed_resume?: any;
   employer_id?: number;
+  ai_interview_report?: any;
 }
 
 interface JobMatchesResponse {
@@ -83,6 +85,8 @@ const MatchedCandidatesPage = () => {
 
   const [score_threshold, set_score_threshold] = useState([70]);
   const [search_term, set_search_term] = useState("");
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [selectedReport, setSelectedReport] = useState<any | null>(null);
 
   useEffect(() => {
     console.log("useEffect triggered, job_id:", job_id);
@@ -433,6 +437,17 @@ const MatchedCandidatesPage = () => {
                       >
                         <Calendar className="h-5 w-5" />
                       </Button>
+                      {mc.ai_interview_report && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-purple-600 hover:text-purple-800 hover:bg-purple-100 rounded-full p-2 transition-all duration-150"
+                          title="View AI Interview Report"
+                          onClick={() => { setSelectedReport(mc.ai_interview_report); setShowReportModal(true); }}
+                        >
+                          <Star className="h-5 w-5" />
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -467,6 +482,82 @@ const MatchedCandidatesPage = () => {
           </CardContent>
         </Card>
       )}
+      <Dialog open={showReportModal} onOpenChange={setShowReportModal}>
+        <DialogContent className="max-w-3xl w-full">
+          <DialogHeader>
+            <DialogTitle>AI Interview Report</DialogTitle>
+            <DialogDescription>
+              Detailed analysis and insights from the candidate's AI interview.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedReport && (
+            <div className="space-y-6">
+              {/* Summary Section */}
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
+                <div className="bg-white rounded-lg p-4 shadow text-center">
+                  <div className="text-xs text-gray-500 mb-1">Overall Score</div>
+                  <div className="text-2xl font-bold text-blue-700">{selectedReport.overall_score?.toFixed(1)}</div>
+                </div>
+                <div className="bg-white rounded-lg p-4 shadow text-center">
+                  <div className="text-xs text-gray-500 mb-1">Technical</div>
+                  <div className="text-xl font-semibold text-blue-600">{selectedReport.technical_score?.toFixed(1)}</div>
+                </div>
+                <div className="bg-white rounded-lg p-4 shadow text-center">
+                  <div className="text-xs text-gray-500 mb-1">Communication</div>
+                  <div className="text-xl font-semibold text-blue-600">{selectedReport.communication_score?.toFixed(1)}</div>
+                </div>
+                <div className="bg-white rounded-lg p-4 shadow text-center">
+                  <div className="text-xs text-gray-500 mb-1">Duration</div>
+                  <div className="text-lg font-medium text-gray-700">{selectedReport.duration?.split(".")[0]}</div>
+                </div>
+                <div className="bg-white rounded-lg p-4 shadow text-center">
+                  <div className="text-xs text-gray-500 mb-1">Questions</div>
+                  <div className="text-lg font-medium text-gray-700">{selectedReport.turns?.length || 0}</div>
+                </div>
+              </div>
+              {/* Per-question breakdown */}
+              <div className="space-y-4">
+                {selectedReport.turns?.map((turn: any, idx: number) => (
+                  <div key={idx} className="bg-slate-50 rounded-lg p-4 shadow">
+                    <div className="font-semibold text-blue-700 mb-2">Question {idx + 1}: {turn.question}</div>
+                    <div className="mb-2"><span className="font-medium text-gray-700">Candidate's Answer:</span> <span className="text-gray-800">{turn.candidate_answer}</span></div>
+                    {turn.followup_question && turn.followup_answer && (
+                      <div className="mb-2">
+                        <div className="font-medium text-purple-700">Follow-up: {turn.followup_question}</div>
+                        <div className="text-gray-800">{turn.followup_answer}</div>
+                      </div>
+                    )}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-2">
+                      <div className="text-xs text-gray-500">Response Time: <span className="font-medium text-gray-700">{turn.response_time_seconds?.toFixed(1)}s</span></div>
+                      {turn.followup_response_time_seconds && <div className="text-xs text-gray-500">Follow-up Time: <span className="font-medium text-gray-700">{turn.followup_response_time_seconds?.toFixed(1)}s</span></div>}
+                      <div className="text-xs text-gray-500">Paste: {turn.paste_count || 0}, Copy: {turn.copy_count || 0}, Tab: {turn.tab_switch_count || 0}</div>
+                    </div>
+                    {selectedReport.evaluations && selectedReport.evaluations[idx] && (
+                      <div className="bg-white rounded p-3 mt-2">
+                        <div className="font-medium text-blue-800 mb-1">Evaluation</div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                          <div className="text-xs text-gray-500">Technical: <span className="font-semibold text-blue-700">{selectedReport.evaluations[idx].technical_score}/100</span></div>
+                          <div className="text-xs text-gray-500">Communication: <span className="font-semibold text-blue-700">{selectedReport.evaluations[idx].communication_score}/100</span></div>
+                          <div className="text-xs text-gray-500">Combined: <span className="font-semibold text-blue-700">{((selectedReport.evaluations[idx].technical_score + selectedReport.evaluations[idx].communication_score)/2).toFixed(1)}/100</span></div>
+                        </div>
+                        <div className="mt-2 text-xs text-gray-700"><b>Feedback:</b> {selectedReport.evaluations[idx].feedback}</div>
+                        <div className="mt-1 grid grid-cols-2 gap-2">
+                          <div><b>Strengths:</b> <ul className="list-disc ml-4">{selectedReport.evaluations[idx].strengths?.map((s: string, i: number) => <li key={i}>{s}</li>)}</ul></div>
+                          <div><b>Improvements:</b> <ul className="list-disc ml-4">{selectedReport.evaluations[idx].improvements?.map((s: string, i: number) => <li key={i}>{s}</li>)}</ul></div>
+                        </div>
+                      </div>
+                    )}
+                    <div className="mt-2">
+                      <span className="font-medium text-gray-700">Ideal Answer:</span>
+                      <pre className="bg-slate-100 rounded p-2 text-xs text-gray-700 whitespace-pre-wrap">{turn.ideal_answer}</pre>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
