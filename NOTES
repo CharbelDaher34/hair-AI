@@ -10,3 +10,6 @@ report structure:
 
 -chapter2: system design + data structure
 -chapter3: hair implementation and results
+
+
+add the ai report to the application page and add the button to schedule an interview from there, add the ai interview scheduling when editing the interview in the forntned, add teh reprot to the matched candidates section, give 3 days for the ai interviewer

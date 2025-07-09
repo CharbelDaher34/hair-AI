@@ -1,9 +1,11 @@
 import json
+import sys
 import time
 from datetime import datetime, date
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union, get_args, get_origin
 import inspect
+from pathlib import Path
 
 from llm.llm_agent import LLM
 from elasticsearch import Elasticsearch
@@ -11,6 +13,7 @@ from pydantic import BaseModel, Field, create_model, field_validator, Validation
 
 
 import time
+import asyncio
 
 
 class ElasticsearchModelGenerator:
@@ -277,6 +280,7 @@ class ElasticsearchModelGenerator:
                         else full_field_path
                     )
                     distinct_values = self.get_distinct_field_values(field_path)
+                    print(f"Distinct values for {field_path}: {distinct_values}")
 
                     if distinct_values:
                         # Create enum class name
@@ -775,7 +779,7 @@ Now read the user's question and output **only** the JSON object described above
         """
         if self._llm_client is None:
             self._llm_client = LLM(
-                model="ollama/qwen3:4b",
+                model="ollama/qwen3:8b",
                 result_type=self.generate_filter_model(),
                 system_prompt=self.generate_system_prompt(),
                 api_key="key",
@@ -797,7 +801,7 @@ Now read the user's question and output **only** the JSON object described above
         """
         if self._llm_client is None:
             self._llm_client = LLM(
-                model="ollama/qwen3:8b",
+                model="gemini-2.0-flash",
                 result_type=self.generate_filter_model(),
                 system_prompt=self.generate_system_prompt(),
                 api_key="AIzaSyDp8n_AmYsspADJBaNpkJvBdlch1-9vkhw",
@@ -970,56 +974,171 @@ Now read the user's question and output **only** the JSON object described above
             
         return response
 
+    def debug_category_fields(self) -> Dict[str, Any]:
+        """
+        Debug method to show which category fields are being processed and their enum values.
+        
+        Returns:
+            Dictionary containing debug information about category fields
+        """
+        debug_info = {
+            "configured_category_fields": self.category_fields,
+            "processed_fields": {},
+            "errors": []
+        }
+        
+        try:
+            # Get the mapping to understand field structure
+            properties = self._get_index_mapping()
+            
+            # Check each configured category field
+            for category_field in self.category_fields:
+                try:
+                    # Determine the correct field path for querying
+                    field_path = f"{category_field}.keyword" if "." in category_field else category_field
+                    
+                    # Try to get distinct values
+                    distinct_values = self.get_distinct_field_values(field_path)
+                    
+                    debug_info["processed_fields"][category_field] = {
+                        "field_path_used": field_path,
+                        "distinct_values_found": len(distinct_values),
+                        "sample_values": distinct_values[:5] if distinct_values else [],
+                        "all_values": distinct_values
+                    }
+                    
+                    print(f"✅ Category field '{category_field}' -> {len(distinct_values)} values: {distinct_values[:5]}")
+                    
+                except Exception as e:
+                    error_msg = f"Error processing category field '{category_field}': {str(e)}"
+                    debug_info["errors"].append(error_msg)
+                    print(f"❌ {error_msg}")
+            
+            # Also check what fields exist in the mapping
+            debug_info["available_fields"] = self._get_all_field_paths(properties)
+            
+        except Exception as e:
+            debug_info["errors"].append(f"General error in debug_category_fields: {str(e)}")
+            print(f"❌ General error: {str(e)}")
+        
+        return debug_info
+    
+    def _get_all_field_paths(self, mapping: Dict[str, Any], prefix: str = "") -> List[str]:
+        """Helper method to get all available field paths from mapping."""
+        paths = []
+        
+        for field_name, field_props in mapping.items():
+            full_path = f"{prefix}.{field_name}" if prefix else field_name
+            paths.append(full_path)
+            
+            # If field has properties (nested), recurse
+            if "properties" in field_props:
+                nested_paths = self._get_all_field_paths(field_props["properties"], full_path)
+                paths.extend(nested_paths)
+        
+        return paths
 
-import asyncio
 
-
-async def main(query: str):
+def AppendQueriesToJson(queries: list[str], filename: str = "queries.json") -> None:
+    """Append queries with their filters and elastic queries to JSON file using async processing."""
     client = ElasticsearchModelGenerator(
         index_name="user_transactions",
         category_fields=[
             "card_kind",
-            "card_type",
+            "card_type", 
             "transaction.receiver.category_type",
+            "transaction.receiver.location",
+            "transaction.type",
+            "transaction.currency"
         ],
         fields_to_ignore=["user_id", "card_number"],
     )
-    
-    # Get complete results from database
-    result = await client.QueryFromNaturalLanguageAsync(query, execute=True, size=10)
-    
-    print(f"\n=== Query: {query} ===")
-    print(f"\nExtracted Filters:")
-    print(json.dumps(result["extracted_filters"], indent=2))
-    
-    print(f"\nElasticsearch Queries:")
-    for i, eq in enumerate(result["elasticsearch_queries"]):
-        print(f"Query {i+1}:")
-        print(json.dumps(eq, indent=2))
-    
-    if "results" in result:
-        print(f"\nDatabase Results:")
-        for i, res in enumerate(result["results"]):
-            print(f"\nSlice {i+1} - Total Hits: {res['total_hits']}")
-            if "error" in res:
-                print(f"Error: {res['error']}")
-            else:
-                print(f"Documents ({len(res['documents'])}):")
-                for j, doc in enumerate(res['documents'][:3]):  # Show first 3 docs
-                    print(f"  Doc {j+1}: {json.dumps(doc, indent=4, default=str)}")
-                if len(res['documents']) > 3:
-                    print(f"  ... and {len(res['documents']) - 3} more documents")
-    else:
-        print("\nNo results - queries not executed")
+    file_path = Path(filename)
+
+    async def process_query(q: str):
+        # Load existing data for each query
+        existing_data = []
+        if file_path.exists():
+            try:
+                existing_data = json.loads(file_path.read_text())
+            except (json.JSONDecodeError, FileNotFoundError):
+                existing_data = []
+        try:
+            result = await client.QueryFromNaturalLanguageAsync(q, execute=False)
+            new_entry = {
+                "timestamp": datetime.now().isoformat(),
+                "input": q,
+                "filter": result["extracted_filters"],
+                "elastic_query": result["elasticsearch_queries"],
+                "status": "success"
+            }
+            print(f"✅ Processed: {q}")
+        except Exception as e:
+            new_entry = {
+                "timestamp": datetime.now().isoformat(),
+                "input": q,
+                "filter": None,
+                "elastic_query": None,
+                "status": "error",
+                "error": str(e)
+            }
+            print(f"❌ Error processing: {q} - {e}")
+        existing_data.append(new_entry)
+        file_path.write_text(json.dumps(existing_data, indent=2))
+        print(f"Appended query to {filename}")
+        await asyncio.sleep(2)
+
+    async def process_all():
+        for q in queries:
+            await process_query(q)
+        print(f"Completed processing {len(queries)} queries")
+
+    asyncio.run(process_all())
 
 
-# client.print_model_summary()
+def main(queries: list[str], filename: str = "queries.json") -> None:
+    """Process list of queries and append results to JSON file using async processing."""
+    AppendQueriesToJson(queries, filename)
+
 
 if __name__ == "__main__":
-    # asyncio.run(main("what did my income change between july and august last year?"))
-
-    asyncio.run(
-        main("what are my spendings using my gold card vs card kind credit?")
-    )
-
-# client.print_model_summary()
+    if len(sys.argv) > 1:
+        # Command line usage: python elasticsearch_model_generator.py "query1" "query2" ...
+        queries = sys.argv[1:]
+        main(queries, "queries.json")
+    else:
+        # Example queries for testing
+        example_queries = ["Can you show me all my transactions from April 2024?",
+"What deposits have I made recently?",
+"How much have I spent on clothing?",
+"What's the total amount I withdrew in May 2024?",
+"Can you give me a breakdown of my spending by category?",
+"What are all the transactions I made at Starbucks?",
+"Which of my transactions were made online?",
+"Can you show me all my transactions from April 2024?",
+"What deposits have I made recently?",
+"How much have I spent on clothing?",
+"What's the total amount I withdrew in May 2024?",
+"Can you give me a breakdown of my spending by category?",
+"What are all the transactions I made at Starbucks?",
+"Which of my transactions were made online?",
+"How many times did I deposit money, and what's the total amount?",
+"Can you show me all my transactions from April 2024?",
+"What deposits have I made recently?",
+"How much have I spent on clothing?",
+"What's the total amount I withdrew in May 2024?",
+"Can you give me a breakdown of my spending by category?",
+"What are all the transactions I made at Starbucks?",
+"Which of my transactions were made online?",
+"How many times did I deposit money, and what's the total amount?",
+"Which of my withdrawals were over $500?",
+"How much have I spent each month?",
+"What are my travel-related transactions?",
+"How much money did I spend in London?",
+"What's the highest single transaction I've made?",
+"List all my subscriptions and how much I've paid for them.",
+"Can you group my transactions by location?",
+"Show me everything I've spent on food and drinks.",
+"What are all my transactions from June 2024?",
+"How much have I spent at restaurants versus cafes?"]
+        main(example_queries, "example_queries.json")
