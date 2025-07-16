@@ -99,7 +99,7 @@ async def match_candidates_endpoint(request: MatchRequest):
             job=job_dict,
             candidates=candidates_dicts,
             weights=request.weights,
-            fuzzy_threshold=request.fuzzy_threshold,
+            fuzzy_threshold=request.fuzzy_threshold or 80.0,
         )
 
         # Convert results to response format

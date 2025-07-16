@@ -52,14 +52,17 @@ def create_job(
 def read_job(
     *, db: Session = Depends(get_session), job_id: int, request: Request
 ) -> JobRead:
+    """
+    Retrieve a job if the current HR's employer owns the job.
+    """
     current_user = get_current_user(request)
     job = crud_job.get_job(db=db, job_id=job_id)
-    if job.recruited_to_id != current_user.employer_id:
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if job.employer_id != current_user.employer_id:
         raise HTTPException(
             status_code=403, detail="You are not authorized to access this job"
         )
-    if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
     return job
 
 
@@ -164,7 +167,6 @@ def get_form_data(
     # Check if user has access to this job
     if (
         job.employer_id != current_user.employer_id
-        and job.recruited_to_id != current_user.employer_id
     ):
         raise HTTPException(
             status_code=403, detail="You are not authorized to access this job"
@@ -215,7 +217,6 @@ def get_job_analytics(
     # Check if user has access to this job
     if (
         job.employer_id != current_user.employer_id
-        and job.recruited_to_id != current_user.employer_id
     ):
         raise HTTPException(
             status_code=403, detail="You are not authorized to access this job"
@@ -268,7 +269,6 @@ def get_job_matches(
     # Check if user has access to this job
     if (
         job.employer_id != current_user.employer_id
-        and job.recruited_to_id != current_user.employer_id
     ):
         raise HTTPException(
             status_code=403, detail="You are not authorized to access this job"
