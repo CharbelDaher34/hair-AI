@@ -21,7 +21,7 @@ dotenv.load_dotenv()
 class LLM:
     def __init__(
         self,
-        result_type: BaseModel,
+        output_type: BaseModel,
         system_prompt: str,
         model_settings: dict = None,
         api_key: str = None,
@@ -44,11 +44,11 @@ class LLM:
         # Default model settings if none provided
         self.model_settings = model_settings or {"temperature": 0.2, "top_p": 0.95}
 
-        self.result_type = result_type
+        self.output_type = output_type
         # Initialize the agent with Candidate as the result type
         self.llm_agent = agent(
             model=model,
-            result_type=self.result_type,
+            output_type=self.output_type,
             system_prompt=system_prompt,
             api_key=self.api_key,
             model_settings=self.model_settings,
@@ -224,7 +224,7 @@ class LLM:
             print("Warning: No processable content found in input_data for parse_async.")
             # Depending on how llm_agent.run handles empty list, this might be fine or might need to return early.
             # To be safe, if strict parsing is required and empty payload is an error:
-            # return self.result_type() # Return default empty model or handle as error
+            # return self.output_type() # Return default empty model or handle as error
             # For now, let it pass to agent.run to see its behavior.
 
         # Process the payload asynchronously
@@ -234,11 +234,11 @@ class LLM:
                  # Return default model instance or specific error response
                 print("parse_async: No data to send to LLM agent after processing inputs.")
                 # This should ideally return what the API expects for an empty/failed parse.
-                # For instance, if result_type is a Pydantic model:
+                # For instance, if output_type is a Pydantic model:
                 try:
-                    return self.result_type() # Return a default-initialized Pydantic model
+                    return self.output_type() # Return a default-initialized Pydantic model
                 except Exception as model_init_e:
-                    print(f"Error initializing default result_type: {model_init_e}")
+                    print(f"Error initializing default output_type: {model_init_e}")
                     return {} # Fallback to empty dict
 
             result = await self.llm_agent.run(payload)
@@ -293,12 +293,12 @@ class LLM:
                 else:
                     print(f"Batch: Unsupported item type: {type(item)} in resume data. Skipping.")
 
-            # Add the processed payload for this resume and its expected result_type to the batch
+            # Add the processed payload for this resume and its expected output_type to the batch
             # If current_resume_payload is empty, the agent will receive an empty list for this item.
             # The agent's batch method should handle empty payloads for individual items gracefully.
             if not current_resume_payload:
                 print(f"Batch: Warning: No processable content for one of the resume inputs. Sending empty payload for this item.")
-            batch_payloads_for_agent.append((current_resume_payload, self.result_type))
+            batch_payloads_for_agent.append((current_resume_payload, self.output_type))
 
         if not batch_payloads_for_agent:
             print("Warning: No valid inputs to process in batch.")

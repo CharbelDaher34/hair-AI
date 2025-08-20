@@ -94,7 +94,7 @@ async def process_uploaded_files(
 #     llm_parser = LLM(
 #         api_key=api_key,
 #         system_prompt=system_prompt, # Use the system_prompt parameter
-#         result_type=schema_model,
+#         output_type=schema_model,
 #     )
 
 #     input_data = []
@@ -148,7 +148,7 @@ async def parse_resume(
     llm_parser = LLM(
         api_key=api_key,
         system_prompt=system_prompt,
-        result_type=schema_model,
+        output_type=schema_model,
     )
 
     processed_inputs = []
@@ -244,7 +244,7 @@ async def batch_parse_resume(
     llm_parser = LLM(
         api_key=api_key,
         system_prompt=first_request.get("system_prompt"),
-        result_type=schema_model,
+        output_type=schema_model,
     )
 
     # Map filename to UploadFile for quick lookup

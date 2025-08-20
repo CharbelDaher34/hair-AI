@@ -6,11 +6,13 @@ readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "aiofiles>=24.1.0",
+    # Pin cmake below 4.0 to keep FindBoost module (needed by camel-kenlm build)
+    "cmake<4.0",
     "camel-kenlm>=2025.4.8",
     "camel-tools>=1.5.2",
     "fastapi>=0.115.12",
     "fuzzywuzzy>=0.18.0",
-    "gliner>=0.2.21",
+    "gliner[tokenizers]>=0.2.21",
     "indic-nlp-library>=0.92",
     "ipython>=9.2.0",
     "janome>=0.5.0",

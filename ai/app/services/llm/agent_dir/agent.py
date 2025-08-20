@@ -13,7 +13,7 @@ class agent:
     def __init__(
         self,
         model: str,
-        result_type: BaseModel,
+        output_type: BaseModel,
         system_prompt: str,
         api_key: str,
         name: Optional[str] = None,
@@ -22,7 +22,7 @@ class agent:
         tools: Optional[List[Any]] = None,
     ):
         self.model = model
-        self.result_type = result_type
+        self.output_type = output_type
         self.system_prompt = system_prompt
         self.name = name
         self.model_settings = model_settings or {}
@@ -55,10 +55,10 @@ class agent:
         else:
             os.environ["OPENAI_API_KEY"] = api_key
 
-    async def run(self, payload, result_type: Optional[BaseModel] = None):
+    async def run(self, payload, output_type: Optional[BaseModel] = None):
         agent = Agent(
             model=self.model,
-            result_type=result_type or self.result_type,
+            output_type=output_type or self.output_type,
             system_prompt=self.system_prompt,
             name=self.name,
             model_settings=self.model_settings,
@@ -83,9 +83,9 @@ class agent:
             try:
                 result = await agent.run(payload)
                 return (
-                    result.data.model_dump()
-                    if hasattr(result.data, "model_dump")
-                    else result.data
+                    result.output.model_dump()
+                    if hasattr(result.output, "model_dump")
+                    else result.output
                 )
             except Exception as e:
                 attempts += 1
@@ -110,7 +110,7 @@ class agent:
     #     """Run the agent with streaming response"""
     #     agent = Agent(
     #         model=self.model,
-    #         result_type=self.result_type,
+    #         output_type=self.output_type,
     #         system_prompt=self.system_prompt,
     #         name=self.name,
     #         model_settings=self.model_settings,
@@ -140,7 +140,7 @@ class agent:
             """Run the agent synchronously"""
             agent = Agent(
                 model=self.model,
-                result_type=self.result_type,
+                output_type=self.output_type,
                 system_prompt=self.system_prompt,
                 name=self.name,
                 model_settings=self.model_settings,
@@ -163,9 +163,9 @@ class agent:
             result = agent.run_sync(payload)
 
             return (
-                result.data.model_dump()
-                if hasattr(result.data, "model_dump")
-                else result.data
+                result.output.model_dump()
+                if hasattr(result.output, "model_dump")
+                else result.output
             )
         except Exception as e:
             if "429" in str(e):
@@ -179,11 +179,11 @@ class agent:
     async def batch(self, batch_inputs: list[tuple[list[Any], BaseModel]]):
         agent_instance = self
 
-        async def run_single(payload, result_type):
-            return await agent_instance.run(payload, result_type)
+        async def run_single(payload, output_type):
+            return await agent_instance.run(payload, output_type)
 
         tasks = [
-            run_single(payload, result_type) for payload, result_type in batch_inputs
+            run_single(payload, output_type) for payload, output_type in batch_inputs
         ]
         results = await asyncio.gather(*tasks)
         return results

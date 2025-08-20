@@ -130,7 +130,7 @@ SCORING GUIDANCE:
 • Technical (70% weight): accuracy, depth, practical insight
 • Communication (30% weight): clarity, structured reasoning, engaging with AI (asking clarifications, logical flow)
 """,
-    result_retries=3
+    retries=3
 )
 
 follow_up_agent = Agent(
@@ -167,7 +167,7 @@ OUTPUT JSON FIELDS:
 - followup_question: string | null (null if needs_followup=false)
 - reason: VERY brief (max 15 words).
 """,
-    result_retries=3
+    retries=3
 )
 
 classification_agent = Agent(
@@ -223,7 +223,7 @@ classification_agent = Agent(
         
         "Maintain a supportive interview environment while ensuring productive conversation flow."
     ),
-    result_retries=3
+    retries=3
 )
 
 # ───────── SHARED STATE ─────────
