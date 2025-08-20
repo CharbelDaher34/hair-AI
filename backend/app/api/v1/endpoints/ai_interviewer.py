@@ -39,8 +39,6 @@ LOCAL_PROVIDER = OpenAIProvider(base_url="http://ollama:11439/v1")
 DEFAULT_MODEL_ID = "ollama/qwen3:8b"
 MODEL_NAME = DEFAULT_MODEL_ID.split("ollama/")[1]
 LOCAL_MODEL = OpenAIModel(model_name=MODEL_NAME, provider=LOCAL_PROVIDER)
-# MODEL_NAME = "mistralai/mistral-small-3.2-24b-instruct:free"
-# LOCAL_MODEL = OpenAIModel(model_name=MODEL_NAME,provider=OpenRouterProvider(api_key="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"))
 # ───────── Pydantic MODELS ─────────
 class ContextSummary(BaseModel):
     summary: str
