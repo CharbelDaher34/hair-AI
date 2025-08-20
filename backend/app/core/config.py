@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     POSTGRES_PORT: int = 5432
     POSTGRES_DB: str
 
+    # Optional aliases / extras coming from .env
+    POSTGRES_HOST: Optional[str] = None  # Some env files use POSTGRES_HOST
+    POSTGRES_HOST_AUTH_METHOD: Optional[str] = None  # Not used in code but allow to avoid validation failure
+
     DATABASE_URL: Optional[PostgresDsn] = None
 
     ADMIN_USER: str
@@ -28,11 +32,16 @@ class Settings(BaseSettings):
     ODBC_USER: Optional[str] = None
     ODBC_PASSWORD: Optional[str] = None
     API_KEY: Optional[str] = None
+    GEMINI_API_KEY: Optional[str] = None  # Accept GEMINI key directly
+    LOGFIRE_TOKEN: Optional[str] = None   # Observability token (optional)
     MAX_LONG_DATA: Optional[int] = None
 
     @model_validator(mode="before")
     def assemble_db_urls(cls, v: Any) -> Any:
         if isinstance(v, dict):
+            # Support POSTGRES_HOST as an alias for POSTGRES_SERVER if provided
+            if not v.get("POSTGRES_SERVER") and v.get("POSTGRES_HOST"):
+                v["POSTGRES_SERVER"] = v.get("POSTGRES_HOST")
             port = v.get("POSTGRES_PORT")
             if port is not None:
                 port = int(port)

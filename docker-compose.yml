@@ -11,6 +11,11 @@ services:
       POSTGRES_DB: matching_db
     volumes:
       - local_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U charbel -d matching_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
   pgadmin:
     image: dpage/pgadmin4
     container_name: pgadmin4_container
@@ -31,32 +36,13 @@ services:
     ports: 
       - "8017:8017"
     depends_on:
-      - ai
-      - db
-    environment:
-      - POSTGRES_USER=app_user
-      - POSTGRES_PASSWORD=a
-      - POSTGRES_DB=matching_db
-      - POSTGRES_PORT=5437
-      - POSTGRES_HOST=db
-      - POSTGRES_HOST_AUTH_METHOD=trust
-      - AI_URL=http://ai:8011
-      - AI_PORT=8011
-      - GEMINI_API_KEY=AIzaSyDp8n_AmYsspADJBaNpkJvBdlch1-9vkhw
-      - LOGFIRE_TOKEN=pylf_v1_us_659r32Hx0CWSbpJFLL6R0xhwm3N1Xjxq99DqYSJBpQWN
-      # Email configuration (replace with your SMTP settings)
-      - SMTP_HOST=smtp.gmail.com
-      - SMTP_PORT=587
-      - SMTP_USERNAME=charbeldaher34@gmail.com
-      - SMTP_PASSWORD=dqfp axar sozd qkps
-      - FROM_EMAIL=charbeldaher34@gmail.com
-      # OTP configuration
-      - OTP_EXPIRE_MINUTES=10
-      - OTP_LENGTH=6
-      # Resume storage configuration
-      - RESUME_STORAGE_DIR=/resumes
-      - ADMIN_USER=charbel
-      - ADMIN_PASSWORD=charbel
+      db:
+        condition: service_healthy
+      ai:
+        condition: service_started
+    # Load environment variables from backend .env file
+    env_file:
+      - ./backend/app/.env
     volumes:
       - ./backend/app/static:/static
       - ./backend/app/resumes:/resumes
@@ -68,8 +54,9 @@ services:
     restart: on-failure
     ports: 
       - "8015:8011"
-    environment:
-      - API_KEY=AIzaSyDp8n_AmYsspADJBaNpkJvBdlch1-9vkhw
+    # Load environment variables from ai .env file
+    env_file:
+      - ./ai/app/.env
     volumes:
       - ./ai/app/static:/app/static
   frontend:
